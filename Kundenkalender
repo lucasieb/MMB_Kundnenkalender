@@ -17,6 +17,7 @@
     --mmb-accent-500:#0284c7;
     --mmb-muted:#4a4a4a;  /* Pane rechts */
     --mmb-border:#555;
+    --mmb-badge-width:calc(5ch + 1rem);
   }
 
   /* Basis */
@@ -82,13 +83,15 @@
   .mmb-day::before,
   .mmb-pill-add{
     position:absolute; top:6px; left:50%; transform:translateX(-50%);
-    display:inline-block; padding:.12rem .58rem; border-radius:999px; border:1px solid var(--mmb-border);
-    font-size:.72rem; font-weight:400; letter-spacing:.01em; line-height:1; min-width:74px; text-align:center;
+    display:inline-flex; align-items:center; justify-content:center;
+    padding:.12rem .45rem; border-radius:999px; border:1px solid var(--mmb-border);
+    font-size:.72rem; font-weight:400; letter-spacing:.01em; line-height:1;
+    width:var(--mmb-badge-width); min-width:var(--mmb-badge-width); text-align:center; white-space:nowrap;
   }
   /* Start/Ende (dunkel) */
   .mmb-day::before{ content: attr(data-badge); background:#3a3a3a; color:var(--mmb-light); }
   .mmb-day[data-badge=""]::before{content:"";display:none;}
-  /* Hinzufügen (hell) */
+  /* Erweiterungsschaltfläche (hell) */
   .mmb-pill-add{ background:#fff; color:#111; display:none; cursor:pointer; }
   .mmb-day[data-extend="1"] .mmb-pill-add{display:inline-block;}
 
@@ -292,7 +295,7 @@ class Calendar{
             const blocked=(day.date<new Date().setHours(0,0,0,0))?' mmb-day--blocked':'';
             return `<div class="mmb-day${other}${blocked}" data-date="${key}" data-price="" data-badge="">
                       <span class="num">${day.date.getDate()}</span>
-                      <button class="mmb-pill-add" type="button" data-act="extend" data-date="${key}">Hinzufügen</button>
+                      <button class="mmb-pill-add" type="button" data-act="extend" data-date="${key}" aria-label="Zeitraum verlängern">+</button>
                     </div>`;
           }).join('')}
         </div>
