@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kundenkalender – MietMichBox</title>
+  <style>
+    :root{
+      /* Farbcodes an dein Theme angelehnt */
+      --bg: #2f2f31;
+      --bg-2: #3b3b3e;
+      --bg-3: #1f1f21;
+      --text: #e8e8e8;
+      --muted: #bdbdbf;
+      --line: #454547;
+      --chip-bg: #0ea5e9;      /* dein Blau für aktive Felder */
+      --chip-text: #ffffff;
+      --white: #ffffff;
+      --accent: #139be8;       /* Button blau */
+      --ok: #10b981;
+      --danger: #ef4444;
+      --radius-lg: 14px;
+      --radius-md: 12px;
+      --radius-sm: 8px;
+
+      --font: ui-rounded, "Poppins", system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif;
+      --fs-0: 12px;
+      --fs-1: 14px;
+      --fs-2: 16px;
+      --fs-3: 18px;
+      --fs-4: 20px;
+    }
+
+    html, body { background: #efefe6; margin: 0; padding: 0; }
+    .page { max-width: 1180px; margin: 12px auto 32px; padding: 0 12px; }
+
+    .widget {
+      background: var(--bg);
+      color: var(--text);
+      border-radius: var(--radius-lg);
+      overflow: hidden; /* oben & unten gleich rund */
+      padding: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,.25);
+      font-family: var(--font);
+    }
+
+    /* Header: Produkt-Tabs + Monat */
+    .header { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: center; margin-bottom: 10px; }
+    .products {
+      display: flex; gap: 10px; overflow-x: auto; -webkit-overflow-scrolling: touch;
+      padding-bottom: 2px;
+    }
+    .products::-webkit-scrollbar{ height:6px }
+    .products button {
+      flex:0 0 auto;
+      min-width: 140px; height: 56px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--line);
+      background: var(--bg-2);
+      color: var(--text);
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .products button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+    .monthbar { display: contents; }
+    .monthbar .prev { justify-self: start; }
+    .monthbar .next { justify-self: end; }
+    .monthbar .title { justify-self: center; font-weight: 700; font-size: var(--fs-3); }
+
+    .iconbtn {
+      width: 36px; height: 36px; border-radius: var(--radius-sm);
+      border: 1px solid var(--line); background: var(--bg-2); color: var(--text);
+      display: grid; place-items: center; cursor: pointer; font-weight: 700;
+    }
+
+    /* Layout: Kalender links, Formular rechts (Desktop) */
+    .grid {
+      display: grid; grid-template-columns: 2fr 1.2fr; gap: 16px;
+    }
+
+    /* Kalender */
+    .cal-box {
+      background: var(--bg-2);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      padding: 10px;
+    }
+    .dow {
+      display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; margin-bottom: 6px;
+      font-size: var(--fs-1); color: var(--muted);
+    }
+    .dow div { text-align: center; padding: 10px 0; background: transparent; }
+
+    .calendar {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 2px;
+    }
+
+    .day {
+      position: relative;
+      background: var(--bg-3);
+      border-radius: 6px;
+      min-height: 88px;    /* Desktop */
+      display: grid; grid-template-rows: auto 1fr auto; align-items: start;
+      padding: 6px;
+      box-sizing: border-box;
+      overflow: hidden;
+    }
+    .day.past { opacity: .45; pointer-events: none; }
+    .day .num { font-size: var(--fs-1); color: var(--text); opacity: .8; }
+    .day .price { align-self: end; text-align: center; font-weight: 700; color: var(--text); opacity: .9; padding: 6px 0; }
+
+    /* Range-Highlight */
+    .day.in-range { background: #0ea5e92b; }
+    .day.start, .day.end { background: var(--chip-bg); color: var(--chip-text); }
+    .day.start .num, .day.end .num { color: var(--chip-text); opacity: 1; }
+
+    /* Chips oben (Start / Ende / +) – Breite nach Wortlänge */
+    .chips { position: absolute; top: 6px; left: 6px; right: 6px; display: flex; gap: 6px; align-items: center; }
+    .chip {
+      height: 24px; padding: 0 10px; border-radius: 12px; line-height: 24px;
+      font-size: var(--fs-0); font-weight: 700; background: #ffffff; color: #111;
+      width: fit-content; min-width: auto; white-space: nowrap; border: 1px solid rgba(0,0,0,.08);
+      box-shadow: 0 1px 0 rgba(0,0,0,.12);
+    }
+    .chip.add { cursor: pointer; user-select: none; }
+    .day.start .chip.label{ background:#fff; }
+    .day.end .chip.label{ background:#fff; }
+
+    /* Formular */
+    .form {
+      background: var(--bg-2);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      padding: 12px;
+    }
+    .card {
+      background: #2d2d30;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+    .form h3 { margin: 0 0 10px; font-size: var(--fs-4); }
+    .row { display: grid; gap: 8px; margin-bottom: 8px; }
+    .input, textarea, select {
+      width: 100%; box-sizing: border-box;
+      border: 1px solid var(--line); background: #1f1f21; color: var(--text);
+      border-radius: 10px; height: 44px; padding: 8px 12px; font-size: var(--fs-2);
+    }
+    textarea { height: 120px; resize: vertical; }
+
+    .consent {
+      display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start;
+      font-size: var(--fs-1);
+    }
+    .submit {
+      background: var(--accent); color: #fff; border: none; height: 46px;
+      border-radius: 12px; font-weight: 800; cursor: pointer; width: 100%;
+    }
+
+    .mini {
+      color: var(--muted); font-size: var(--fs-1); margin-top: 6px;
+    }
+
+    /* Mobile */
+    @media (max-width: 900px){
+      .grid { grid-template-columns: 1fr; }
+      .day { min-height: 72px; }
+      .form { padding: 10px 10px 14px; }
+      .page { padding: 0 8px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="widget" id="kundenkalender">
+      <div class="header">
+        <div class="products" id="products">
+          <button class="active" data-product="marshall">Marshall Bromley 750</button>
+          <button data-product="teufel">Teufel Rockster Neo</button>
+          <button data-product="soundboks">Soundboks 4</button>
+        </div>
+        <div class="monthbar">
+          <button class="iconbtn prev" id="prevBtn">←</button>
+          <div class="title" id="monthTitle">September 2025</div>
+          <button class="iconbtn next" id="nextBtn">→</button>
+        </div>
+      </div>
+
+      <div class="grid">
+        <!-- Kalender -->
+        <section class="cal-box">
+          <div class="dow">
+            <div>Mo</div><div>Di</div><div>Mi</div><div>Do</div><div>Fr</div><div>Sa</div><div>So</div>
+          </div>
+          <div class="calendar" id="calendar"></div>
+        </section>
+
+        <!-- Formular -->
+        <aside class="form" id="form">
+          <h3>Buchungsanfrage</h3>
+
+          <div class="card" id="summary">
+            <div style="display:grid;grid-template-columns:1fr auto;gap:6px 10px;">
+              <div>Original (ohne Rabatt)</div><div id="sumOriginal">–</div>
+              <div>Rabatt (35%)</div><div id="sumDiscount">–</div>
+              <div style="font-weight:800">Gesamt</div><div id="sumTotal" style="font-weight:800">–</div>
+              <div>Ø pro Tag</div><div id="sumAvg">–</div>
+              <div>Kaution</div><div>gratis</div>
+            </div>
+          </div>
+
+          <div class="row"><input class="input" placeholder="Name *" required></div>
+          <div class="row"><input class="input" type="email" placeholder="E-Mail *" required></div>
+          <div class="row"><input class="input" placeholder="Telefon"></div>
+          <div class="row"><textarea placeholder="Anmerkungen"></textarea></div>
+
+          <div class="row consent">
+            <input type="checkbox" id="agb" aria-label="AGB & Datenschutz akzeptieren">
+            <label for="agb">Ich akzeptiere <a href="#" style="color:#8cc6ff">AGB</a> &amp; <a href="#" style="color:#8cc6ff">Datenschutz</a> *</label>
+          </div>
+
+          <div class="row"><button class="submit">Buchungsanfrage senden</button></div>
+
+          <div class="mini" id="selLabel">Bitte Zeitraum wählen</div>
+        </aside>
+      </div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  // ===== Grunddaten (Demo) –> an deine Datenquelle koppelbar =====
+  const state = {
+    product: 'marshall',
+    view: new Date(2025, 8, 1), // September 2025 (Monatsindex 0-basiert)
+    start: null,
+    end: null,
+    prices: { // Ø Tagespreis (Demo)
+      marshall: 30,
+      teufel: 20,
+      soundboks: 35
+    },
+    disabled: new Set([
+      // Beispiel: yyyy-mm-dd als gesperrt
+      // '2025-09-12'
+    ])
+  };
+
+  const elCal  = document.getElementById('calendar');
+  const title  = document.getElementById('monthTitle');
+  const selLbl = document.getElementById('selLabel');
+  const prevBtn= document.getElementById('prevBtn');
+  const nextBtn= document.getElementById('nextBtn');
+
+  // Utils
+  const pad = n => String(n).padStart(2,'0');
+  const keyOf = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  const isPast = (d) => {
+    const today = new Date(); today.setHours(0,0,0,0);
+    const dd = new Date(d); dd.setHours(0,0,0,0);
+    return dd < today;
+  };
+
+  function sameDay(a,b){ return a && b && a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate(); }
+  function inRange(d,a,b){ if(!a||!b) return false; const x=d.getTime(), s=a.getTime(), e=b.getTime(); return x>=s && x<=e; }
+
+  function render(){
+    // Monatstitel
+    const m = state.view.getMonth();
+    const y = state.view.getFullYear();
+    const germanMonths = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+    title.textContent = `${germanMonths[m]} ${y}`;
+
+    // Start bei Monatsanfang 1
+    const first = new Date(y, m, 1);
+    const startWeekday = (first.getDay() + 6) % 7; // Mo=0 … So=6
+    const daysInMonth = new Date(y, m+1, 0).getDate();
+
+    elCal.innerHTML = '';
+
+    // Leere vor dem 1.
+    for(let i=0; i<startWeekday; i++){
+      const d = document.createElement('div');
+      d.className = 'day disabled';
+      d.style.visibility = 'hidden';
+      elCal.appendChild(d);
+    }
+
+    for(let day=1; day<=daysInMonth; day++){
+      const d = new Date(y, m, day);
+      const dayKey = keyOf(d);
+      const disabled = state.disabled.has(dayKey);
+      const past = isPast(d);
+
+      const cell = document.createElement('div');
+      cell.className = 'day';
+      if (past) cell.classList.add('past');
+
+      if (state.start && state.end && inRange(d, state.start, state.end)) {
+        cell.classList.add('in-range');
+      }
+      if (sameDay(d, state.start)) cell.classList.add('start');
+      if (sameDay(d, state.end))   cell.classList.add('end');
+
+      // Kopfzeile mit Chips (Start/Ende/ + )
+      const chips = document.createElement('div'); chips.className='chips';
+
+      if (sameDay(d, state.start)) {
+        const c = document.createElement('div'); c.className='chip label'; c.textContent='Start';
+        chips.appendChild(c);
+      }
+      if (sameDay(d, state.end)) {
+        const c = document.createElement('div'); c.className='chip label'; c.textContent='Ende';
+        chips.appendChild(c);
+      }
+
+      // Plus nur anzeigen, wenn sinnvoll:
+      //  - nicht Vergangenheit
+      //  - nicht disabled
+      //  - Wenn (nur Start gewählt und Tag > Start) ODER (noch nichts gewählt)
+      let showPlus = !past && !disabled;
+      if (state.start && !state.end) {
+        showPlus = showPlus && d.getTime() >= state.start.getTime();
+      }
+      if (state.start && state.end) {
+        // wenn Range steht, kein Plus mehr im Raster
+        showPlus = false;
+      }
+
+      if (showPlus) {
+        const add = document.createElement('div');
+        add.className='chip add'; add.textContent='+';
+        add.title = 'Zeitraum hinzufügen';
+        add.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          // gleiche Funktionalität wie bisheriger "Hinzufügen": 
+          // Wenn Start noch nicht gesetzt -> setze Start
+          // Wenn Start gesetzt, End noch nicht und d >= Start -> setze End
+          // Sonst: starte neuen Bereich
+          if (!state.start) {
+            state.start = new Date(d);
+          } else if (!state.end && d.getTime() >= state.start.getTime()) {
+            state.end = new Date(d);
+          } else {
+            state.start = new Date(d);
+            state.end = null;
+          }
+          updateSummary();
+          render();
+        });
+        chips.appendChild(add);
+      }
+
+      cell.appendChild(chips);
+
+      // Nummer
+      const num = document.createElement('div'); num.className='num'; num.textContent = day;
+      cell.appendChild(num);
+
+      // Preis (Demo Ø Preis)
+      const price = document.createElement('div'); price.className='price';
+      price.textContent = `Ø ${state.prices[state.product]}€`;
+      cell.appendChild(price);
+
+      // Klicklogik des Tages
+      cell.addEventListener('click', () => {
+        if (past || disabled) return;
+        // Auswahl-Logik wie gewohnt:
+        if (!state.start || (state.start && state.end)) {
+          state.start = new Date(d);
+          state.end = null;
+        } else if (!state.end && d.getTime() >= state.start.getTime()) {
+          state.end = new Date(d);
+        } else {
+          state.start = new Date(d);
+          state.end = null;
+        }
+        updateSummary();
+        render();
+      });
+
+      elCal.appendChild(cell);
+    }
+
+    updateSummary();
+  }
+
+  function daysBetween(a,b){
+    const d=(b-a)/(1000*60*60*24) + 1; // inkl. beider Tage
+    return Math.max(0, Math.floor(d));
+  }
+
+  function updateSummary(){
+    const sumOriginal = document.getElementById('sumOriginal');
+    const sumDiscount = document.getElementById('sumDiscount');
+    const sumTotal    = document.getElementById('sumTotal');
+    const sumAvg      = document.getElementById('sumAvg');
+
+    let text = 'Bitte Zeitraum wählen';
+    let orig='–', disc='–', tot='–', avg='–';
+
+    if (state.start && state.end){
+      const n = daysBetween(state.start, state.end);
+      const base = n * state.prices[state.product];
+      const discount = Math.round(base * 0.35);
+      const total = base - discount;
+      orig = base + '€';
+      disc = '−' + discount + '€';
+      tot  = total + '€';
+      avg  = Math.round(total / n) + '€';
+      text = `${state.start.toLocaleDateString('de-DE')} – ${state.end.toLocaleDateString('de-DE')} (${n} Tage)`;
+    } else if (state.start){
+      text = `${state.start.toLocaleDateString('de-DE')} (Start)`;
+    }
+
+    sumOriginal.textContent = orig;
+    sumDiscount.textContent = disc;
+    sumTotal.textContent = tot;
+    sumAvg.textContent = avg;
+    selLbl.textContent = text;
+  }
+
+  // Produktwechsel
+  document.getElementById('products').addEventListener('click', (e)=>{
+    const btn = e.target.closest('button[data-product]');
+    if(!btn) return;
+    document.querySelectorAll('#products button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    state.product = btn.dataset.product;
+    updateSummary();
+    render();
+  });
+
+  prevBtn.addEventListener('click', ()=>{
+    state.view = new Date(state.view.getFullYear(), state.view.getMonth()-1, 1);
+    state.start = null; state.end = null;
+    render();
+  });
+  nextBtn.addEventListener('click', ()=>{
+    state.view = new Date(state.view.getFullYear(), state.view.getMonth()+1, 1);
+    state.start = null; state.end = null;
+    render();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
