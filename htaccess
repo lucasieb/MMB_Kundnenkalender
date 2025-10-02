@@ -1,0 +1,25 @@
+AddDefaultCharset utf-8
+<IfModule mod_mime.c>
+  AddCharset utf-8 .html .htm .css .js .php
+</IfModule>
+
+Options -Indexes
+
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "SAMEORIGIN"
+  Header always set Referrer-Policy "no-referrer-when-downgrade"
+</IfModule>
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Echte Dateien/Ordner NIE umschreiben
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # (Falls du ein Frontcontroller/SPA brauchst, hier drunter)
+  # RewriteRule . index.php [L]
+</IfModule>
