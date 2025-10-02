@@ -1,0 +1,33 @@
+<?php
+declare(strict_types=1);
+require __DIR__ . '/cors.php';        // <-- NEU: muss vor jeglicher Ausgabe stehen
+require __DIR__ . '/db.php';
+require __DIR__ . '/auth.php';        // falls genutzt
+header('Content-Type: application/json; charset=utf-8');
+
+try {
+  $data = json_decode(file_get_contents('php://input'), true) ?: [];
+  $id = isset($data['id']) ? (int)$data['id'] : 0;
+  if ($id <= 0) throw new Exception('Ungültige ID');
+
+  // Whitelist erlaubter Felder
+  $allow = ['customer_name','customer_email','customer_phone','box_id','start_date','end_date','status','total_amount'];
+  $sets = [];
+  $params = [':id'=>$id];
+  foreach ($allow as $f) {
+    if (array_key_exists($f, $data)) {
+      $sets[] = "`$f` = :$f";
+      $params[":$f"] = $data[$f];
+    }
+  }
+  if (!$sets) throw new Exception('Keine Änderungen übergeben');
+
+  $sql = "UPDATE bookings SET ".implode(', ', $sets)." WHERE id = :id";
+  $stmt = $pdo->prepare($sql);
+  $stmt->execute($params);
+
+  echo json_encode(['ok'=>true]);
+} catch (Throwable $e) {
+  http_response_code(400);
+  echo json_encode(['ok'=>false,'error'=>$e->getMessage()]);
+}
