@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Kundenkalender – MietMichBox</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --mmb-light:#EFEFE6;  /* hell */
+    --mmb-dark:#3B3B3B;   /* dunkel */
+    --mmb-accent:#0EA5E9;
+    --mmb-accent-200: rgba(14,165,233,.18);
+    --mmb-accent-300: rgba(14,165,233,.30);
+    --mmb-accent-500:#0284c7;
+    --mmb-muted:#4a4a4a;  /* Pane rechts */
+    --mmb-border:#555;
+    --mmb-radius:12px;
+    --mmb-badge-width-range:calc((5ch + 1rem) * 0.595);
+    --mmb-badge-width-add:var(--mmb-badge-width-range);
+  }
+
+  *,*::before,*::after{box-sizing:border-box;}
+
+  /* Basis */
+  body{ margin:0;background:transparent;color:var(--mmb-light);
+        font-family:"Poppins",system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;font-weight:400; }
+  .mmb-widget{background:var(--mmb-dark);border-radius:var(--mmb-radius);overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.1);max-width:1200px;margin:0 auto;}
+
+  /* Header */
+  .mmb-header{display:grid;grid-template-columns:1fr auto auto;gap:12px;padding:.8rem 1rem;background:#2f2f2f;border-bottom:1px solid var(--mmb-border);}
+  .mmb-box-buttons{display:flex;gap:.4rem;flex-wrap:wrap;}
+  .mmb-box-btn{background:transparent;border:1px solid var(--mmb-border);padding:.5rem .8rem;border-radius:6px;cursor:pointer;
+               font-size:.85rem;font-weight:600;color:var(--mmb-light);display:inline-flex;align-items:center;justify-content:center;text-align:center;white-space:nowrap;}
+  .mmb-box-btn:hover{background:#3a3a3a;}
+  .mmb-box-btn.mmb-box-btn--active{background:var(--mmb-accent);color:#fff;border-color:var(--mmb-accent);}
+
+  .mmb-nav{display:flex;align-items:center;gap:8px;}
+  .mmb-nav-btn{background:transparent;border:1px solid var(--mmb-border);padding:.4rem .6rem;border-radius:6px;cursor:pointer;
+               color:var(--mmb-light);font-weight:600;}
+  .mmb-nav-btn:hover{background:#3a3a3a;}
+  .mmb-month-title{font-weight:600;font-size:1rem;min-width:160px;text-align:center;color:var(--mmb-light);}
+
+  /* Layout – feste Min-Höhen, kein Springen */
+  .mmb-content{display:grid;grid-template-columns:1fr 440px;gap:18px;padding:1rem;}
+  @media (max-width:900px){.mmb-content{grid-template-columns:1fr;}}
+  .mmb-calendar-wrap{min-height:560px;display:flex;width:100%;justify-content:center;}
+  .mmb-side-wrap{min-height:560px;display:flex;width:100%;justify-content:center;}
+
+  @media (max-width:600px){
+    .mmb-widget{margin:0 auto;border-radius:18px;width:min(100%,calc(100vw - 1.5rem));}
+    .mmb-header{grid-template-columns:1fr;grid-auto-rows:auto;gap:.65rem;padding:.85rem .7rem;justify-items:center;text-align:center;}
+    .mmb-box-buttons{justify-content:center;width:100%;gap:.5rem;}
+    .mmb-box-btn{flex:1 1 calc(50% - .6rem);min-width:140px;text-align:center;white-space:normal;padding:.55rem .6rem;}
+    .mmb-nav{width:100%;justify-content:space-between;}
+    .mmb-month-title{min-width:0;font-size:1.05rem;}
+    .mmb-content{padding:.8rem .7rem;gap:12px;}
+    .mmb-calendar-wrap,.mmb-side-wrap{min-height:0;width:100%;justify-content:center;}
+    .mmb-calendar{border-radius:calc(var(--mmb-radius) + 4px);width:100%;}
+    .mmb-day-header{padding:.5rem .2rem;font-size:.75rem;}
+    .mmb-day{min-height:72px;gap:.18rem;}
+    .mmb-day .num{width:1.9rem;height:1.9rem;font-size:.95rem;}
+    .mmb-day::before,.mmb-pill-add{top:4px;}
+    .mmb-day::after{font-size:.82rem;}
+    .mmb-booking-form{padding:16px;border-radius:14px;gap:.7rem;}
+    .mmb-terms{font-size:.85rem;}
+    .mmb-btn{font-size:.95rem;padding:.6rem .95rem;}
+  }
+
+  /* Kalender */
+  .mmb-calendar{border:1px solid var(--mmb-border);border-radius:var(--mmb-radius);overflow:hidden;background:#2a2a2a;flex:1;}
+  .mmb-calendar-header{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));background:#383838;color:var(--mmb-light);}
+  .mmb-day-header{padding:.6rem .4rem;text-align:center;font-weight:600;font-size:.8rem;border-right:1px solid var(--mmb-border);}
+  .mmb-day-header:last-child{border-right:none;}
+  .mmb-calendar-body{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));}
+
+  .mmb-day{ position:relative; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:.22rem;
+            min-height:96px; border-right:1px solid var(--mmb-border); border-bottom:1px solid var(--mmb-border);
+            cursor:pointer; user-select:none; text-align:center; background:#2f2f2f; color:var(--mmb-light);
+            font-variant-numeric:tabular-nums; }
+  .mmb-day:nth-child(7n){border-right:none;}
+  .mmb-day--other-month{opacity:.45;}
+  .mmb-day--blocked{background:#1f1f1f!important;color:#9a9a9a!important;cursor:not-allowed;}
+
+  /* Range / Selection */
+  .mmb-calendar .mmb-calendar-body .mmb-day.mmb-day--in-range{
+    background:var(--mmb-accent-300)!important; border:1px solid rgba(14,165,233,.35)!important;
+  }
+  .mmb-calendar .mmb-calendar-body .mmb-day.mmb-day--selected{
+    background:var(--mmb-accent)!important; color:#fff!important; border:2px solid var(--mmb-accent-500)!important; font-weight:600!important;
+  }
+
+  /* Datum */
+  .mmb-day .num{ display:inline-flex;align-items:center;justify-content:center;width:2.1rem;height:2.1rem;border-radius:999px;
+                 font-size:1rem;background:transparent;color:currentColor; }
+
+  /* Preis (unter der Zahl) */
+  .mmb-day::after{
+    content: attr(data-price);
+    display:block; margin-top:.05rem; font-size:.88rem; line-height:1; opacity:.95; width:100%; text-align:center;
+  }
+  .mmb-day[data-price=""]::after{content:"";}
+
+  /* Badges oben mittig – gemeinsame Basis */
+  .mmb-day::before,
+  .mmb-pill-add{
+    position:absolute; top:6px; left:50%; transform:translateX(-50%);
+    display:inline-flex; align-items:center; justify-content:center;
+    padding:.12rem .45rem; border-radius:999px; border:1px solid var(--mmb-border);
+    font-size:.72rem; font-weight:400; letter-spacing:.01em; line-height:1;
+    text-align:center; white-space:nowrap;
+  }
+  /* Start/Ende (dunkel) */
+  .mmb-day::before{
+    content: attr(data-badge);
+    background:#3a3a3a;
+    color:var(--mmb-light);
+    width:var(--mmb-badge-width-range);
+    min-width:var(--mmb-badge-width-range);
+  }
+  .mmb-day[data-badge=""]::before{content:"";display:none;}
+  /* Erweiterungsschaltfläche (hell) */
+  .mmb-pill-add{
+    background:#fff;
+    color:#111;
+    display:none;
+    cursor:pointer;
+    width:var(--mmb-badge-width-add);
+    min-width:var(--mmb-badge-width-add);
+  }
+  .mmb-day[data-extend="1"] .mmb-pill-add{display:inline-block;}
+
+  /* Formular rechts – wieder mit Linie + Gesamt fett */
+  .mmb-booking-form{background:var(--mmb-muted);padding:18px;border-radius:10px;color:var(--mmb-light);display:flex;flex-direction:column;gap:.8rem;flex:1;width:100%;}
+  .mmb-price-summary{background:#2f2f2f;padding:.75rem;border-radius:6px;border:1px solid var(--mmb-border);}
+  .mmb-price-line{display:flex;justify-content:space-between;align-items:center;margin:.35rem 0;font-size:.9rem;}
+  .mmb-hr{height:1px;background:rgba(255,255,255,.12);margin:.35rem 0;}
+  .mmb-total{display:flex;justify-content:space-between;align-items:center;margin-top:.35rem;}
+  .mmb-total .label{font-weight:600;}
+  .mmb-total .value{font-weight:600;font-size:1.05rem;}
+  .mmb-price-small{font-size:.8rem;color:#cfcfcf;}
+
+  .mmb-input{width:100%;padding:.6rem .7rem;border:1px solid var(--mmb-border);border-radius:6px;background:#2a2a2a;color:var(--mmb-light);font-size:.95rem;box-sizing:border-box;}
+  .mmb-btn{background:var(--mmb-accent);color:#fff;border:none;padding:.7rem 1.2rem;border-radius:8px;font-size:1rem;font-weight:600;cursor:pointer;width:100%;}
+  .mmb-btn:disabled{opacity:.5;cursor:not-allowed;}
+  .mmb-terms{display:flex;gap:.5rem;align-items:flex-start;font-size:.88rem;line-height:1.4;color:#f5f5f5;flex-wrap:wrap;}
+  .mmb-terms input{margin-top:.25rem;}
+  .mmb-terms a{color:#9fdcff;text-decoration:none;}
+  .mmb-terms a:hover{text-decoration:underline;}
+
+  /* Modal */
+  #mmb-modal{display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); align-items:center; justify-content:center; z-index:9999;}
+  #mmb-modal .inner{background:#efefe6; color:#3b3b3b; padding:1rem 1.25rem; border-radius:10px; max-width:560px; width:92%;}
+  #mmb-modal .title{font-weight:600; margin-bottom:.4rem;}
+  #mmb-modal .text{white-space:pre-wrap; line-height:1.5;}
+</style>
+</head>
+<body>
+
+  <div id="mmb-customer"></div>
+
+  <!-- Modal -->
+  <div id="mmb-modal" role="dialog" aria-modal="true" aria-labelledby="mmb-modal-title" aria-describedby="mmb-modal-text">
+    <div class="inner">
+      <div id="mmb-modal-title" class="title">Hinweis</div>
+      <div id="mmb-modal-text" class="text"></div>
+      <div class="actions" style="margin-top:.8rem; text-align:right;">
+        <button id="mmb-modal-close" type="button" style="padding:.45rem .85rem; border:1px solid #d9d9d3; border-radius:8px; cursor:pointer; background:#f8f9fa; color:#3b3b3b;">OK</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* ========= KONFIG ========= */
+const MMB_CONFIG = {
+  pricingUrl: 'https://firebrick-squirrel-568721.hostingersite.com/pricing.php',
+  createUrl:  'https://firebrick-squirrel-568721.hostingersite.com/create_booking.php'
+};
+/* ========================= */
+
+const Utils={
+  MONTH_NAMES:['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'],
+  DAY_NAMES:['Mo','Di','Mi','Do','Fr','Sa','So'],
+  formatDate(d){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),da=String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${da}`;},
+  formatMonthYear(d){return `${this.MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;},
+  startOfDay(d){const x=new Date(d); x.setHours(0,0,0,0); return x;},
+  cmpDate(a,b){a=this.startOfDay(a).getTime(); b=this.startOfDay(b).getTime(); return a===b?0:(a<b?-1:1);},
+  generateCalendarDays(cur){const y=cur.getFullYear(),m=cur.getMonth(),first=new Date(y,m,1),last=new Date(y,m+1,0);
+    const start=(first.getDay()===0?6:first.getDay()-1), days=[], prevLast=new Date(y,m,0);
+    for(let i=start-1;i>=0;i--){days.push({date:new Date(y,m-1,prevLast.getDate()-i),otherMonth:true});}
+    for(let d=1; d<=last.getDate(); d++){days.push({date:new Date(y,m,d),otherMonth:false});}
+    const total=Math.ceil(days.length/7)*7; for(let d=1; d<=total-days.length; d++){days.push({date:new Date(y,m+1,d),otherMonth:true});}
+    return days;}
+};
+const Euro={round:x=>Math.round(Number(x)||0), fmt:x=>`${Math.round(Number(x)||0)}€`};
+const Percent={disp:p=>Math.round(Number(p)||0)};
+
+/* ===== HTTP Helpers ===== */
+function parseJsonLoose(txt){
+  try { return JSON.parse(txt); } catch(e){}
+  const first = txt.indexOf('{'); const last  = txt.lastIndexOf('}');
+  if(first !== -1 && last !== -1 && last > first){
+    const cand = txt.slice(first, last+1);
+    try { return JSON.parse(cand); } catch(e){}
+  }
+  const m = txt.match(/\{[\s\S]*?"ok"\s*:\s*(true|false)[\s\S]*?\}/);
+  if(m){ try { return JSON.parse(m[0]); } catch(e){} }
+  throw new Error('Antwort ist kein valides JSON.\n\nAusschnitt:\n' + txt.slice(0, 200));
+}
+async function fetchText(url, opts){ const r=await fetch(url, opts||{}); const t=await r.text(); return {ok:r.ok,status:r.status,text:t}; }
+
+/* ===== API Endpoints ===== */
+const PRICING_URLS = [MMB_CONFIG.pricingUrl,'pricing.php','api/pricing.php'].filter(Boolean);
+const BOOKING_URLS = [MMB_CONFIG.createUrl];
+
+/* — Ableitungslogik: erzwinge Verfügbarkeit ja/nein — */
+function deriveEnforcement(pr){
+  const s = (pr && (pr.settings || (pr.pricing&&pr.pricing.settings))) || {};
+  if (typeof s.enforce_availability === 'boolean') return s.enforce_availability;
+  if (typeof s.availability_visible   === 'boolean') return s.availability_visible; // sichtbar => auch erzwingen
+  if (typeof s.enforceAvailability    === 'boolean') return s.enforceAvailability;
+  if (typeof s.allowOverlapWhenHidden === 'boolean') return !s.allowOverlapWhenHidden;
+  return true; // Default: erzwingen
+}
+
+async function getPricing(){
+  let last;
+  for(const u of PRICING_URLS){
+    try{
+      const {status,text} = await fetchText(u, { headers:{'Accept':'application/json'} });
+      const j = parseJsonLoose(text);
+      if(j && j.ok === true) return j;
+      last = new Error((j && j.error) ? j.error : ('HTTP '+status+' / ' + text.slice(0,160)));
+    }catch(e){ last = e; }
+  }
+  throw last || new Error('Konnte Preise nicht laden');
+}
+
+/* ==== Senden: urlencoded (bevorzugt), Fallback JSON ==== */
+async function sendBooking(url, payload){
+  const makeUrlEnc = (p)=>{ const u=new URLSearchParams(); Object.entries(p).forEach(([k,v])=>u.append(k,String(v))); return u; };
+  // 1) application/x-www-form-urlencoded
+  const r1 = await fetchText(url, {
+    method:'POST',
+    body: makeUrlEnc(payload),
+    headers:{'Content-Type':'application/x-www-form-urlencoded','Accept':'application/json'},
+    credentials:'omit'
+  });
+  if (r1.ok){
+    const j = parseJsonLoose(r1.text);
+    if (j && j.ok===true) return j;
+    throw new Error((j && j.error) ? j.error : ('HTTP '+r1.status+' / '+r1.text.slice(0,200)));
+  }
+  // 2) JSON Fallback
+  const r2 = await fetchText(url, {
+    method:'POST',
+    body: JSON.stringify(payload),
+    headers:{'Content-Type':'application/json','Accept':'application/json'},
+    credentials:'omit'
+  });
+  if (r2.ok){
+    const j = parseJsonLoose(r2.text);
+    if (j && j.ok===true) return j;
+    throw new Error((j && j.error) ? j.error : ('HTTP '+r2.status+' / '+r2.text.slice(0,200)));
+  }
+  throw new Error('HTTP '+r1.status+' / '+r1.text.slice(0,140));
+}
+
+/* ===== Kalender ===== */
+class Calendar{
+  constructor(container){
+    this.root = typeof container==='string'? document.querySelector(container):container;
+    this.state={month:new Date(), boxes:[], box:null, sel:{start:null,end:null}, pricing:null, enforceAvailability:true, summary:null};
+    this.dayElMap=new Map(); this.avgCache=null;
+    this.init();
+  }
+  async init(){
+    this.root.innerHTML=`
+      <div class="mmb-widget">
+        <div class="mmb-header">
+          <div class="mmb-box-buttons"></div>
+          <div></div>
+          <div class="mmb-nav">
+            <button class="mmb-nav-btn" data-act="prev" aria-label="Vorheriger Monat">←</button>
+            <div class="mmb-month-title"></div>
+            <button class="mmb-nav-btn" data-act="next" aria-label="Nächster Monat">→</button>
+          </div>
+        </div>
+        <div class="mmb-content">
+          <div class="mmb-calendar-wrap"><div class="cal" style="flex:1"></div></div>
+          <div class="mmb-side-wrap"><div class="side" style="flex:1"></div></div>
+        </div>
+      </div>`;
+    const pr=await getPricing(); this.state.pricing=pr.pricing; this.state.enforceAvailability = deriveEnforcement(pr);
+    const boxes=Object.entries(pr.pricing.boxes).map(([id,b])=>({id,name:b.name})).sort((a,b)=>Number(a.id)-Number(b.id));
+    this.state.boxes=boxes; this.state.box=boxes[0];
+
+    this.renderHeader(); this.renderCalendar(); this.renderSide(); this.wire();
+  }
+
+  getBoxPricing(id){ return this.state?.pricing?.boxes?.[id]||null; }
+  baseDayPrice(id, date){ const bp=this.getBoxPricing(id); const w=['so','mo','di','mi','do','fr','sa'][date.getDay()]; return Number(bp?.prices?.[w]||0); }
+  discountExact(days){ const m=this.state?.pricing?.discountsByDay||{}; return days>=30?Number(m[30]||0):Number(m[days]||0); }
+  sumOriginal(id,s,e){ let sum=0; for(let d=new Date(s); d<=e; d.setDate(d.getDate()+1)){ sum+=this.baseDayPrice(id,d); } return sum; }
+  pricedTotal(id,s,e){
+    const days=this.days(s,e), orig=this.sumOriginal(id,s,e), pct=this.discountExact(days);
+    const total=Euro.round(orig*(1-pct/100));
+    return {days,original:orig,total,discountPercentExact:pct,discountPercentDisplay:Percent.disp(pct),discountAmount:orig-total,avgPerDay:Euro.round(total/days)};
+  }
+  marginalOneDay(id, start, day){
+    const prev=new Date(day); prev.setDate(prev.getDate()-1);
+    const a=this.pricedTotal(id,start,day).total;
+    const b=this.pricedTotal(id,start,prev).total;
+    return Math.max(0, Euro.round(a-b));
+  }
+
+  renderHeader(){
+    const h=this.root.querySelector('.mmb-header');
+    h.querySelector('.mmb-month-title').textContent=Utils.formatMonthYear(this.state.month);
+    const btns=this.state.boxes.map(b=>`<button class="mmb-box-btn ${this.state.box?.id===b.id?'mmb-box-btn--active':''}" data-act="box" data-id="${b.id}">${b.name}</button>`).join('');
+    h.querySelector('.mmb-box-buttons').innerHTML=btns;
+  }
+
+  renderCalendar(){
+    const host=this.root.querySelector('.cal');
+    const days=Utils.generateCalendarDays(this.state.month);
+    host.innerHTML=`
+      <div class="mmb-calendar">
+        <div class="mmb-calendar-header">${Utils.DAY_NAMES.map(d=>`<div class="mmb-day-header">${d}</div>`).join('')}</div>
+        <div class="mmb-calendar-body">
+          ${days.map(day=>{
+            const key=Utils.formatDate(day.date);
+            const other=day.otherMonth?' mmb-day--other-month':'';
+            const blocked=(day.date<new Date().setHours(0,0,0,0))?' mmb-day--blocked':'';
+            return `<div class="mmb-day${other}${blocked}" data-date="${key}" data-price="" data-badge="">
+                      <span class="num">${day.date.getDate()}</span>
+                      <button class="mmb-pill-add" type="button" data-act="extend" data-date="${key}" aria-label="Zeitraum verlängern">+</button>
+                    </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+    this.dayElMap.clear();
+    host.querySelectorAll('.mmb-day[data-date]').forEach(el=>this.dayElMap.set(el.dataset.date,el));
+    this.updateVisuals();
+  }
+
+  renderSide(){
+    const s=this.state.sel.start, e=this.state.sel.end; const hasRange=!!(s&&e);
+    let html=`<div class="mmb-booking-form"><h3 style="margin:0;font-weight:600;">Buchungsanfrage</h3>`;
+    if(hasRange){
+      const sum=this.pricedTotal(this.state.box.id,s,e); 
+      this.avgCache=sum.avgPerDay;
+      // >>> NEU: Summary speichern (für Request)
+      this.state.summary = { total: sum.total, deposit: 0, original: sum.original, days: sum.days };
+      html+=`<div class="mmb-price-summary">
+        <div class="mmb-price-line"><span>Original (ohne Rabatt)</span><span>${Euro.fmt(sum.original)}</span></div>
+        <div class="mmb-price-line"><span>Rabatt (${sum.discountPercentDisplay}%)</span><span>–${Euro.fmt(sum.discountAmount)}</span></div>
+        <div class="mmb-hr"></div>
+        <div class="mmb-total"><span class="label">Gesamt</span><span class="value">${Euro.fmt(sum.total)}</span></div>
+        <div class="mmb-price-line"><span class="mmb-price-small">Ø pro Tag</span><span class="mmb-price-small">${Euro.fmt(sum.avgPerDay)}</span></div>
+        <div class="mmb-price-line"><span class="mmb-price-small">Kaution</span><span class="mmb-price-small">gratis</span></div>
+      </div>`;
+    }else if(s){
+      const base=this.baseDayPrice(this.state.box.id,s);
+      this.state.summary = { total: base, deposit: 0, original: base, days: 1 }; // <<< NEU
+      html+=`<div class="mmb-price-summary">
+        <div class="mmb-price-line"><span>Aktueller Rabatt</span><span>0%</span></div>
+        <div class="mmb-hr"></div>
+        <div class="mmb-total"><span class="label">Gesamt</span><span class="value">${Euro.fmt(base)}</span></div>
+        <div class="mmb-price-line"><span class="mmb-price-small">Ø pro Tag</span><span class="mmb-price-small">${Euro.fmt(base)}</span></div>
+        <div class="mmb-price-line"><span class="mmb-price-small">Kaution</span><span class="mmb-price-small">gratis</span></div>
+      </div>`;
+      this.avgCache=null;
+    }else{
+      html+=`<div class="mmb-price-summary" style="text-align:center;color:#cfcfcf;">Bitte Zeitraum wählen</div>`;
+      this.avgCache=null;
+      this.state.summary = null; // <<< NEU
+    }
+    html+=`<form data-act="submit">
+      <label>Name *<br><input class="mmb-input" name="customer_name" required></label><br>
+      <label>E-Mail *<br><input type="email" class="mmb-input" name="customer_email" required></label><br>
+      <label>Telefon<br><input class="mmb-input" name="customer_phone"></label><br>
+      <label>Anmerkungen<br><textarea class="mmb-input" name="note" style="min-height:70px;"></textarea></label><br>
+      <label class="mmb-terms"><input type="checkbox" name="accept_terms" required> Ich akzeptiere <a href="https://www.mietmichbox.de/allgemeine-geschaftsbedingungen" target="_blank" rel="noopener">AGB</a> & <a href="https://www.mietmichbox.de/datenschutzerklarung" target="_blank" rel="noopener">Datenschutz</a>*</label>
+      <button class="mmb-btn" ${s?'':'disabled'}>Buchungsanfrage senden</button>
+    </form>
+    <div style="margin-top:6px;color:#cfcfcf;font-size:.9rem;">${
+      hasRange?`${s.toLocaleDateString('de-DE')} – ${e.toLocaleDateString('de-DE')} (${this.pricedTotal(this.state.box.id,s,e).days} Tage)`
+      : (s?`${s.toLocaleDateString('de-DE')} (Start gewählt)`:``)
+    }</div></div>`;
+    this.root.querySelector('.side').innerHTML=html;
+  }
+
+  /* === Visuals === */
+  updateVisuals(){
+    this.dayElMap.forEach(el=>{
+      el.classList.remove('mmb-day--in-range','mmb-day--selected');
+      el.setAttribute('data-price',''); el.setAttribute('data-badge',''); el.removeAttribute('data-extend');
+    });
+
+    const s=this.state.sel.start, e=this.state.sel.end;
+    const today=Utils.startOfDay(new Date());
+    const cmp=(a,b)=>Utils.cmpDate(a,b);
+
+    // Grundpreise
+    this.dayElMap.forEach((el,key)=>{
+      const [Y,M,D]=key.split('-').map(Number); const d=Utils.startOfDay(new Date(Y,M-1,D));
+      if(el.classList.contains('mmb-day--blocked') || d<today){ el.setAttribute('data-price','—'); return; }
+      el.setAttribute('data-price', Euro.fmt(this.baseDayPrice(this.state.box.id,d)));
+    });
+
+    if(!s) return;
+
+    // nur Start
+    if(s && !e){
+      this.setBadge(s,'Start'); this.markRange(s,s);
+      this.dayElMap.forEach((el,key)=>{
+        const [Y,M,D]=key.split('-').map(Number); const d=Utils.startOfDay(new Date(Y,M-1,D));
+        if(cmp(d,s)>0 && !el.classList.contains('mmb-day--blocked')){
+          const add=this.marginalOneDay(this.state.box.id,s,d);
+          el.setAttribute('data-price', add>0?`+${Euro.round(add)}€`:'—');
+        }
+      });
+      return;
+    }
+
+    // Start & Ende
+    if(s && e){
+      this.setBadge(s,'Start'); this.setBadge(e,'Ende'); this.markRange(s,e);
+      const avg = this.avgCache ?? this.pricedTotal(this.state.box.id,s,e).avgPerDay;
+      this.forEachInRange(s,e, el=>{ el.setAttribute('data-price',`Ø ${Euro.round(avg)}€`); });
+      this.dayElMap.forEach((el,key)=>{
+        const [Y,M,D]=key.split('-').map(Number); const d=Utils.startOfDay(new Date(Y,M-1,D));
+        if(cmp(d,e)>0 && !el.classList.contains('mmb-day--blocked')){
+          const add=this.marginalOneDay(this.state.box.id,s,d);
+          el.setAttribute('data-price', add>0?`+${Euro.round(add)}€`:'—');
+          el.setAttribute('data-extend','1');
+        }
+      });
+    }
+  }
+
+  setBadge(date,label){ const k=Utils.formatDate(date); const el=this.dayElMap.get(k); if(el) el.setAttribute('data-badge',label||''); }
+  markRange(s,e){
+    const cmp=(a,b)=>Utils.cmpDate(a,b);
+    this.dayElMap.forEach((el,key)=>{
+      const [Y,M,D]=key.split('-').map(Number); const d=Utils.startOfDay(new Date(Y,M-1,D));
+      if(cmp(d,s)>=0 && cmp(d,e)<=0){ el.classList.add('mmb-day--in-range'); }
+      if(cmp(d,s)===0 || cmp(d,e)===0){ el.classList.add('mmb-day--selected'); }
+    });
+  }
+
+  /* === Events === */
+  wire(){
+    this.root.addEventListener('click',e=>{
+      const nav = e.target.closest('[data-act="prev"],[data-act="next"],[data-act="box"]');
+      if(nav){
+        const act=nav.dataset.act;
+        if(act==='prev'){ this.changeMonth(-1); return; }
+        if(act==='next'){ this.changeMonth(1); return; }
+        if(act==='box'){ const b=this.state.boxes.find(x=>x.id===nav.dataset.id); this.state.box=b; this.state.sel={start:null,end:null}; this.avgCache=null; this.renderHeader(); this.renderCalendar(); this.renderSide(); return; }
+      }
+      const add = e.target.closest('[data-act="extend"]');
+      if(add){
+        const key = add.dataset.date;
+        if(this.state.sel.start && this.state.sel.end){
+          const [Y,M,D]=key.split('-').map(Number); const target=Utils.startOfDay(new Date(Y,M-1,D));
+          if(Utils.cmpDate(target,this.state.sel.end)>0){
+            this.state.sel.end=target; this.renderSide(); this.updateVisuals();
+          }
+        }
+        return;
+      }
+      const day = e.target.closest('.mmb-day[data-date]');
+      if(day){ this.pick(day.dataset.date); }
+    });
+
+    // Submit
+    this.root.addEventListener('submit', async (e)=>{
+      if(!e.target.matches('form[data-act="submit"]')) return;
+      e.preventDefault();
+      const fd=new FormData(e.target);
+      const data=Object.fromEntries(fd.entries());
+      if(!data.customer_name || !data.customer_email || !data.accept_terms){ return this.modal('Bitte prüfen','Bitte alle Pflichtfelder ausfüllen und AGB/Datenschutz akzeptieren.'); }
+      if(!this.state.sel.start){ return this.modal('Zeitraum fehlt','Bitte einen Zeitraum im Kalender wählen.'); }
+
+      const start=this.state.sel.start, end=this.state.sel.end || this.state.sel.start;
+
+      // >>> NEU: Summen aus dem State (Fallback: on-the-fly berechnen)
+      const sum = this.state.summary || this.pricedTotal(this.state.box.id, start, end);
+      const total_amount = Number(sum?.total ?? 0);
+      const deposit_eur  = Number(sum?.deposit ?? 0);
+
+      const payload={
+        box_id:Number(this.state.box.id),
+        start_date:Utils.formatDate(start),
+        end_date:Utils.formatDate(end),
+        customer_name:(data.customer_name||'').trim(),
+        customer_email:(data.customer_email||'').trim(),
+        customer_phone:(data.customer_phone||'').trim(),
+        note:(data.note||'').trim(),
+        /* Overlap: wenn Verfügbarkeit NICHT erzwungen wird, darf trotzdem angefragt werden */
+        force: this.state.enforceAvailability ? 0 : 1,
+
+        // >>> NEU: Preis an Backend übergeben (als reine Zahlen)
+        total_amount: total_amount,
+        deposit_eur:  deposit_eur
+      };
+
+      const btn=e.target.querySelector('button'); const orig=btn.textContent; btn.disabled=true; btn.textContent='Senden…';
+      try{
+        const res=await sendBooking(MMB_CONFIG.createUrl, payload);
+        const dispId = res?.booking?.display_id ? String(res.booking.display_id) : '–';
+        this.modal('Buchungsanfrage gesendet','Danke! Deine Anfrage ist eingegangen.\n\nBuchungs-ID: '+dispId);
+        e.target.reset(); this.state.sel={start:null,end:null}; this.avgCache=null; this.state.summary=null;
+        this.renderSide(); this.updateVisuals();
+      }catch(err){
+        console.error(err);
+        this.modal('Fehler beim Senden', (err && err.message)? err.message : String(err));
+      }finally{ btn.disabled=false; btn.textContent=orig; }
+    });
+  }
+
+  pick(key){
+    const [Y,M,D]=key.split('-').map(Number); const date=Utils.startOfDay(new Date(Y,M-1,D));
+    const today=Utils.startOfDay(new Date()); if(date<today) return;
+    let {start,end}=this.state.sel;
+    if(start && end){ this.state.sel={start:date,end:null}; this.avgCache=null; this.state.summary=null; this.renderSide(); this.updateVisuals(); return; }
+    if(!start){ this.state.sel={start:date,end:null}; this.avgCache=null; this.state.summary=null; this.renderSide(); this.updateVisuals(); return; }
+    const cmp=Utils.cmpDate(date,start);
+    if(cmp===0){ this.state.sel={start:start,end:start}; this.renderSide(); this.updateVisuals(); return; }
+    if(cmp>0){ this.state.sel={start:start,end:date}; this.renderSide(); this.updateVisuals(); return; }
+    this.state.sel={start:date,end:null}; this.avgCache=null; this.state.summary=null; this.renderSide(); this.updateVisuals();
+  }
+
+  changeMonth(delta){
+    const m=new Date(this.state.month); m.setMonth(m.getMonth()+delta);
+    const today=new Date(); if(m<new Date(today.getFullYear(),today.getMonth(),1)) return;
+    this.state.month=m; this.renderHeader(); this.renderCalendar(); this.renderSide();
+  }
+
+  days(s,e){ const S=new Date(s.getFullYear(),s.getMonth(),s.getDate()), E=new Date(e.getFullYear(),e.getMonth(),e.getDate()); return Math.floor((E-S)/86400000)+1; }
+
+  forEachInRange(s,e,cb){
+    const cmp=(a,b)=>Utils.cmpDate(a,b);
+    this.dayElMap.forEach((el,key)=>{
+      const [Y,M,D]=key.split('-').map(Number); const d=Utils.startOfDay(new Date(Y,M-1,D));
+      if(cmp(d,s)>=0 && cmp(d,e)<=0){ cb(el); }
+    });
+  }
+
+  modal(title,text){
+    document.getElementById('mmb-modal-title').textContent=title;
+    document.getElementById('mmb-modal-text').textContent=text;
+    document.getElementById('mmb-modal').style.display='flex';
+  }
+}
+document.getElementById('mmb-modal-close').addEventListener('click',()=>{document.getElementById('mmb-modal').style.display='none';});
+function start(){ new Calendar('#mmb-customer'); }
+document.readyState==='loading'?document.addEventListener('DOMContentLoaded',start):start();
+</script>
+</body>
+</html>
