@@ -1,0 +1,33 @@
+name: Deploy via SFTP to Hostinger
+
+on:
+  push:
+    branches: [ "public_html" ]   # Dein Branch-Name mit Unterstrich
+  workflow_dispatch: {}           # Optional: manuell auslösbar
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Deploy to Hostinger via SFTP
+        uses: wlixcc/SFTP-Deploy-Action@v1.2.4
+        with:
+          server: ${{ secrets.HOST }}
+          port: ${{ secrets.PORT }}
+          username: ${{ secrets.USER }}
+          ssh_private_key: ${{ secrets.SSH_PRIVATE_KEY }}
+          local_path: "./"   # nimmt alle Dateien aus deinem Branch
+          remote_path: "/home/u555265653/domains/firebrick-squirrel-568721.hostingersite.com/public_html/"
+          sftp_only: true
+          delete_remote_files: false
+          exclude: |
+            .git*
+            .github/
+            node_modules/
+            **/*.map
+            **/.DS_Store
+            **/README.md
