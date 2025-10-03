@@ -23,7 +23,7 @@ jobs:
           local_path: "./"   # nimmt alle Dateien aus deinem Branch
           remote_path: "/home/u555265653/domains/firebrick-squirrel-568721.hostingersite.com/public_html/"
           sftp_only: true
-          delete_remote_files: false
+          delete_remote_files: true
           exclude: |
             .git*
             .github/
