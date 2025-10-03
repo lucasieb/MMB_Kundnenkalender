@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8"/>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MietMichBox – Admin Buchungsliste</title>
+  <style>
+    body{margin:0; padding:1rem; background:#f5f5f5; font-family:'Poppins',sans-serif;}
+    .page{max-width:1400px;margin:0 auto;}
+    .card{background:#fff;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.1);overflow:hidden;}
+    .card h1{margin:0;padding:1rem;border-bottom:1px solid #e5e7eb;background:#f8f9fa;font-size:1.25rem;}
+    .card .content{padding:1rem;}
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="card">
+      <h1>Admin – Buchungsliste</h1>
+      <div class="content">
+        <div id="mmb-admin-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================= MMB CORE ======================= -->
+  <script>
+  (function(global){'use strict';
+
+    function injectBaseCSS(){
+      if (document.getElementById('mmb-core-css')) return;
+      const style=document.createElement('style'); style.id='mmb-core-css';
+      style.textContent=`
+        :root{
+          --mmb-primary:#3b3b3b; --mmb-accent:#0EA5E9; --mmb-bg:#efefe6;
+          --mmb-muted:#f8f9fa; --mmb-ok:#10b981; --mmb-warn:#f59e0b;
+          --mmb-busy:#ef4444; --mmb-border:#e5e7eb; --mmb-text:#3b3b3b; --mmb-text-light:#6b7280;
+        }
+        @media (prefers-color-scheme: dark){
+          :root{ --mmb-bg:#3b3b3b; --mmb-muted:#4a4a4a; --mmb-border:#555; --mmb-text:#fff; --mmb-text-light:#ccc; --mmb-primary:#fff; }
+        }
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap');
+
+        .mmb-widget{font-family:'Poppins',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,sans-serif;background:var(--mmb-bg);color:var(--mmb-text);border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.1);}
+        .mmb-loading{display:flex;justify-content:center;align-items:center;height:200px;font-size:.875rem;color:var(--mmb-text-light);}
+        @media (prefers-reduced-motion: reduce){.mmb-day,.mmb-btn,.mmb-nav-btn{transition:none;}}
+      `;
+      document.head.appendChild(style);
+    }
+
+    class EventEmitter{constructor(){this.events={};} on(e,l){(this.events[e]??=[]).push(l);} off(e,l){if(!this.events[e])return; this.events[e]=this.events[e].filter(x=>x!==l);} emit(e,d){(this.events[e]||[]).forEach(l=>l(d));}}
+
+    class GlobalState{
+      constructor(){ this.instances=new Map(); this.sharedState={availability:{}, bookings:[], customerBookings:new Map()};}
+      registerInstance(id,inst){this.instances.set(id,inst);} unregisterInstance(id){this.instances.delete(id);}
+      updateAvailability(boxId,dateString,availability,source='admin'){
+        const key=`${boxId}_${dateString}`; this.sharedState.availability[key]=availability;
+        if(source==='customer'&&availability.available===0){ this.sharedState.customerBookings.set(key,true); }
+        else if(source==='admin'&&availability.available>0){ this.sharedState.customerBookings.delete(key); }
+        MMBCore.events.emit('availability:changed',{boxId,dateString,availability,source});
+      }
+      getAvailability(boxId,dateString){ return this.sharedState.availability[`${boxId}_${dateString}`]; }
+      isCustomerBooked(boxId,dateString){ return this.sharedState.customerBookings.has(`${boxId}_${dateString}`); }
+    }
+
+    const Utils={
+      MONTH_NAMES:['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'],
+      DAY_NAMES:['Mo','Di','Mi','Do','Fr','Sa','So'],
+      formatDate(d){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),da=String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${da}`;},
+      formatMonthYear(d){return `${this.MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;},
+      formatDateRange(s,e){return `${s.toLocaleDateString('de-DE')} - ${e.toLocaleDateString('de-DE')}`;},
+      generateCalendarDays(cur){const y=cur.getFullYear(),m=cur.getMonth(),first=new Date(y,m,1),last=new Date(y,m+1,0); const start=(first.getDay()===0?6:first.getDay()-1); const days=[]; const prevLast=new Date(y,m,0);
+        for(let i=start-1;i>=0;i--){days.push({date:new Date(y,m-1,prevLast.getDate()-i),otherMonth:true});}
+        for(let d=1; d<=last.getDate(); d++){days.push({date:new Date(y,m,d),otherMonth:false});}
+        const total=Math.ceil(days.length/7)*7; for(let d=1; d<=total-days.length; d++){days.push({date:new Date(y,m+1,d),otherMonth:true});}
+        return days;},
+      showNotification(msg,type='info'){const ex=document.querySelector(`.mmb-${type}-notification`); if(ex) ex.remove(); const el=document.createElement('div'); el.className=`mmb-${type}-notification`; const bg=type==='error'?'var(--mmb-busy)':'var(--mmb-ok)';
+        el.style.cssText=`position:fixed;top:20px;right:20px;background:${bg};color:#fff;padding:1rem;border-radius:4px;box-shadow:0 4px 6px rgba(0,0,0,.1);z-index:1000;max-width:300px;`; el.textContent=msg; document.body.appendChild(el); setTimeout(()=>el.remove(),5000);}
+    };
+
+    injectBaseCSS(); const events=new EventEmitter(), globalState=new GlobalState();
+    global.MMBCore={events,globalState,Utils,version:'1.0.0'};
+  })(window);
+  </script>
+
+  <!-- ======================= MMB API ======================= -->
+  <script>
+    const MMB_API_BASE='https://firebrick-squirrel-568721.hostingersite.com/';
+
+    async function mmbApiGet(path){
+      const res=await fetch(MMB_API_BASE+path,{credentials:'include'});
+      const text=await res.text(); let data;
+      try{ data=JSON.parse(text);}catch{ data={ok:false,error:'Keine JSON-Antwort',raw:text};}
+      if(!res.ok||!data.ok) throw new Error(data.error||('HTTP '+res.status+'\n'+(data.raw||'')));
+      return data;
+    }
+    async function mmbApiPost(path,body){
+      const res=await fetch(MMB_API_BASE+path,{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(body||{})});
+      const text=await res.text(); let data;
+      try{ data=JSON.parse(text);}catch{ data={ok:false,error:'Keine JSON-Antwort',raw:text};}
+      if(!res.ok||!data.ok) throw new Error(data.error||('HTTP '+res.status+'\n'+(data.raw||'')));
+      return data;
+    }
+
+    const MMBApi={
+      async listBookings(params = {}) {
+        const q=new URLSearchParams();
+        if(params.box_id) q.set('box_id', params.box_id);
+        if(params.status) q.set('status', params.status);
+        if(params.from) q.set('from', params.from);
+        if(params.to) q.set('to', params.to);
+        return mmbApiGet('list_bookings.php'+(q.toString()?`?${q}`:''));
+      },
+      // FIX: richtiger Endpoint + richtige Keys
+      async updateBookingStatus(payload){
+        return mmbApiPost('update_booking_status.php', payload);
+      },
+      // Optional: Wenn du weiterhin ein separates update_booking.php benutzt
+      async updateBooking(payload){
+        return mmbApiPost('update_booking.php', payload);
+      }
+    };
+  </script>
+
+  <!-- ======================= ADMIN – LISTE ======================= -->
+  <script>
+  (function(global){'use strict';
+
+    const BOX_MAP = { '1':'Marshall Bromley 750', '2':'Teufel Rockster Neo', '3':'Soundboks 4' };
+
+    // Anzeige-ID (nur Ziffern), Prefix 00 + laufend ab 100
+    const ID_CATEGORY = '00';
+    function displayId(rawId){ const num = 100 + (Number(rawId)||0); return ID_CATEGORY + String(num).padStart(3,'0'); }
+
+    function injectAdminListCSS(){
+      if(document.getElementById('mmb-admin-list-css')) return;
+      const s=document.createElement('style'); s.id='mmb-admin-list-css'; s.textContent=`
+        .mmb-admin-filters{
+          display:grid;
+          grid-template-columns: repeat(4, minmax(200px, 1fr)) auto;
+          gap:.75rem; padding:1rem; background:var(--mmb-muted); border-radius:6px; align-items:center;
+        }
+        .mmb-admin-filters select,.mmb-admin-filters input{ padding:.6rem;border:1px solid var(--mmb-border);border-radius:6px;background:var(--mmb-bg);color:var(--mmb-text);font-size:.9rem; }
+        .mmb-admin-list-wrap{height:70vh;overflow:auto;margin:.75rem 0;border-radius:6px;}
+        .mmb-bookings-table{width:100%;border-collapse:collapse;background:var(--mmb-bg);border-radius:6px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.1);}
+        .mmb-bookings-table th,.mmb-bookings-table td{padding:.75rem;text-align:left;border-bottom:1px solid var(--mmb-border);}
+        .mmb-bookings-table th{background:var(--mmb-muted);font-weight:600;position:sticky;top:0;z-index:2;}
+        .mmb-btn{background:var(--mmb-accent);color:#fff;border:none;padding:.5rem .75rem;border-radius:6px;font-size:.875rem;font-weight:500;cursor:pointer;transition:background-color .2s;}
+        .mmb-btn:hover{background:#0284c7;} .mmb-btn:disabled{opacity:.45;cursor:not-allowed;filter:saturate(0.6) contrast(0.9);}
+        .mmb-btn-small{padding:.25rem .5rem;font-size:.75rem;min-width:28px;}
+        .mmb-btn-success{background:var(--mmb-ok);} .mmb-btn-success:hover{background:#059669;}
+        .mmb-btn-danger{background:var(--mmb-busy);} .mmb-btn-danger:hover{background:#dc2626;}
+        .mmb-btn-warning{background:var(--mmb-warn);} .mmb-btn-warning:hover{background:#d97706;}
+        .mmb-reset{background:#e5e7eb;color:#111827;} .mmb-reset:hover{background:#d1d5db;}
+        .mmb-modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;justify-content:center;align-items:center;z-index:9999;font-family:'Poppins',sans-serif;}
+        .mmb-modal-content{background:var(--mmb-bg);color:var(--mmb-text);padding:1.5rem;border-radius:8px;max-width:640px;width:92%;max-height:85vh;overflow:auto;box-shadow:0 10px 25px rgba(0,0,0,.3);}
+        .mmb-modal h3{margin:0 0 .75rem 0;color:var(--mmb-text);}
+        .mmb-modal .mmb-field{display:flex;flex-direction:column;gap:.25rem;margin:.5rem 0;}
+        .mmb-modal input,.mmb-modal select,.mmb-modal textarea{border:1px solid var(--mmb-border);background:var(--mmb-bg);color:var(--mmb-text);border-radius:6px;padding:.5rem;font-family:inherit;font-size:.9rem;}
+        .mmb-modal textarea{min-height:140px;resize:vertical;}
+        .mmb-modal-actions{display:flex;gap:.5rem;justify-content:flex-end;margin-top:1rem;}
+        .mmb-modal-btn{padding:.5rem 1rem;border:1px solid var(--mmb-border);border-radius:6px;cursor:pointer;font-size:.9rem;font-family:inherit;}
+        .mmb-modal-btn-primary{background:var(--mmb-accent);color:#fff;border-color:var(--mmb-accent);}
+        .mmb-modal-btn-secondary{background:var(--mmb-bg);color:var(--mmb-text);}
+        .mmb-status-badge{display:inline-flex;justify-content:center;align-items:center;width:8.5rem;min-width:8.5rem;height:28px;border-radius:9999px;font-weight:600;font-size:.75rem;}
+        .mmb-status-pending{background:#fef3c7;color:#92400e;}
+        .mmb-status-confirmed{background:#d1fae5;color:#065f46;}
+        .mmb-status-rejected{background:#ffe4e6;color:#9f1239;}
+        .mmb-status-cancelled{background:#fee2e2;color:#991b1b;}
+        .mmb-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;}
+        .badge-id{font-variant-numeric:tabular-nums;letter-spacing:.5px;}
+        .mmb-footer{display:flex;justify-content:center;align-items:center;height:36px;color:var(--mmb-text-light);font-size:.9rem;background:var(--mmb-muted);border-radius:6px;}
+      `; document.head.appendChild(s);
+    }
+
+    class AdminList{
+      constructor(options={}){
+        this.container = typeof options.container==='string'?document.querySelector(options.container):options.container;
+        if(!this.container) throw new Error('Container not found: '+options.container);
+        this.options={ locale:'de-DE', timezone:'Europe/Berlin', ...options };
+        this.state={
+          bookings:[], originalBookings:[], boxes:[],
+          loading:false,
+          filters:{ status:'', box:'', id:'', name:'' }
+        };
+        this.instanceId=Math.random().toString(36).substr(2,9); MMBCore.globalState.registerInstance(this.instanceId,this);
+        this.init();
+      }
+      destroy(){ MMBCore.globalState.unregisterInstance(this.instanceId); }
+
+      async init(){ try{ this.render(); await this.loadInitialData(); this.bindUI(); this.applyFilters(); }catch(e){ console.error('AdminList init error:',e); MMBCore.Utils.showNotification('Fehler beim Initialisieren der Admin-Liste','error'); } }
+
+      async loadInitialData(){
+        this.setState({loading:true});
+        await Promise.all([this.loadBookings(), this.loadBoxes()]);
+        this.setState({loading:false});
+      }
+
+      async loadBookings(){ try{
+        const res=await MMBApi.listBookings();
+        const items=(res.items||[]).map(r=>{
+          const boxId = String(r.box_id);
+          return {
+            id:String(r.id),
+            box_id:boxId,
+            box_name: BOX_MAP[boxId] || r.box_name || ('Box #'+boxId),
+            start_date:r.start_date, end_date:r.end_date, status:r.status,
+            customer_name:r.customer_name||'', customer_email:r.customer_email||'', customer_phone:r.customer_phone||'',
+            price_total:r.total_amount||0, deposit_eur:r.deposit_eur ?? 0, created_at:r.created_at
+          };
+        });
+        this.state.originalBookings = items;
+        this.applyFilters(); // hält Filter aktiv nach jedem Reload/Statuswechsel
+      }catch(err){ console.error('loadBookings error:',err); MMBCore.Utils.showNotification('Buchungen konnten nicht geladen werden','error'); } }
+
+      async loadBoxes(){
+        this.state.boxes = [
+          {id:'1',name:BOX_MAP['1']},
+          {id:'2',name:BOX_MAP['2']},
+          {id:'3',name:BOX_MAP['3']}
+        ];
+      }
+
+      setState(ns){ this.state={...this.state,...ns}; this.render(); }
+
+      // ---------- Focus Snapshot ----------
+      snapshotFocus(){
+        const ae = document.activeElement;
+        if(!ae || !this.container.contains(ae)) return null;
+        const id = ae.id || '';
+        let start=null,end=null;
+        try{ start=ae.selectionStart; end=ae.selectionEnd; }catch(e){}
+        return {id,start,end};
+      }
+      restoreFocus(snap){
+        if(!snap||!snap.id) return;
+        const el = document.getElementById(snap.id);
+        if(!el) return;
+        el.focus({preventScroll:true});
+        try{
+          const pos = (typeof snap.end==='number') ? snap.end : (el.value?el.value.length:0);
+          el.setSelectionRange(pos,pos);
+        }catch(e){}
+      }
+
+      // ---------- Rendering ----------
+      render(){
+        if(this.state.loading){
+          this.container.innerHTML=`<div class="mmb-widget"><div class="mmb-loading">Lade Buchungen...</div></div>`;
+          return;
+        }
+        const f = this.state.filters;
+        this.container.innerHTML=`
+          <div class="mmb-widget">
+            ${this.renderFilters(f)}
+            <div class="mmb-admin-list-wrap">${this.renderTable()}</div>
+            ${this.renderFooter()}
+          </div>`;
+        this.bindTableActions();
+        const btn = document.getElementById(`btn-reset-${this.instanceId}`);
+        if(btn && !btn._bound){ btn.addEventListener('click', ()=> this.resetFilters()); btn._bound=true; }
+      }
+
+      renderFilters(f){
+        return `
+        <div class="mmb-admin-filters">
+          <select id="filter-status-${this.instanceId}">
+            <option value="">Status: Alle</option>
+            <option value="pending"   ${f.status==='pending'?'selected':''}>Ausstehend</option>
+            <option value="confirmed" ${f.status==='confirmed'?'selected':''}>Bestätigt</option>
+            <option value="rejected"  ${f.status==='rejected'?'selected':''}>Abgelehnt</option>
+            <option value="cancelled" ${f.status==='cancelled'?'selected':''}>Storniert</option>
+          </select>
+          <select id="filter-box-${this.instanceId}">
+            <option value="">Box: Alle</option>
+            ${this.state.boxes.map(b=>`<option value="${b.id}" ${f.box===b.id?'selected':''}>${b.name}</option>`).join('')}
+          </select>
+          <input id="filter-id-${this.instanceId}" inputmode="numeric" pattern="[0-9]*" placeholder="ID (z. B. 00123)" value="${this.escape(f.id)}"/>
+          <input id="filter-name-${this.instanceId}" placeholder="Name oder E-Mail" value="${this.escape(f.name)}"/>
+          <div style="justify-self:end;">
+            <button class="mmb-btn mmb-reset" id="btn-reset-${this.instanceId}">Alle Filter löschen</button>
+          </div>
+        </div>`;
+      }
+
+      renderTable(){
+        const rows = (this.state.bookings||[]);
+        if(!rows.length){
+          return `
+            <table class="mmb-bookings-table">
+              <thead>
+                <tr><th>ID</th><th>Kunde</th><th>Box</th><th>Zeitraum</th><th>Status</th><th>Preis</th><th>Erstellt</th><th>Aktionen</th></tr>
+              </thead>
+              <tbody><tr><td colspan="8" style="padding:1rem;color:var(--mmb-text-light);">Keine Buchungen vorhanden</td></tr></tbody>
+            </table>`;
+        }
+        return `
+        <table class="mmb-bookings-table">
+          <thead>
+            <tr><th>ID</th><th>Kunde</th><th>Box</th><th>Zeitraum</th><th>Status</th><th>Preis</th><th>Erstellt</th><th>Aktionen</th></tr>
+          </thead>
+          <tbody>
+            ${rows.map(b=>this.renderRow(b)).join('')}
+          </tbody>
+        </table>`;
+      }
+
+      renderRow(b){
+        const isConfirmed = b.status==='confirmed';
+        const isRejected  = b.status==='rejected';
+        const isCancelled = b.status==='cancelled';
+
+        return `
+        <tr>
+          <td><span class="badge-id">${displayId(b.id)}</span></td>
+          <td><div class="cell--name">${this.escape(b.customer_name)}</div><div class="cell--email" style="font-size:.75rem;color:var(--mmb-text-light);">${this.escape(b.customer_email)}</div></td>
+          <td class="cell--box">${this.escape(b.box_name)}</td>
+          <td class="cell--date">${MMBCore.Utils.formatDateRange(new Date(b.start_date), new Date(b.end_date))}</td>
+          <td><span class="cell--status mmb-status-badge mmb-status-${b.status}">${this.translateStatus(b.status)}</span></td>
+          <td class="cell--total">${Number(b.price_total).toLocaleString('de-DE')}€</td>
+          <td>${new Date(b.created_at).toLocaleDateString('de-DE')}</td>
+          <td>
+            <div style="display:flex;gap:.25rem;flex-wrap:wrap;">
+              <button class="mmb-btn mmb-btn-small mmb-btn-success"
+                      data-action="confirmBooking" data-id="${b.id}"
+                      title="${isConfirmed?'Bereits bestätigt':'Buchung bestätigen'}"
+                      ${isConfirmed ? 'disabled aria-disabled="true"' : ''}>✓</button>
+
+              <button class="mmb-btn mmb-btn-small mmb-btn-danger"
+                      data-action="declineBooking" data-id="${b.id}"
+                      title="${isRejected?'Bereits abgelehnt':'Buchung ablehnen'}"
+                      ${isRejected ? 'disabled aria-disabled="true"' : ''}>×</button>
+
+              <button class="mmb-btn mmb-btn-small mmb-btn-warning"
+                      data-action="offerAlternative" data-id="${b.id}"
+                      title="Alternative Box vorschlagen">Alt</button>
+
+              <button class="mmb-btn mmb-btn-small"
+                      data-action="editBooking" data-id="${b.id}"
+                      title="Buchung bearbeiten">✍🏼</button>
+            </div>
+          </td>
+        </tr>`;
+      }
+
+      renderFooter(){
+        const shown = (this.state.bookings||[]).filter(r=>r && r.id).length;
+        const total = (this.state.originalBookings||[]).length;
+        return `<div class="mmb-footer">${shown} von ${total} Buchungen</div>`;
+      }
+
+      // ---------- Events ----------
+      bindUI(){
+        // Live-Filtern + Fokus halten
+        this.container.addEventListener('input', (e)=>{
+          const t = e.target;
+          if(!t.id) return;
+          const snap = this.snapshotFocus();
+          if(t.id===`filter-id-${this.instanceId}`){
+            this.state.filters.id = (t.value||'').replace(/[^\d]/g,''); // nur Ziffern
+            this.applyFilters(snap);
+          }
+          if(t.id===`filter-name-${this.instanceId}`){
+            this.state.filters.name = (t.value||'');
+            this.applyFilters(snap);
+          }
+        });
+        this.container.addEventListener('change', (e)=>{
+          const t = e.target;
+          if(!t.id) return;
+          const snap = this.snapshotFocus();
+          if(t.id===`filter-status-${this.instanceId}`){
+            this.state.filters.status = t.value||'';
+            this.applyFilters(snap);
+          }
+          if(t.id===`filter-box-${this.instanceId}`){
+            this.state.filters.box = t.value||'';
+            this.applyFilters(snap);
+          }
+          if(t.id===`btn-reset-${this.instanceId}`){
+            this.resetFilters();
+          }
+        });
+
+        const btn = document.getElementById(`btn-reset-${this.instanceId}`);
+        if(btn){ btn.addEventListener('click', ()=> this.resetFilters()); }
+      }
+
+      bindTableActions(){
+        this.container.querySelector('.mmb-widget')?.addEventListener('click', async (e)=>{
+          const btn = e.target.closest('button[data-action]');
+          if(!btn) return;
+          if (btn.disabled || btn.getAttribute('aria-disabled') === 'true') return;
+          e.preventDefault();
+          const id = btn.dataset.id;
+          if(btn.dataset.action==='confirmBooking') await this.confirmBooking(id);
+          if(btn.dataset.action==='declineBooking') await this.declineBooking(id);
+          if(btn.dataset.action==='offerAlternative') await this.offerAlternative(id);
+          if(btn.dataset.action==='editBooking') await this.editBooking(id);
+        });
+      }
+
+      resetFilters(){
+        const snap = this.snapshotFocus();
+        this.state.filters = { status:'', box:'', id:'', name:'' };
+        this.applyFilters(snap);
+      }
+
+      // ---------- Filterlogik ----------
+      applyFilters(focusSnapshot=null){
+        const f = this.state.filters;
+        const rows = this.state.originalBookings.filter(x=>{
+          if (f.status && x.status!==f.status) return false;
+          if (f.box && x.box_id!==f.box) return false;
+
+          if (f.id){
+            const disp = displayId(x.id);
+            if (!disp.startsWith(f.id)) return false;
+          }
+
+          if (f.name){
+            const q = f.name.toLowerCase();
+            const inName = (x.customer_name||'').toLowerCase().includes(q);
+            const inMail = (x.customer_email||'').toLowerCase().includes(q);
+            if (!inName && !inMail) return false;
+          }
+          return true;
+        });
+
+        this.state.bookings = rows;
+
+        this.render();
+        this.restoreFocus(focusSnapshot);
+
+        const fid = document.getElementById(`filter-id-${this.instanceId}`);
+        const fnm = document.getElementById(`filter-name-${this.instanceId}`);
+        const fs  = document.getElementById(`filter-status-${this.instanceId}`);
+        const fb  = document.getElementById(`filter-box-${this.instanceId}`);
+        if(fid && fid.value !== this.state.filters.id) fid.value = this.state.filters.id;
+        if(fnm && fnm.value !== this.state.filters.name) fnm.value = this.state.filters.name;
+        if(fs && fs.value !== this.state.filters.status) fs.value = this.state.filters.status;
+        if(fb && fb.value !== this.state.filters.box) fb.value = this.state.filters.box;
+
+        const btn = document.getElementById(`btn-reset-${this.instanceId}`);
+        if(btn && !btn._bound){ btn.addEventListener('click', ()=> this.resetFilters()); btn._bound=true; }
+      }
+
+      // ---------- Aktionen ----------
+      async confirmBooking(id){
+        const b = this.state.originalBookings.find(x=>x.id===id); if(!b) return;
+        const subject = `Deine Buchung wurde bestätigt ✅ – Buchungs-ID: ${displayId(id)}`;
+        const body = this.tplConfirm(b);
+        const html = `
+          <div class="mmb-field"><strong>Buchung:</strong> ${displayId(id)} – ${this.escape(b.customer_name)} (${this.escape(b.box_name)})</div>
+          <div class="mmb-field"><label>Betreff</label><input name="subject" value="${this.escape(subject)}"/></div>
+          <div class="mmb-field"><label>Nachricht an Kund*in</label><textarea name="message">${this.escape(body)}</textarea></div>
+        `;
+        const values = await this.openModal({ title:'Buchung bestätigen', html, confirmText:'Status auf „Bestätigt“ setzen' });
+        if(!values) return;
+        await MMBApi.updateBookingStatus({ booking_id: Number(id), status: 'confirmed', send_email: 1, subject: values.subject, message: values.message });
+        await this.loadBookings();
+        MMBCore.Utils.showNotification('Buchung wurde bestätigt');
+      }
+
+      async declineBooking(id){
+        const b = this.state.originalBookings.find(x=>x.id===id); if(!b) return;
+        const subject = `Deine Buchung wurde abgelehnt ❌ – Buchungs-ID: ${displayId(id)}`;
+        const body = this.tplReject(b);
+        const html = `
+          <div class="mmb-field"><strong>Buchung:</strong> ${displayId(id)} – ${this.escape(b.customer_name)} (${this.escape(b.box_name)})</div>
+          <div class="mmb-field"><label>Grund (intern)</label><input name="reason" placeholder="z.B. Terminkonflikt"/></div>
+          <div class="mmb-field"><label>Betreff</label><input name="subject" value="${this.escape(subject)}"/></div>
+          <div class="mmb-field"><label>Nachricht an Kund*in</label><textarea name="message">${this.escape(body)}</textarea></div>
+        `;
+        const values = await this.openModal({ title:'Buchung ablehnen', html, confirmText:'Als „Abgelehnt“ markieren' });
+        if(!values) return;
+        await MMBApi.updateBookingStatus({ booking_id: Number(id), status: 'rejected', send_email: 1, subject: values.subject, message: values.message });
+        await this.loadBookings();
+        MMBCore.Utils.showNotification('Buchung wurde abgelehnt');
+      }
+
+      async offerAlternative(id){
+        const b = this.state.originalBookings.find(x=>x.id===id); if(!b) return;
+        const alternatives = [{id:'2',name:BOX_MAP['2']},{id:'3',name:BOX_MAP['3']},{id:'1',name:BOX_MAP['1']}]
+          .filter(x => x.id !== b.box_id);
+        const altMap = Object.fromEntries(alternatives.map(a=>[a.id,a]));
+        const subject = `Konflikt bei deiner Buchung ⚠️ – Buchungs-ID: ${displayId(id)}`;
+        const initialAlt = alternatives[0];
+        let body = this.tplAlternative(b, initialAlt);
+        const html = `
+          <div class="mmb-field"><strong>Buchung:</strong> ${displayId(id)} – ${this.escape(b.customer_name)}</div>
+          <div class="mmb-field"><label>Alternative Box</label>
+            <select name="alternative_box_id">
+              ${alternatives.map(x=>`<option value="${x.id}">${this.escape(x.name)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="mmb-field"><label>Betreff</label><input name="subject" value="${this.escape(subject)}"/></div>
+          <div class="mmb-field"><label>Nachricht an Kund*in</label><textarea name="message">${this.escape(body)}</textarea></div>
+        `;
+        const values = await this.openModal({
+          title:'Alternative Box vorschlagen',
+          html,
+          confirmText:'Alternative senden',
+          onMount: (form)=>{
+            const sel = form.querySelector('select[name="alternative_box_id"]');
+            const ta  = form.querySelector('textarea[name="message"]');
+            const sync = ()=>{
+              const alt = altMap[sel.value];
+              ta.value = (alt ? this.tplAlternative(b, alt) : this.tplAlternative(b, initialAlt));
+            };
+            sel.addEventListener('change', sync);
+            sync();
+          }
+        });
+        if(!values) return;
+        await MMBApi.updateBookingStatus({
+          booking_id: Number(id),
+          alternative_box_id: Number(values.alternative_box_id),
+          send_email: 1,
+          subject: values.subject,
+          message: values.message
+        });
+        MMBCore.Utils.showNotification('Alternative vorgeschlagen (Mail gesendet)');
+      }
+
+      async editBooking(id){
+        const b = this.state.originalBookings.find(x=>x.id===id); if(!b) return;
+        const boxOptions = [{id:'1',name:BOX_MAP['1']},{id:'2',name:BOX_MAP['2']},{id:'3',name:BOX_MAP['3']}]
+          .map(x => `<option value="${x.id}" ${x.id===b.box_id?'selected':''}>${this.escape(x.name)}</option>`).join('');
+        const subject = `Buchung aktualisiert – ${displayId(id)}`;
+        const body = this.tplEditInfo(b);
+        const html = `
+          <div class="mmb-grid-2">
+            <div class="mmb-field"><label>Kundename</label><input name="customer_name" value="${this.escape(b.customer_name)}"/></div>
+            <div class="mmb-field"><label>E-Mail</label><input name="customer_email" value="${this.escape(b.customer_email)}"/></div>
+          </div>
+          <div class="mmb-grid-2">
+            <div class="mmb-field"><label>Telefon</label><input name="customer_phone" value="${this.escape(b.customer_phone)}"/></div>
+            <div class="mmb-field"><label>Box</label><select name="box_id">${boxOptions}</select></div>
+          </div>
+          <div class="mmb-grid-2">
+            <div class="mmb-field"><label>Start (YYYY-MM-DD)</label><input name="start_date" value="${this.escape(b.start_date)}"/></div>
+            <div class="mmb-field"><label>Ende (YYYY-MM-DD)</label><input name="end_date" value="${this.escape(b.end_date)}"/></div>
+          </div>
+          <div class="mmb-grid-2">
+            <div class="mmb-field"><label>Status</label>
+              <select name="status">
+                <option value="pending" ${b.status==='pending'?'selected':''}>Ausstehend</option>
+                <option value="confirmed" ${b.status==='confirmed'?'selected':''}>Bestätigt</option>
+                <option value="rejected" ${b.status==='rejected'?'selected':''}>Abgelehnt</option>
+                <option value="cancelled" ${b.status==='cancelled'?'selected':''}>Storniert</option>
+              </select>
+            </div>
+            <div class="mmb-field"><label>Preis (EUR)</label><input name="total_amount" value="${this.escape(b.price_total)}"/></div>
+          </div>
+          <hr style="border:none;border-top:1px solid var(--mmb-border);margin:.75rem 0"/>
+          <div class="mmb-field"><label>Betreff (E-Mail an Kund*in)</label><input name="subject" value="${this.escape(subject)}"/></div>
+          <div class="mmb-field"><label>Nachricht (E-Mail an Kund*in)</label><textarea name="message">${this.escape(body)}</textarea></div>
+        `;
+        const values = await this.openModal({ title:`Buchung bearbeiten – ${displayId(id)}`, html, confirmText:'Änderungen speichern' });
+        if(!values) return;
+
+        // Server: alles über den EINEN Endpoint – inkl. Mail
+        const update = {
+          customer_name: values.customer_name,
+          customer_email: values.customer_email,
+          customer_phone: values.customer_phone,
+          box_id: Number(values.box_id),
+          start_date: values.start_date,
+          end_date: values.end_date,
+          status: values.status,
+          total_amount: Number(values.total_amount)
+        };
+        await MMBApi.updateBookingStatus({
+          booking_id: Number(id),
+          update,
+          send_email: 1,
+          subject: values.subject,
+          message: values.message
+        });
+
+        // Optimistisches Update in der Liste:
+        const updated = {
+          ...b,
+          customer_name: values.customer_name,
+          customer_email: values.customer_email,
+          customer_phone: values.customer_phone,
+          box_id: String(values.box_id),
+          box_name: BOX_MAP[String(values.box_id)] || b.box_name,
+          start_date: values.start_date,
+          end_date: values.end_date,
+          status: values.status,
+          price_total: Number(values.total_amount)
+        };
+        this.state.originalBookings = this.state.originalBookings.map(x=> x.id===id ? updated : x);
+        const snap = this.snapshotFocus();
+        this.applyFilters(snap);
+        MMBCore.Utils.showNotification('Buchung aktualisiert & Mail gesendet');
+      }
+
+      // ---------- Modal & Utils ----------
+      openModal({ title, html, confirmText='OK', cancelText='Abbrechen', onMount=null }){
+        return new Promise((resolve)=>{
+          const modal = document.createElement('div');
+          modal.className = 'mmb-modal';
+          modal.innerHTML = `
+            <div class="mmb-modal-content" role="dialog" aria-modal="true">
+              <h3>${title}</h3>
+              <form id="mmb-modal-form">
+                ${html}
+                <div class="mmb-modal-actions">
+                  <button type="button" class="mmb-modal-btn mmb-modal-btn-secondary" data-cancel>${cancelText}</button>
+                  <button type="submit" class="mmb-modal-btn mmb-modal-btn-primary">${confirmText}</button>
+                </div>
+              </form>
+            </div>`;
+          document.body.appendChild(modal);
+
+          const form = modal.querySelector('#mmb-modal-form');
+          const cancelBtn = modal.querySelector('[data-cancel]');
+
+          if(typeof onMount==='function'){ try{ onMount(form, modal); }catch(e){} }
+
+          cancelBtn.addEventListener('click', ()=>{ modal.remove(); resolve(null); });
+          modal.addEventListener('click', (ev)=>{ if(ev.target===modal) { modal.remove(); resolve(null); }});
+          form.addEventListener('submit', (ev)=>{
+            ev.preventDefault();
+            const data = new FormData(form);
+            const values = {};
+            data.forEach((v,k)=>{ values[k]=v; });
+            modal.remove();
+            resolve(values);
+          });
+        });
+      }
+
+      escape(s){ return (s??'').toString().replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+      translateStatus(s){ return ({pending:'Ausstehend',confirmed:'Bestätigt',rejected:'Abgelehnt',cancelled:'Storniert'})[s]||s; }
+
+      tplConfirm(b){
+        const range = `${new Date(b.start_date).toLocaleDateString('de-DE')} – ${new Date(b.end_date).toLocaleDateString('de-DE')}`;
+        return `Hallo ${b.customer_name},
+
+hier sind hervorragende Neuigkeiten für dich 🎉
+Wir haben deine Buchung mit der Buchungs-ID: ${displayId(b.id)} bestätigt.
+
+Deine Buchung im Überblick:
+👤 Name: ${b.customer_name}
+📧 E-Mail: ${b.customer_email}
+🎵 Musikbox: ${b.box_name}
+🕰️ Zeitraum: ${range}
+💶 Gesamtkosten: ${Math.round(b.price_total)}€
+
+Bitte überprüfe einmal, ob wir deine Buchung korrekt hinterlegt haben.
+
+Falls du noch offene Fragen hast, kannst du uns jederzeit kontaktieren.
+
+Viele Grüße
+Dein MietMichBox Team
+www.mietmichbox.de
+
+E-Mail: info@mietmichbox.de
+Telefon: 01742015500`;
+      }
+
+      tplReject(b){
+        const range = `${new Date(b.start_date).toLocaleDateString('de-DE')} – ${new Date(b.end_date).toLocaleDateString('de-DE')}`;
+        return `Hallo ${b.customer_name},
+
+vielen Dank für deine Buchung (${displayId(b.id)}) für den Zeitraum ${range}.
+Leider können wir diese Buchung nicht annehmen, da zu deinem gewählten Zeitraum bereits alle unsere Musikboxen vermietet sind.
+
+Du kannst gerne direkt in unserem <a href="https://www.mietmichbox.de/buchungskalender" target="_blank" rel="noopener">Buchungskalender</a> eine neue Buchung zu einem anderen Zeitraum anfragen oder uns als Antwort auf diese E-Mail alternative Zeiträume nennen, sodass wir gemeinsam eine Lösung finden können. Wir helfen dir gerne schnellstmöglich weiter.
+
+Falls du noch offene Fragen hast, kannst du uns jederzeit kontaktieren.
+
+Viele Grüße
+Dein MietMichBox Team
+www.mietmichbox.de
+
+E-Mail: info@mietmichbox.de
+Telefon: 01742015500`;
+      }
+
+      tplAlternative(b, alt){
+        const range = `${new Date(b.start_date).toLocaleDateString('de-DE')} – ${new Date(b.end_date).toLocaleDateString('de-DE')}`;
+        return `Hallo ${b.customer_name},
+
+tut uns leid, aber unsere Musikboxen sind sehr gefragt 🔥
+
+Für deine Buchung (${displayId(b.id)}) ist die Musikbox ${b.box_name} für den Zeitraum ${range} leider nicht mehr verfügbar. Wir schlagen dir als Alternative die ${alt?.name||'—'} vor.
+
+Du kannst gerne direkt in unserem <a href="https://www.mietmichbox.de/buchungskalender" target="_blank" rel="noopener">Buchungskalender</a> eine neue Buchung mit einer anderen Musikbox oder zu einem anderen Zeitraum anfragen. Alternativ kannst du uns auch als Antwort auf diese E-Mail die alternative Musikbox oder den alternativen Zeitraum nennen, sodass wir deine Buchung aktualisieren können. Wir helfen dir gerne schnellstmöglich weiter.
+
+Falls du noch offene Fragen hast, kannst du uns jederzeit kontaktieren.
+
+Viele Grüße
+Dein MietMichBox Team
+www.mietmichbox.de
+
+E-Mail: info@mietmichbox.de
+Telefon: 01742015500`;
+      }
+
+      tplEditInfo(b){
+        const range = `${new Date(b.start_date).toLocaleDateString('de-DE')} – ${new Date(b.end_date).toLocaleDateString('de-DE')}`;
+        return `Hallo ${b.customer_name},
+
+wir haben deine Buchung (${displayId(b.id)}) aktualisiert.
+• Zeitraum: ${range}
+• Box: ${b.box_name}
+
+Falls etwas nicht passt, antworte einfach auf diese E-Mail.
+
+Viele Grüße
+Dein MietMichBox Team`;
+      }
+    }
+
+    injectAdminListCSS();
+    global.MietMichBoxAdminList={ init:(opts)=>new AdminList(opts) };
+
+  })(window);
+  </script>
+
+  <!-- ======================= INIT ======================= -->
+  <script>
+    document.addEventListener('DOMContentLoaded', function(){
+      MietMichBoxAdminList.init({ container:'#mmb-admin-list', locale:'de-DE', timezone:'Europe/Berlin' });
+    });
+  </script>
+</body>
+</html>

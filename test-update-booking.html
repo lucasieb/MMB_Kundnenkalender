@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8"/>
+  <title>Test – Admin Buchungsaktionen</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:900px;margin:24px auto;padding:0 16px;color:#222}
+    fieldset{border:1px solid #ddd;border-radius:8px;margin:12px 0;padding:12px}
+    legend{padding:0 6px;color:#555}
+    label{display:block;margin:8px 0 4px}
+    input,select,textarea{width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;box-sizing:border-box}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    button{padding:10px 14px;border:1px solid #0ea5e9;background:#0ea5e9;color:#fff;border-radius:8px;cursor:pointer;font-weight:600}
+    button.secondary{border-color:#999;background:#fff;color:#333}
+    .btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+    pre{background:#f7f7f9;border:1px solid #eee;border-radius:8px;padding:12px;white-space:pre-wrap}
+    .hint{color:#666;font-size:.95rem}
+  </style>
+</head>
+<body>
+  <h1>Test – Admin Buchungsaktionen</h1>
+  <p class="hint">Mit diesem Formular kannst du <b>update_booking_status.php</b> testen, ohne Konsole. Trage unten eine <b>echte Booking-ID</b> ein und klicke auf eine Aktion.</p>
+
+  <fieldset>
+    <legend>Allgemein</legend>
+    <label>Buchungs-ID (intern)</label>
+    <input id="booking_id" type="number" placeholder="z. B. 123" required>
+
+    <label><input id="send_email" type="checkbox" checked> E-Mail senden</label>
+
+    <div class="row">
+      <div>
+        <label>Eigener Betreff (optional)</label>
+        <input id="subject" type="text" placeholder="frei lassen = Standard">
+      </div>
+      <div>
+        <label>Alternative Box-ID (optional)</label>
+        <input id="alt_box" type="number" placeholder="2 oder 3, frei lassen wenn nicht nötig">
+      </div>
+    </div>
+
+    <label>Eigene Nachricht (optional)</label>
+    <textarea id="message" rows="5" placeholder="Wenn leer, wird die passende Vorlage verwendet."></textarea>
+  </fieldset>
+
+  <fieldset>
+    <legend>Bearbeiten (optional)</legend>
+    <div class="row">
+      <div>
+        <label>Neuer Kundenname</label>
+        <input id="u_name" type="text" placeholder="frei lassen = unverändert">
+      </div>
+      <div>
+        <label>Neue E-Mail</label>
+        <input id="u_email" type="email" placeholder="frei lassen = unverändert">
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label>Neue Box-ID</label>
+        <input id="u_box" type="number" placeholder="1, 2 oder 3">
+      </div>
+      <div>
+        <label>Neuer Gesamtpreis</label>
+        <input id="u_total" type="number" step="0.01" placeholder="z. B. 159.00">
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label>Neues Startdatum (YYYY-MM-DD)</label>
+        <input id="u_start" type="text" placeholder="2025-12-10">
+      </div>
+      <div>
+        <label>Neues Enddatum (YYYY-MM-DD)</label>
+        <input id="u_end" type="text" placeholder="2025-12-12">
+      </div>
+    </div>
+  </fieldset>
+
+  <div class="btns">
+    <button id="btn-confirm">Buchung bestätigen</button>
+    <button id="btn-reject" class="secondary">Buchung ablehnen</button>
+    <button id="btn-pending" class="secondary">Status auf &bdquo;ausstehend&ldquo;</button>
+    <button id="btn-update" class="secondary">Nur bearbeiten (keine Statusänderung)</button>
+    <button id="btn-alt" class="secondary">Alternative vorschlagen</button>
+  </div>
+
+  <h3>Antwort</h3>
+  <pre id="out">–</pre>
+
+<script>
+const API = 'update_booking_status.php'; // gleicher Ordner wie diese Seite
+
+function getPayload(base={}) {
+  const id = Number(document.getElementById('booking_id').value||0);
+  const send_email = document.getElementById('send_email').checked ? 1 : 0;
+  const subject = document.getElementById('subject').value.trim();
+  const message = document.getElementById('message').value.trim();
+  const altBox = Number(document.getElementById('alt_box').value||0);
+
+  const update = {};
+  const u = (id, v)=>{ if(v) update[id]=v; };
+
+  u('customer_name', document.getElementById('u_name').value.trim());
+  u('customer_email', document.getElementById('u_email').value.trim());
+  const ub = document.getElementById('u_box').value.trim(); if(ub) update['box_id']=Number(ub);
+  const ut = document.getElementById('u_total').value.trim(); if(ut) update['total_amount']=Number(ut);
+  const us = document.getElementById('u_start').value.trim(); if(us) update['start_date']=us;
+  const ue = document.getElementById('u_end').value.trim(); if(ue) update['end_date']=ue;
+
+  const payload = { booking_id:id, send_email, ...base };
+  if(Object.keys(update).length) payload.update = update;
+  if(altBox) payload.alternative_box_id = altBox;
+  if(subject) payload.subject = subject;
+  if(message) payload.message = message;
+  return payload;
+}
+
+async function call(payload){
+  const out = document.getElementById('out');
+  out.textContent = 'Sende…';
+  try{
+    const res = await fetch(API, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const txt = await res.text();
+    out.textContent = txt;
+  }catch(e){
+    out.textContent = 'Fehler: ' + e;
+  }
+}
+
+document.getElementById('btn-confirm').onclick = ()=> call(getPayload({status:'confirmed'}));
+document.getElementById('btn-reject').onclick  = ()=> call(getPayload({status:'rejected'}));
+document.getElementById('btn-pending').onclick = ()=> call(getPayload({status:'pending'}));
+document.getElementById('btn-update').onclick  = ()=> call(getPayload({}));
+document.getElementById('btn-alt').onclick     = ()=> call(getPayload({}));
+</script>
+</body>
+</html>

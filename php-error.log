@@ -1,0 +1,7 @@
+[22-Sep-2025 21:12:11 Europe/Berlin] PHP Fatal error:  Cannot redeclare pdo() (previously declared in /home/u555265653/domains/firebrick-squirrel-568721.hostingersite.com/public_html/db.php:41) in /home/u555265653/domains/firebrick-squirrel-568721.hostingersite.com/public_html/db.php on line 41
+[22-Sep-2025 21:12:19 Europe/Berlin] PHP Fatal error:  Cannot redeclare pdo() (previously declared in /home/u555265653/domains/firebrick-squirrel-568721.hostingersite.com/public_html/db.php:41) in /home/u555265653/domains/firebrick-squirrel-568721.hostingersite.com/public_html/db.php on line 41
+[22-Sep-2025 21:37:50 Europe/Berlin] booking_alternatives insert failed: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'u555265653_mmb_prod.booking_alternatives' doesn't exist
+[24-Sep-2025 11:25:45 Europe/Berlin] booking_alternatives insert failed: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'u555265653_mmb_prod.booking_alternatives' doesn't exist
+[24-Sep-2025 16:27:59 Europe/Berlin] booking_alternatives insert failed: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'u555265653_mmb_prod.booking_alternatives' doesn't exist
+[28-Sep-2025 15:47:57 Europe/Berlin] booking_alternatives insert failed: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'u555265653_mmb_prod.booking_alternatives' doesn't exist
+[28-Sep-2025 15:48:14 Europe/Berlin] booking_alternatives insert failed: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'u555265653_mmb_prod.booking_alternatives' doesn't exist
