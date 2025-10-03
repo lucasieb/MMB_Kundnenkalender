@@ -2,7 +2,7 @@ name: Deploy via SFTP to Hostinger
 
 on:
   push:
-    branches: [ "public_html" ]   # ODER: "main" – je nach deinem Flow
+    branches: [ "main" ]   # ODER: "main" – je nach deinem Flow
   workflow_dispatch: {}
 
 jobs:
