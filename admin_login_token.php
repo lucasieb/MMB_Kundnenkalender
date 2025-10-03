@@ -1,13 +1,12 @@
 <?php
 declare(strict_types=1);
 
-require __DIR__ . '/db.php';
 require __DIR__ . '/auth.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-if ($method !== 'POST') {
+if ($method !== 'GET') {
     http_response_code(405);
     echo json_encode(['ok' => false, 'error' => 'Method not allowed']);
     exit;
@@ -58,38 +57,12 @@ if ($allowedOrigins) {
     }
 }
 
-$email = isset($_POST['email']) ? trim((string)$_POST['email']) : '';
-$pass  = isset($_POST['pass']) ? (string)$_POST['pass'] : '';
-$csrf  = isset($_POST['csrf_token']) ? (string)$_POST['csrf_token'] : '';
-
-$errors = [];
-if ($email === '') {
-    $errors['email'] = 'Email is required.';
-}
-if ($pass === '') {
-    $errors['pass'] = 'Password is required.';
-}
-if ($csrf === '' || empty($_SESSION['admin_csrf_token']) || !hash_equals((string)$_SESSION['admin_csrf_token'], $csrf)) {
-    $errors['csrf_token'] = 'Invalid CSRF token.';
-}
-if ($errors) {
-    http_response_code(422);
-    echo json_encode(['ok' => false, 'errors' => $errors]);
-    exit;
+if (empty($_SESSION['admin_csrf_token'])) {
+    $_SESSION['admin_csrf_token'] = bin2hex(random_bytes(32));
 }
 
-$stmt = pdo()->prepare('SELECT id, password_hash FROM admins WHERE email=?');
-$stmt->execute([$email]);
-$row = $stmt->fetch();
-
-if (!$row || !password_verify($pass, $row['password_hash'])) {
-    http_response_code(401);
-    echo json_encode(['ok' => false, 'error' => 'Login failed']);
-    exit;
-}
-
-session_regenerate_id(true);
-$_SESSION['admin_id'] = (int)$row['id'];
-unset($_SESSION['admin_csrf_token']);
-
-echo json_encode(['ok' => true]);
+echo json_encode([
+    'ok' => true,
+    'token' => $_SESSION['admin_csrf_token'],
+    'authenticated' => !empty($_SESSION['admin_id']),
+]);

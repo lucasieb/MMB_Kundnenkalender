@@ -11,6 +11,7 @@
     .card{background:#fff;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.1);overflow:hidden;}
     .card h1{margin:0;padding:1rem;border-bottom:1px solid #e5e7eb;background:#f8f9fa;font-size:1.25rem;}
     .card .content{padding:1rem;}
+    .mmb-error{margin-top:1.5rem;padding:1rem;border-radius:6px;background:#fee2e2;color:#b91c1c;font-weight:600;}
   </style>
 </head>
 <body>
@@ -24,6 +25,7 @@
   </div>
 
   <!-- ======================= MMB CORE ======================= -->
+  <script src="admin_auth.js"></script>
   <script>
   (function(global){'use strict';
 
@@ -85,7 +87,7 @@
 
   <!-- ======================= MMB API ======================= -->
   <script>
-    const MMB_API_BASE='https://firebrick-squirrel-568721.hostingersite.com/';
+    const MMB_API_BASE = MMBAdminAuth.getApiBase();
 
     async function mmbApiGet(path){
       const res=await fetch(MMB_API_BASE+path,{credentials:'include'});
@@ -725,8 +727,17 @@ Dein MietMichBox Team`;
 
   <!-- ======================= INIT ======================= -->
   <script>
-    document.addEventListener('DOMContentLoaded', function(){
-      MietMichBoxAdminList.init({ container:'#mmb-admin-list', locale:'de-DE', timezone:'Europe/Berlin' });
+    document.addEventListener('DOMContentLoaded', async function(){
+      try {
+        await MMBAdminAuth.ensureSession();
+        MietMichBoxAdminList.init({ container:'#mmb-admin-list', locale:'de-DE', timezone:'Europe/Berlin' });
+      } catch (error) {
+        console.error('Admin-Login konnte nicht initialisiert werden', error);
+        const container = document.querySelector('#mmb-admin-list');
+        if (container) {
+          container.innerHTML = '<p class="mmb-error">Der Admin-Login konnte nicht initialisiert werden. Bitte prüfen Sie die HTTPS-Verbindung oder wenden Sie sich an den Support.</p>';
+        }
+      }
     });
   </script>
 </body>
