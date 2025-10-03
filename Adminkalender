@@ -44,6 +44,7 @@
     .mmb-day:nth-child(7n){border-right:none;}
     .mmb-day--other-month{color:var(--mmb-text-light);opacity:.5;}
     .mmb-day--available{background:var(--mmb-bg);} .mmb-day--busy{background:#fee2e2;color:#991b1b;} .mmb-day--blocked{background:#f3f4f6;color:var(--mmb-text-light);cursor:not-allowed;}
+    .mmb-error{margin-top:1rem;padding:1rem;border-radius:6px;background:#fee2e2;color:#b91c1c;font-weight:600;}
   </style>
 </head>
 <body>
@@ -54,6 +55,7 @@
     </div>
   </div>
 
+  <script src="admin_auth.js"></script>
   <script>
   /* ============ CORE ============ */
   (function(global){'use strict';
@@ -74,7 +76,7 @@
   })(window);
 
   /* ============ API ============ */
-  const MMB_API_BASE='https://firebrick-squirrel-568721.hostingersite.com/';
+  const MMB_API_BASE = MMBAdminAuth.getApiBase();
   async function mmbApiPost(path,body){
     const res=await fetch(MMB_API_BASE+path,{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(body||{})});
     const t=await res.text(); let d; try{d=JSON.parse(t);}catch{d={ok:false,raw:t};}
@@ -180,8 +182,19 @@
       }
     }
 
-    function start(){ new AdminCalendar('#mmb-admin-cal'); }
-    if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded', start); } else { start(); }
+    async function start(){
+      try {
+        await MMBAdminAuth.ensureSession();
+        new AdminCalendar('#mmb-admin-cal');
+      } catch (error) {
+        console.error('Admin-Login konnte nicht initialisiert werden', error);
+        const container = document.querySelector('#mmb-admin-cal');
+        if (container) {
+          container.innerHTML = '<p class="mmb-error">Der Admin-Login konnte nicht initialisiert werden. Bitte prüfen Sie die HTTPS-Verbindung oder wenden Sie sich an den Support.</p>';
+        }
+      }
+    }
+    if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded', start); } else { void start(); }
   })(window);
   </script>
 </body>
