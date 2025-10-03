@@ -30,11 +30,21 @@ if (function_exists('mb_internal_encoding')) {
 // PHP-Zeitzone
 date_default_timezone_set('Europe/Berlin');
 
+require_once __DIR__ . '/lib/env.php';
+
 // ---- DB-Zugangsdaten ----
-const DB_HOST = 'localhost';
-const DB_NAME = 'u555265653_mmb_prod';
-const DB_USER = 'u555265653_mmb_user';
-const DB_PASS = 'MMB.de2025';
+if (!defined('DB_HOST')) {
+  define('DB_HOST', get_required_env('DB_HOST'));
+}
+if (!defined('DB_NAME')) {
+  define('DB_NAME', get_required_env('DB_NAME'));
+}
+if (!defined('DB_USER')) {
+  define('DB_USER', get_required_env('DB_USER'));
+}
+if (!defined('DB_PASS')) {
+  define('DB_PASS', get_required_env('DB_PASS'));
+}
 // -------------------------
 
 /** Singleton-PDO + MySQL-Session-Zeitzone (DST-sicher) */
