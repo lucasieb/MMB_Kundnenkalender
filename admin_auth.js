@@ -1,22 +1,60 @@
 (function(global){
   'use strict';
 
-  const secureOrigin = (function(){
-    if (global.location.protocol === 'https:') {
-      return global.location.origin;
+  const scriptBaseUrl = (function(){
+    const current = document.currentScript;
+    const resolveUrl = (value) => {
+      if (!value) return null;
+      try {
+        return new URL(value, global.location.href);
+      } catch (_) {
+        return null;
+      }
+    };
+    const resolvedCurrent = current ? resolveUrl(current.getAttribute('src') || current.src) : null;
+    if (resolvedCurrent) {
+      return resolvedCurrent;
     }
-    const host = global.location.host || global.location.hostname;
-    return host ? `https://${host}` : 'https://'+global.location.hostname;
+    const scripts = document.getElementsByTagName('script');
+    for (let i = scripts.length - 1; i >= 0; i--) {
+      const candidate = scripts[i];
+      if (!candidate || !candidate.src) {
+        continue;
+      }
+      if (candidate.src.indexOf('admin_auth.js') === -1) {
+        continue;
+      }
+      const resolved = resolveUrl(candidate.src);
+      if (resolved) {
+        return resolved;
+      }
+    }
+    return resolveUrl('admin_auth.js') || new URL(global.location.href);
   })();
-  const API_BASE = secureOrigin.replace(/\/$/, '') + '/';
-  const TOKEN_ENDPOINT = API_BASE + 'admin_login_token.php';
-  const LOGIN_ENDPOINT = API_BASE + 'admin_login.php';
+
+  const secureBaseUrl = (function(){
+    const base = new URL(scriptBaseUrl.href);
+    if (global.location.protocol === 'https:') {
+      base.protocol = 'https:';
+      base.host = global.location.host;
+      return base;
+    }
+    if (base.protocol !== 'https:' && base.hostname) {
+      base.protocol = 'https:';
+    }
+    return base;
+  })();
+
+  const apiBaseUrl = new URL('./', secureBaseUrl);
+  const API_BASE = apiBaseUrl.href;
+  const TOKEN_ENDPOINT = new URL('admin_login_token.php', apiBaseUrl).href;
+  const LOGIN_ENDPOINT = new URL('admin_login.php', apiBaseUrl).href;
   const STYLE_ID = 'mmb-admin-auth-style';
 
   let overlay;
   let form;
-  let emailInput;
-  let passInput;
+  let usernameInput;
+  let passwordInput;
   let errorBox;
   let submitButton;
   let pendingResolve = null;
@@ -63,12 +101,12 @@
           <p class="mmb-login-hint">Bitte melden Sie sich an, um fortzufahren.</p>
           <div class="mmb-login-error" role="alert" hidden></div>
           <label class="mmb-login-field">
-            <span>E-Mail-Adresse</span>
-            <input type="email" name="email" autocomplete="username" required />
+            <span>Benutzername</span>
+            <input type="text" name="username" autocomplete="username" required />
           </label>
           <label class="mmb-login-field">
             <span>Passwort</span>
-            <input type="password" name="pass" autocomplete="current-password" required />
+            <input type="password" name="password" autocomplete="current-password" required />
           </label>
           <button type="submit" class="mmb-login-submit">Anmelden</button>
           <p class="mmb-login-footer">Die Übertragung erfolgt ausschließlich über HTTPS.</p>
@@ -77,8 +115,8 @@
     `;
     document.body.appendChild(overlay);
     form = overlay.querySelector('form');
-    emailInput = overlay.querySelector('input[name="email"]');
-    passInput = overlay.querySelector('input[name="pass"]');
+    usernameInput = overlay.querySelector('input[name="username"]');
+    passwordInput = overlay.querySelector('input[name="password"]');
     errorBox = overlay.querySelector('.mmb-login-error');
     submitButton = overlay.querySelector('.mmb-login-submit');
     form.addEventListener('submit', onSubmit);
@@ -89,7 +127,7 @@
     ensureOverlay();
     overlay.hidden = false;
     overlay.classList.add('is-visible');
-    setTimeout(() => { emailInput?.focus(); }, 50);
+    setTimeout(() => { usernameInput?.focus(); }, 50);
   }
 
   function hideOverlay(){
@@ -147,13 +185,13 @@
     return parts.join(' ') || 'Unbekannter Fehler';
   }
 
-  async function performLogin(email, password){
+  async function performLogin(username, password){
     if (!csrfToken) {
       await fetchState();
     }
     const body = new URLSearchParams();
-    body.set('email', email);
-    body.set('pass', password);
+    body.set('username', username);
+    body.set('password', password);
     if (csrfToken) {
       body.set('csrf_token', csrfToken);
     }
@@ -189,17 +227,17 @@
     event.preventDefault();
     if (!form) return;
     showError('');
-    const email = emailInput ? emailInput.value.trim() : '';
-    const password = passInput ? passInput.value : '';
-    if (!email || !password) {
-      showError('Bitte E-Mail-Adresse und Passwort eingeben.');
+    const username = usernameInput ? usernameInput.value.trim() : '';
+    const password = passwordInput ? passwordInput.value : '';
+    if (!username || !password) {
+      showError('Bitte Benutzername und Passwort eingeben.');
       return;
     }
     if (submitButton) {
       submitButton.disabled = true;
     }
     try {
-      await performLogin(email, password);
+      await performLogin(username, password);
       hideOverlay();
       showError('');
       form.reset();
