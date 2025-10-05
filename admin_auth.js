@@ -1,16 +1,54 @@
 (function(global){
   'use strict';
 
-  const secureOrigin = (function(){
-    if (global.location.protocol === 'https:') {
-      return global.location.origin;
+  const scriptBaseUrl = (function(){
+    const current = document.currentScript;
+    const resolveUrl = (value) => {
+      if (!value) return null;
+      try {
+        return new URL(value, global.location.href);
+      } catch (_) {
+        return null;
+      }
+    };
+    const resolvedCurrent = current ? resolveUrl(current.getAttribute('src') || current.src) : null;
+    if (resolvedCurrent) {
+      return resolvedCurrent;
     }
-    const host = global.location.host || global.location.hostname;
-    return host ? `https://${host}` : 'https://'+global.location.hostname;
+    const scripts = document.getElementsByTagName('script');
+    for (let i = scripts.length - 1; i >= 0; i--) {
+      const candidate = scripts[i];
+      if (!candidate || !candidate.src) {
+        continue;
+      }
+      if (candidate.src.indexOf('admin_auth.js') === -1) {
+        continue;
+      }
+      const resolved = resolveUrl(candidate.src);
+      if (resolved) {
+        return resolved;
+      }
+    }
+    return resolveUrl('admin_auth.js') || new URL(global.location.href);
   })();
-  const API_BASE = secureOrigin.replace(/\/$/, '') + '/';
-  const TOKEN_ENDPOINT = API_BASE + 'admin_login_token.php';
-  const LOGIN_ENDPOINT = API_BASE + 'admin_login.php';
+
+  const secureBaseUrl = (function(){
+    const base = new URL(scriptBaseUrl.href);
+    if (global.location.protocol === 'https:') {
+      base.protocol = 'https:';
+      base.host = global.location.host;
+      return base;
+    }
+    if (base.protocol !== 'https:' && base.hostname) {
+      base.protocol = 'https:';
+    }
+    return base;
+  })();
+
+  const apiBaseUrl = new URL('./', secureBaseUrl);
+  const API_BASE = apiBaseUrl.href;
+  const TOKEN_ENDPOINT = new URL('admin_login_token.php', apiBaseUrl).href;
+  const LOGIN_ENDPOINT = new URL('admin_login.php', apiBaseUrl).href;
   const STYLE_ID = 'mmb-admin-auth-style';
 
   let overlay;
