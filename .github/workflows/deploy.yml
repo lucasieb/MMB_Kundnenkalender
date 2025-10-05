@@ -2,8 +2,8 @@ name: Deploy via SFTP to Hostinger
 
 on:
   push:
-    branches: [ "public_html" ]   # Dein Branch-Name mit Unterstrich
-  workflow_dispatch: {}           # Optional: manuell auslösbar
+    branches: [ "public_html" ]     # ggf. auf "main" ändern
+  workflow_dispatch: {}
 
 jobs:
   deploy:
@@ -13,6 +13,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # Build a clean deploy dir (ohne .git/.github/node_modules/Maps etc.)
+      - name: Prepare deploy folder
+        run: |
+          mkdir -p deploy
+          rsync -a \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='node_modules' \
+            --exclude='**/*.map' \
+            --exclude='**/.DS_Store' \
+            ./ deploy/
+
       - name: Deploy to Hostinger via SFTP
         uses: wlixcc/SFTP-Deploy-Action@v1.2.4
         with:
@@ -20,7 +32,7 @@ jobs:
           port: ${{ secrets.PORT }}
           username: ${{ secrets.USER }}
           ssh_private_key: ${{ secrets.SSH_PRIVATE_KEY }}
-          local_path: "./"   # nimmt alle Dateien aus deinem Branch
-          remote_path: "/home/u555265653/domains/firebrick-squirrel-568721.hostingersite.com/public_html/"
+          local_path: "./deploy"    # <— nur der bereinigte Ordner!
+          remote_path: "domains/firebrick-squirrel-568721.hostingersite.com/public_html/"  # RELATIV, nicht /home/...
           sftp_only: true
-          delete_remote_files: false
+          delete_remote_files: false   # auf true stellen, wenn du 1:1 spiegeln willst
