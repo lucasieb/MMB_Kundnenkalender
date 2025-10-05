@@ -3,6 +3,17 @@ declare(strict_types=1);
 require __DIR__ . '/cors.php';        // <-- NEU: muss vor jeglicher Ausgabe stehen
 require __DIR__ . '/db.php';
 require __DIR__ . '/auth.php';        // falls genutzt
+require_admin();
+
+$pdo = null;
+
+try {
+  $pdo = pdo();
+} catch (Throwable $dbError) {
+  http_response_code(500);
+  echo json_encode(['ok' => false, 'error' => 'DB connection failed']);
+  exit;
+}
 header('Content-Type: application/json; charset=utf-8');
 
 try {
