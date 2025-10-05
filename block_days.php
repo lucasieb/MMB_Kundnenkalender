@@ -1,6 +1,9 @@
 <?php
 declare(strict_types=1);
+require __DIR__ . '/cors.php';
 require __DIR__ . '/db.php';
+
+header('Content-Type: application/json; charset=utf-8');
 
 require __DIR__.'/auth.php';
 require_admin();
