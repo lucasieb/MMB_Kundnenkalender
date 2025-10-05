@@ -3,6 +3,10 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/lib/env.php';
 
+// Set this switch to true to allow public access without requiring an admin login.
+// Environment variable DISABLE_ADMIN_AUTH overrides this value when provided.
+const ADMIN_AUTH_DISABLED_SWITCH = true;
+
 const ADMIN_SESSION_TIMEOUT = 60 * 60 * 8; // 8 hours of inactivity.
 
 if (!function_exists('mmb_env_truthy')) {
@@ -13,8 +17,12 @@ if (!function_exists('mmb_env_truthy')) {
 }
 
 if (!defined('MMB_ADMIN_AUTH_DISABLED')) {
-  $envValue = get_optional_env('DISABLE_ADMIN_AUTH', '0');
-  define('MMB_ADMIN_AUTH_DISABLED', mmb_env_truthy($envValue));
+  $envValue = getenv('DISABLE_ADMIN_AUTH');
+  if ($envValue === false || $envValue === '') {
+    define('MMB_ADMIN_AUTH_DISABLED', ADMIN_AUTH_DISABLED_SWITCH);
+  } else {
+    define('MMB_ADMIN_AUTH_DISABLED', mmb_env_truthy($envValue));
+  }
 }
 
 function is_admin_auth_disabled(): bool {
