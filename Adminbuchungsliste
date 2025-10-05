@@ -743,10 +743,23 @@
           return;
         }
 
+        const bookingId = Number(id);
         let updatesApplied = false;
         if(hasUpdates){
+          const updatePayload = { id: bookingId };
+          Object.entries(updatesToSend).forEach(([key, value])=>{
+            if(key === 'box_id'){
+              updatePayload[key] = Number(value);
+            }else if(key === 'total_amount'){
+              const numeric = Number(value);
+              updatePayload[key] = Number.isFinite(numeric) ? Math.round(numeric * 100) / 100 : value;
+            }else{
+              updatePayload[key] = value;
+            }
+          });
+
           try {
-            await MMBApi.updateBooking({ id: Number(id), ...updatesToSend });
+            await MMBApi.updateBooking(updatePayload);
             updatesApplied = true;
           } catch (err) {
             console.error('updateBooking failed:', err);
@@ -757,23 +770,31 @@
         }
 
         let mailInfo = null;
+        let emailFailed = false;
+        let emailError = '';
+
         if(shouldSendEmail){
+          const emailPayload = {
+            booking_id: bookingId,
+            send_email: 1,
+            subject: normalizedSubject,
+            message: normalizedMessage,
+          };
+          if(sanitized.status){
+            emailPayload.status = sanitized.status;
+          }
+
           try {
-            const mailPayload = {
-              booking_id: Number(id),
-              send_email: 1,
-              subject: normalizedSubject,
-              message: normalizedMessage,
-            };
-            if(sanitized.status && sanitized.status !== originalNormalized.status){
-              mailPayload.status = sanitized.status;
+            const response = await MMBApi.updateBookingStatus(emailPayload);
+            mailInfo = response && response.mail ? response.mail : null;
+            if(mailInfo && mailInfo.sent === false){
+              emailFailed = true;
+              emailError = mailInfo.error ? ` (Fehler: ${mailInfo.error})` : '';
             }
-            const response = await MMBApi.updateBookingStatus(mailPayload);
-            mailInfo = response && response.mail ? response.mail : { sent: true };
           } catch (err) {
-            console.error('sendBookingMail failed:', err);
-            const mailError = err && err.message ? err.message : 'E-Mail-Versand fehlgeschlagen';
-            mailInfo = { sent: false, error: mailError };
+            console.error('updateBookingStatus failed:', err);
+            emailFailed = true;
+            emailError = err && err.message ? ` (${err.message})` : '';
           }
         }
 
@@ -782,13 +803,14 @@
         }
 
         if(shouldSendEmail){
-          if(mailInfo && mailInfo.sent){
-            const successMsg = updatesApplied ? 'Buchung aktualisiert & Mail gesendet' : 'Mail gesendet';
-            MMBCore.Utils.showNotification(successMsg);
-          }else{
-            const info = mailInfo && mailInfo.error ? ` (Fehler: ${mailInfo.error})` : '';
+          if(emailFailed){
             const base = updatesApplied ? 'Buchung aktualisiert (E-Mail konnte nicht gesendet werden)' : 'E-Mail konnte nicht gesendet werden';
-            MMBCore.Utils.showNotification(base + info, 'error');
+            MMBCore.Utils.showNotification(base + emailError, 'error');
+          }else{
+            const message = updatesApplied
+              ? 'Buchung aktualisiert & Kund*in informiert'
+              : 'E-Mail an Kund*in gesendet';
+            MMBCore.Utils.showNotification(message);
           }
         }else if(updatesApplied){
           MMBCore.Utils.showNotification('Buchung aktualisiert');
