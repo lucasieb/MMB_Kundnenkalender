@@ -32,18 +32,38 @@ date_default_timezone_set('Europe/Berlin');
 
 require_once __DIR__ . '/lib/env.php';
 
+const DB_CONFIG_DEFAULTS = [
+  'DB_HOST' => 'localhost',
+  'DB_NAME' => 'u555265653_mmb_prod',
+  'DB_USER' => 'u555265653_mmb_user',
+  'DB_PASS' => 'MMB.de2025',
+];
+
+function resolve_db_config(string $key): string {
+  $env = getenv($key);
+  if ($env !== false && $env !== '') {
+    return (string) $env;
+  }
+
+  if (isset(DB_CONFIG_DEFAULTS[$key]) && DB_CONFIG_DEFAULTS[$key] !== '') {
+    return DB_CONFIG_DEFAULTS[$key];
+  }
+
+  throw new RuntimeException(sprintf('Database configuration "%s" must be provided.', $key));
+}
+
 // ---- DB-Zugangsdaten ----
 if (!defined('DB_HOST')) {
-  define('DB_HOST', get_required_env('DB_HOST'));
+  define('DB_HOST', resolve_db_config('DB_HOST'));
 }
 if (!defined('DB_NAME')) {
-  define('DB_NAME', get_required_env('DB_NAME'));
+  define('DB_NAME', resolve_db_config('DB_NAME'));
 }
 if (!defined('DB_USER')) {
-  define('DB_USER', get_required_env('DB_USER'));
+  define('DB_USER', resolve_db_config('DB_USER'));
 }
 if (!defined('DB_PASS')) {
-  define('DB_PASS', get_required_env('DB_PASS'));
+  define('DB_PASS', resolve_db_config('DB_PASS'));
 }
 // -------------------------
 
