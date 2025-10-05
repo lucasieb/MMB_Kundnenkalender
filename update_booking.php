@@ -22,14 +22,21 @@ try {
   if ($id <= 0) throw new Exception('Ungültige ID');
 
   // Whitelist erlaubter Felder
-  $allow = ['customer_name','customer_email','customer_phone','box_id','start_date','end_date','status','total_amount'];
+  $allow = ['customer_name','customer_email','customer_phone','box_id','start_date','end_date','status','total_amount','fulfillment_method','fulfillment_label','fulfillment_note','fulfillment_price_delta'];
   $sets = [];
   $params = [':id'=>$id];
   foreach ($allow as $f) {
-    if (array_key_exists($f, $data)) {
-      $sets[] = "`$f` = :$f";
-      $params[":$f"] = $data[$f];
+    if (!array_key_exists($f, $data)) {
+      continue;
     }
+    $val = $data[$f];
+    if ($f === 'box_id') {
+      $val = (int)$val;
+    } elseif ($f === 'total_amount' || $f === 'fulfillment_price_delta') {
+      $val = (float)$val;
+    }
+    $sets[] = "`$f` = :$f";
+    $params[":$f"] = $val;
   }
   if (!$sets) throw new Exception('Keine Änderungen übergeben');
 
