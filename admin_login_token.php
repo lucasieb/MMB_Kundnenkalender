@@ -14,7 +14,7 @@ if ($method !== 'GET') {
 }
 
 $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
-    || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower((string)$_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https');
+    || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower((string) $_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https');
 if (!$https) {
     http_response_code(400);
     echo json_encode(['ok' => false, 'error' => 'HTTPS is required for admin login']);
@@ -35,7 +35,7 @@ if ($configuredOrigins) {
     }
 }
 if ($allowedOrigins) {
-    $allowedOrigins = array_values(array_unique(array_map(static fn(string $origin): string => rtrim($origin, '/'), $allowedOrigins)));
+    $allowedOrigins = array_values(array_unique(array_map(static fn (string $origin): string => rtrim($origin, '/'), $allowedOrigins)));
     $originHeader = $_SERVER['HTTP_ORIGIN'] ?? '';
     $refererHeader = $_SERVER['HTTP_REFERER'] ?? '';
     $candidate = $originHeader;
@@ -62,8 +62,18 @@ if (empty($_SESSION['admin_csrf_token'])) {
     $_SESSION['admin_csrf_token'] = bin2hex(random_bytes(32));
 }
 
+$authenticated = is_admin_authenticated();
+$user = null;
+if ($authenticated) {
+    $user = [
+        'username' => (string) $_SESSION['admin_username'],
+        'display_name' => (string) ($_SESSION['admin_display_name'] ?? $_SESSION['admin_username']),
+    ];
+}
+
 echo json_encode([
     'ok' => true,
     'token' => $_SESSION['admin_csrf_token'],
-    'authenticated' => !empty($_SESSION['admin_id']),
+    'authenticated' => $authenticated,
+    'user' => $user,
 ]);
