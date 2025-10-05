@@ -1,20 +1,24 @@
 (function(global){
   'use strict';
 
-  const scriptBaseUrl = (function(){
-    const current = document.currentScript;
-    const resolveUrl = (value) => {
+  const scriptInfo = (function(){
+    const resolveUrl = (value, base) => {
       if (!value) return null;
       try {
-        return new URL(value, global.location.href);
+        return new URL(value, base || global.location.href);
       } catch (_) {
         return null;
       }
     };
-    const resolvedCurrent = current ? resolveUrl(current.getAttribute('src') || current.src) : null;
-    if (resolvedCurrent) {
-      return resolvedCurrent;
+
+    const current = document.currentScript;
+    if (current) {
+      const resolved = resolveUrl(current.getAttribute('src') || current.src);
+      if (resolved) {
+        return { element: current, url: resolved };
+      }
     }
+
     const scripts = document.getElementsByTagName('script');
     for (let i = scripts.length - 1; i >= 0; i--) {
       const candidate = scripts[i];
@@ -26,26 +30,45 @@
       }
       const resolved = resolveUrl(candidate.src);
       if (resolved) {
-        return resolved;
+        return { element: candidate, url: resolved };
       }
     }
-    return resolveUrl('admin_auth.js') || new URL(global.location.href);
+
+    const fallback = resolveUrl('admin_auth.js');
+    return {
+      element: current || null,
+      url: fallback || new URL(global.location.href)
+    };
   })();
 
-  const secureBaseUrl = (function(){
-    const base = new URL(scriptBaseUrl.href);
-    if (global.location.protocol === 'https:') {
-      base.protocol = 'https:';
-      base.host = global.location.host;
-      return base;
-    }
-    if (base.protocol !== 'https:' && base.hostname) {
-      base.protocol = 'https:';
-    }
-    return base;
-  })();
+  const scriptElement = scriptInfo.element;
+  const scriptBaseUrl = scriptInfo.url;
 
-  const apiBaseUrl = new URL('./', secureBaseUrl);
+  const apiBaseUrl = (function(){
+    const resolveUrl = (value) => {
+      if (!value) return null;
+      try {
+        return new URL(value, scriptBaseUrl);
+      } catch (_) {
+        return null;
+      }
+    };
+
+    let configured = null;
+    if (scriptElement) {
+      configured = resolveUrl(scriptElement.getAttribute('data-api-base') || scriptElement.getAttribute('data-auth-base'));
+    }
+    if (!configured) {
+      configured = resolveUrl('./');
+    }
+    if (!configured) {
+      configured = new URL(global.location.href);
+    }
+    if (global.location.protocol === 'https:' && configured.protocol !== 'https:') {
+      configured.protocol = 'https:';
+    }
+    return configured;
+  })();
   const API_BASE = apiBaseUrl.href;
   const TOKEN_ENDPOINT = new URL('admin_login_token.php', apiBaseUrl).href;
   const LOGIN_ENDPOINT = new URL('admin_login.php', apiBaseUrl).href;

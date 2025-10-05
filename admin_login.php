@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 
+require __DIR__ . '/cors.php';
 require __DIR__ . '/auth.php';
 
 header('Content-Type: application/json; charset=utf-8');
@@ -20,19 +21,7 @@ if (!$https) {
     exit;
 }
 
-$allowedOrigins = [];
-if (!empty($_SERVER['HTTP_HOST'])) {
-    $allowedOrigins[] = 'https://' . $_SERVER['HTTP_HOST'];
-}
-$configuredOrigins = getenv('ADMIN_APP_ORIGINS');
-if ($configuredOrigins) {
-    foreach (explode(',', $configuredOrigins) as $origin) {
-        $origin = trim($origin);
-        if ($origin !== '') {
-            $allowedOrigins[] = rtrim($origin, '/');
-        }
-    }
-}
+$allowedOrigins = mmb_admin_allowed_origins();
 if ($allowedOrigins) {
     $allowedOrigins = array_values(array_unique(array_map(static fn (string $origin): string => rtrim($origin, '/'), $allowedOrigins)));
     $originHeader = $_SERVER['HTTP_ORIGIN'] ?? '';
