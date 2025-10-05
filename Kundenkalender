@@ -65,6 +65,9 @@
     .mmb-day::before,.mmb-pill-add{top:4px;}
     .mmb-day::after{font-size:.82rem;}
     .mmb-booking-form{padding:16px;border-radius:14px;gap:.7rem;}
+    .mmb-fulfillment-group{grid-template-columns:1fr;}
+    .mmb-fulfillment-option{min-height:76px;}
+    .mmb-fulfillment-info{top:8px;right:8px;}
     .mmb-terms{font-size:.85rem;}
     .mmb-btn{font-size:.95rem;padding:.6rem .95rem;}
   }
@@ -141,6 +144,20 @@
   .mmb-total .label{font-weight:600;}
   .mmb-total .value{font-weight:600;font-size:1.05rem;}
   .mmb-price-small{font-size:.8rem;color:#cfcfcf;}
+  .mmb-price-note{font-size:.78rem;color:rgba(255,255,255,.7);margin-top:.35rem;}
+
+  .mmb-fulfillment-group{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.5rem;margin-top:.4rem;}
+  .mmb-fulfillment-option{position:relative;padding:.75rem .8rem;border-radius:10px;border:1px solid var(--mmb-border);background:#2a2a2a;display:flex;flex-direction:column;gap:.35rem;min-height:88px;cursor:pointer;transition:background .2s,border-color .2s,box-shadow .2s,color .2s;}
+  .mmb-fulfillment-option:hover{border-color:var(--mmb-accent);box-shadow:0 0 0 1px var(--mmb-accent-200);}
+  .mmb-fulfillment-option.is-active{background:var(--mmb-accent);border-color:var(--mmb-accent);color:#fff;box-shadow:0 0 0 1px rgba(14,165,233,.35);}
+  .mmb-fulfillment-option input{position:absolute;opacity:0;pointer-events:none;}
+  .mmb-fulfillment-label{font-weight:600;font-size:.92rem;}
+  .mmb-fulfillment-sub{font-size:.78rem;opacity:.85;line-height:1.35;}
+  .mmb-fulfillment-option.is-active .mmb-fulfillment-sub{opacity:.95;}
+  .mmb-fulfillment-info{position:absolute;top:10px;right:10px;width:24px;height:24px;border-radius:999px;border:1px solid currentColor;background:rgba(0,0,0,.14);color:inherit;display:inline-flex;align-items:center;justify-content:center;font-weight:600;font-size:.75rem;cursor:pointer;}
+  .mmb-fulfillment-option.is-active .mmb-fulfillment-info{background:rgba(255,255,255,.18);}
+
+  .mmb-form-actions{display:flex;flex-direction:column;gap:.65rem;margin-top:.35rem;}
 
   .mmb-input{width:100%;padding:.6rem .7rem;border:1px solid var(--mmb-border);border-radius:6px;background:#2a2a2a;color:var(--mmb-light);font-size:.95rem;box-sizing:border-box;}
   .mmb-btn{background:var(--mmb-accent);color:#fff;border:none;padding:.7rem 1.2rem;border-radius:8px;font-size:1rem;font-weight:600;cursor:pointer;width:100%;}
@@ -149,6 +166,13 @@
   .mmb-terms input{margin-top:.25rem;}
   .mmb-terms a{color:#9fdcff;text-decoration:none;}
   .mmb-terms a:hover{text-decoration:underline;}
+
+  .mmb-info-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:10000;padding:1rem;}
+  .mmb-info-card{background:#efefe6;color:#3b3b3b;border-radius:14px;padding:1.2rem 1.4rem;max-width:420px;width:min(90vw,420px);box-shadow:0 18px 48px rgba(0,0,0,.3);position:relative;line-height:1.5;}
+  .mmb-info-card h4{margin:.2rem 0 .8rem 0;font-size:1.05rem;font-weight:600;}
+  .mmb-info-card p{margin:.4rem 0;font-size:.92rem;}
+  .mmb-info-close{position:absolute;top:10px;right:10px;width:30px;height:30px;border-radius:999px;border:none;background:rgba(0,0,0,.08);color:#3b3b3b;font-size:1rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+  .mmb-info-close:hover{background:rgba(0,0,0,.14);}
 
   /* Modal */
   #mmb-modal{display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); align-items:center; justify-content:center; z-index:9999;}
@@ -179,6 +203,58 @@ const MMB_CONFIG = {
   createUrl:  'https://firebrick-squirrel-568721.hostingersite.com/create_booking.php'
 };
 /* ========================= */
+
+const FULFILLMENT_OPTIONS = [
+  {
+    id:'pickup',
+    label:'Abholung in Wesel',
+    shortLabel:'Abholung',
+    subLabel:'Kostenfreie Selbstabholung vor Ort',
+    priceDelta:0,
+    addsToTotal:true,
+    summaryLabel:'Abholung in Wesel',
+    note:'',
+    infoTitle:'Abholung in Wesel',
+    infoHtml:`<p>📍 Wir stimmen den Treffpunkt in Wesel individuell mit dir ab.</p>
+      <p>🕚 Abholung ab deinem Miettag um 11:00 Uhr möglich.</p>
+      <p>🔁 Rückgabe am selben Ort (sofern nichts anderes vereinbart) bis 10:00 Uhr am Folgetag nach Mietende.</p>
+      <p>😊 Melde dich gerne, falls du andere Zeiten brauchst – wir finden eine Lösung.</p>`
+  },
+  {
+    id:'shipping',
+    label:'Versand (deutschlandweit)',
+    shortLabel:'Versand',
+    subLabel:'Express-Hin- & Rückversand inkl. QR-Code',
+    priceDelta:80,
+    addsToTotal:true,
+    summaryLabel:'Versand (deutschlandweit)',
+    note:'inkl. Express-Hin- & Rückversand sowie Vorbereitungspauschale',
+    infoTitle:'Versand deutschlandweit',
+    infoHtml:`<p>🚚 Wir versenden deine Musikbox einen Tag vor Mietbeginn per Express, damit sie pünktlich ankommt.</p>
+      <p>📦 Am letzten Miettag gibst du das Paket mit dem mitgelieferten QR-Code wieder auf – so ist es direkt am Folgetag bei uns.</p>
+      <p>💶 Die Pauschale von 80€ deckt Hin- und Rückversand sowie den zusätzlichen Aufwand und Ausfalltage ab.</p>
+      <p>✅ Du erhältst alle Versandinfos rechtzeitig per E-Mail.</p>`
+  },
+  {
+    id:'delivery',
+    label:'Lieferung (NRW-weit)',
+    shortLabel:'Lieferung',
+    subLabel:'Individuelles Angebot durch unser Team',
+    priceDelta:0,
+    addsToTotal:false,
+    summaryLabel:'Lieferung (NRW-weit)',
+    summaryValue:'individuell',
+    note:'zzgl. individueller Lieferpauschale – wir melden uns mit einem Angebot',
+    totalLabel:'Vorläufig Gesamt',
+    infoTitle:'Lieferung NRW-weit',
+    infoHtml:`<p>🚗 Wir liefern dir die Musikbox persönlich innerhalb von NRW – auf Wunsch inkl. Aufbau & Abholung.</p>
+      <p>💶 Die Kosten bestehen aus einer Grundpauschale plus einer Kilometerpauschale – daher berechnen wir den Preis individuell.</p>
+      <p>✉️ Du erhältst nach deiner Anfrage ein persönliches Angebot mit allen Details.</p>
+      <p>🤝 Gemeinsam finden wir die bequemste Lösung für dich.</p>`
+  }
+];
+
+const FULFILLMENT_LOOKUP = Object.fromEntries(FULFILLMENT_OPTIONS.map(opt => [opt.id, opt]));
 
 const Utils={
   MONTH_NAMES:['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'],
@@ -272,8 +348,9 @@ async function sendBooking(url, payload){
 class Calendar{
   constructor(container){
     this.root = typeof container==='string'? document.querySelector(container):container;
-    this.state={month:new Date(), boxes:[], box:null, sel:{start:null,end:null}, pricing:null, enforceAvailability:true, summary:null};
-    this.dayElMap=new Map(); this.avgCache=null;
+    this.state={month:new Date(), boxes:[], box:null, sel:{start:null,end:null}, pricing:null, enforceAvailability:true, summary:null, fulfillment:FULFILLMENT_OPTIONS[0]};
+    this.dayElMap=new Map(); this.avgCache=null; this.infoOverlay=null;
+    this.handleInfoKeyDown=this.handleInfoKeyDown.bind(this);
     this.init();
   }
   async init(){
@@ -298,6 +375,136 @@ class Calendar{
     this.state.boxes=boxes; this.state.box=boxes[0];
 
     this.renderHeader(); this.renderCalendar(); this.renderSide(); this.wire();
+  }
+
+  getFulfillmentOption(id){
+    return FULFILLMENT_LOOKUP[id] || FULFILLMENT_OPTIONS[0];
+  }
+
+  renderFulfillmentOptions(selected){
+    const active = selected && selected.id ? selected : FULFILLMENT_OPTIONS[0];
+    const group = FULFILLMENT_OPTIONS.map((opt, idx)=>{
+      const isActive = opt.id === active.id;
+      const sub = opt.subLabel ? `<span class="mmb-fulfillment-sub">${opt.subLabel}</span>` : '';
+      return `<label class="mmb-fulfillment-option ${isActive?'is-active':''}" data-fulfillment="${opt.id}">
+                <input type="radio" name="fulfillment_method" value="${opt.id}" ${isActive?'checked':''} ${idx===0?'required':''}>
+                <span class="mmb-fulfillment-label">${opt.label}</span>
+                ${sub}
+                <button type="button" class="mmb-fulfillment-info" data-act="fulfillment-info" data-id="${opt.id}" aria-label="Infos zu ${opt.label}">?</button>
+              </label>`;
+    }).join('');
+    return `<div>
+      <div style="font-size:.85rem;font-weight:600;letter-spacing:.01em;margin-top:.2rem;">Abwicklung auswählen</div>
+      <div class="mmb-fulfillment-group" role="radiogroup" aria-label="Abwicklung auswählen">
+        ${group}
+      </div>
+    </div>`;
+  }
+
+  fulfillmentMeta(option){
+    const opt = option || FULFILLMENT_OPTIONS[0];
+    const addsToTotal = opt.addsToTotal !== false;
+    const priceDelta = Number(opt.priceDelta||0);
+    const summaryLabel = opt.summaryLabel || opt.label;
+    const summaryValue = opt.summaryValue ?? (addsToTotal ? (priceDelta>0?`+${Euro.fmt(priceDelta)}`:'gratis') : 'gratis');
+    const note = opt.note || '';
+    const totalLabel = opt.totalLabel || (addsToTotal ? 'Gesamt' : 'Vorläufig Gesamt');
+    const shortLabel = opt.shortLabel || summaryLabel;
+    return {addsToTotal, priceDelta, summaryLabel, summaryValue, note, totalLabel, shortLabel};
+  }
+
+  buildRangeSummary(sum, option){
+    const meta = this.fulfillmentMeta(option);
+    const shipping = meta.addsToTotal ? meta.priceDelta : 0;
+    const totalWithShipping = sum.total + shipping;
+    const lines = [
+      `<div class="mmb-price-line"><span>Original (ohne Rabatt)</span><span>${Euro.fmt(sum.original)}</span></div>`,
+      `<div class="mmb-price-line"><span>Rabatt (${sum.discountPercentDisplay}%)</span><span>–${Euro.fmt(sum.discountAmount)}</span></div>`,
+      `<div class="mmb-price-line"><span>${meta.summaryLabel}</span><span>${meta.summaryValue}</span></div>`,
+      `<div class="mmb-hr"></div>`,
+      `<div class="mmb-total"><span class="label">${meta.totalLabel}</span><span class="value">${Euro.fmt(totalWithShipping)}</span></div>`,
+      `<div class="mmb-price-line"><span class="mmb-price-small">Ø pro Tag</span><span class="mmb-price-small">${Euro.fmt(sum.avgPerDay)}</span></div>`,
+      `<div class="mmb-price-line"><span class="mmb-price-small">Kaution</span><span class="mmb-price-small">gratis</span></div>`
+    ];
+    if(meta.note){ lines.push(`<div class="mmb-price-note">${meta.note}</div>`); }
+    return {
+      html:`<div class="mmb-price-summary">${lines.join('')}</div>`,
+      payload:{
+        total: totalWithShipping,
+        deposit: 0,
+        original: sum.original,
+        days: sum.days,
+        base_total: sum.total,
+        shipping_delta: shipping,
+        fulfillment_id: option.id,
+        fulfillment_label: meta.shortLabel,
+        fulfillment_note: meta.note,
+        fulfillment_price_delta: meta.priceDelta,
+        fulfillment_adds_to_total: meta.addsToTotal
+      }
+    };
+  }
+
+  buildSingleSummary(base, option){
+    const meta = this.fulfillmentMeta(option);
+    const shipping = meta.addsToTotal ? meta.priceDelta : 0;
+    const totalWithShipping = base + shipping;
+    const lines = [
+      `<div class="mmb-price-line"><span>Aktueller Rabatt</span><span>0%</span></div>`,
+      `<div class="mmb-price-line"><span>${meta.summaryLabel}</span><span>${meta.summaryValue}</span></div>`,
+      `<div class="mmb-hr"></div>`,
+      `<div class="mmb-total"><span class="label">${meta.totalLabel}</span><span class="value">${Euro.fmt(totalWithShipping)}</span></div>`,
+      `<div class="mmb-price-line"><span class="mmb-price-small">Ø pro Tag</span><span class="mmb-price-small">${Euro.fmt(base)}</span></div>`,
+      `<div class="mmb-price-line"><span class="mmb-price-small">Kaution</span><span class="mmb-price-small">gratis</span></div>`
+    ];
+    if(meta.note){ lines.push(`<div class="mmb-price-note">${meta.note}</div>`); }
+    return {
+      html:`<div class="mmb-price-summary">${lines.join('')}</div>`,
+      payload:{
+        total: totalWithShipping,
+        deposit: 0,
+        original: base,
+        days: 1,
+        base_total: base,
+        shipping_delta: shipping,
+        fulfillment_id: option.id,
+        fulfillment_label: meta.shortLabel,
+        fulfillment_note: meta.note,
+        fulfillment_price_delta: meta.priceDelta,
+        fulfillment_adds_to_total: meta.addsToTotal
+      }
+    };
+  }
+
+  showFulfillmentInfo(option){
+    if(!option) return;
+    this.hideFulfillmentInfo();
+    const overlay=document.createElement('div'); overlay.className='mmb-info-overlay';
+    overlay.innerHTML=`<div class="mmb-info-card" role="dialog" aria-modal="true">
+        <button type="button" class="mmb-info-close" data-close aria-label="Info schließen">×</button>
+        <h4>${option.infoTitle || option.label}</h4>
+        ${option.infoHtml || ''}
+      </div>`;
+    const close=()=>this.hideFulfillmentInfo();
+    overlay.addEventListener('click',ev=>{ if(ev.target===overlay) close(); });
+    const closeBtn=overlay.querySelector('[data-close]');
+    if(closeBtn){ closeBtn.addEventListener('click',close); }
+    document.body.appendChild(overlay);
+    this.infoOverlay=overlay;
+    document.addEventListener('keydown',this.handleInfoKeyDown);
+    setTimeout(()=>{ try{ closeBtn?.focus(); }catch(e){} }, 50);
+  }
+
+  hideFulfillmentInfo(){
+    if(this.infoOverlay){
+      document.removeEventListener('keydown',this.handleInfoKeyDown);
+      this.infoOverlay.remove();
+      this.infoOverlay=null;
+    }
+  }
+
+  handleInfoKeyDown(ev){
+    if(ev.key==='Escape'){ this.hideFulfillmentInfo(); }
   }
 
   getBoxPricing(id){ return this.state?.pricing?.boxes?.[id]||null; }
@@ -348,43 +555,43 @@ class Calendar{
 
   renderSide(){
     const s=this.state.sel.start, e=this.state.sel.end; const hasRange=!!(s&&e);
+    const selectedFulfillment=this.getFulfillmentOption(this.state.fulfillment?.id);
+    this.state.fulfillment=selectedFulfillment;
     let html=`<div class="mmb-booking-form"><h3 style="margin:0;font-weight:600;">Buchungsanfrage</h3>`;
+    html+=this.renderFulfillmentOptions(selectedFulfillment);
+
+    let summaryHtml='';
+    let summaryPayload=null;
+
     if(hasRange){
-      const sum=this.pricedTotal(this.state.box.id,s,e); 
+      const sum=this.pricedTotal(this.state.box.id,s,e);
       this.avgCache=sum.avgPerDay;
-      // >>> NEU: Summary speichern (für Request)
-      this.state.summary = { total: sum.total, deposit: 0, original: sum.original, days: sum.days };
-      html+=`<div class="mmb-price-summary">
-        <div class="mmb-price-line"><span>Original (ohne Rabatt)</span><span>${Euro.fmt(sum.original)}</span></div>
-        <div class="mmb-price-line"><span>Rabatt (${sum.discountPercentDisplay}%)</span><span>–${Euro.fmt(sum.discountAmount)}</span></div>
-        <div class="mmb-hr"></div>
-        <div class="mmb-total"><span class="label">Gesamt</span><span class="value">${Euro.fmt(sum.total)}</span></div>
-        <div class="mmb-price-line"><span class="mmb-price-small">Ø pro Tag</span><span class="mmb-price-small">${Euro.fmt(sum.avgPerDay)}</span></div>
-        <div class="mmb-price-line"><span class="mmb-price-small">Kaution</span><span class="mmb-price-small">gratis</span></div>
-      </div>`;
+      const summary=this.buildRangeSummary(sum, selectedFulfillment);
+      summaryHtml=summary.html;
+      summaryPayload=summary.payload;
     }else if(s){
       const base=this.baseDayPrice(this.state.box.id,s);
-      this.state.summary = { total: base, deposit: 0, original: base, days: 1 }; // <<< NEU
-      html+=`<div class="mmb-price-summary">
-        <div class="mmb-price-line"><span>Aktueller Rabatt</span><span>0%</span></div>
-        <div class="mmb-hr"></div>
-        <div class="mmb-total"><span class="label">Gesamt</span><span class="value">${Euro.fmt(base)}</span></div>
-        <div class="mmb-price-line"><span class="mmb-price-small">Ø pro Tag</span><span class="mmb-price-small">${Euro.fmt(base)}</span></div>
-        <div class="mmb-price-line"><span class="mmb-price-small">Kaution</span><span class="mmb-price-small">gratis</span></div>
-      </div>`;
+      const summary=this.buildSingleSummary(base, selectedFulfillment);
+      summaryHtml=summary.html;
+      summaryPayload=summary.payload;
       this.avgCache=null;
     }else{
-      html+=`<div class="mmb-price-summary" style="text-align:center;color:#cfcfcf;">Bitte Zeitraum wählen</div>`;
+      summaryHtml=`<div class="mmb-price-summary" style="text-align:center;color:#cfcfcf;">Bitte Zeitraum wählen</div>`;
       this.avgCache=null;
-      this.state.summary = null; // <<< NEU
     }
+
+    this.state.summary = summaryPayload;
+    if(summaryHtml) html+=summaryHtml;
+
     html+=`<form data-act="submit">
       <label>Name *<br><input class="mmb-input" name="customer_name" required></label><br>
       <label>E-Mail *<br><input type="email" class="mmb-input" name="customer_email" required></label><br>
       <label>Telefon<br><input class="mmb-input" name="customer_phone"></label><br>
       <label>Anmerkungen<br><textarea class="mmb-input" name="note" style="min-height:70px;"></textarea></label><br>
-      <label class="mmb-terms"><input type="checkbox" name="accept_terms" required> Ich akzeptiere <a href="https://www.mietmichbox.de/allgemeine-geschaftsbedingungen" target="_blank" rel="noopener">AGB</a> & <a href="https://www.mietmichbox.de/datenschutzerklarung" target="_blank" rel="noopener">Datenschutz</a>*</label>
-      <button class="mmb-btn" ${s?'':'disabled'}>Buchungsanfrage senden</button>
+      <div class="mmb-form-actions">
+        <label class="mmb-terms"><input type="checkbox" name="accept_terms" required> Ich akzeptiere <a href="https://www.mietmichbox.de/allgemeine-geschaftsbedingungen" target="_blank" rel="noopener">AGB</a> & <a href="https://www.mietmichbox.de/datenschutzerklarung" target="_blank" rel="noopener">Datenschutz</a>*</label>
+        <button class="mmb-btn" ${s?'':'disabled'}>Buchungsanfrage senden</button>
+      </div>
     </form>
     <div style="margin-top:6px;color:#cfcfcf;font-size:.9rem;">${
       hasRange?`${s.toLocaleDateString('de-DE')} – ${e.toLocaleDateString('de-DE')} (${this.pricedTotal(this.state.box.id,s,e).days} Tage)`
@@ -455,6 +662,13 @@ class Calendar{
   /* === Events === */
   wire(){
     this.root.addEventListener('click',e=>{
+      const infoBtn = e.target.closest('[data-act="fulfillment-info"]');
+      if(infoBtn){
+        e.preventDefault();
+        const opt=this.getFulfillmentOption(infoBtn.dataset.id);
+        this.showFulfillmentInfo(opt);
+        return;
+      }
       const nav = e.target.closest('[data-act="prev"],[data-act="next"],[data-act="box"]');
       if(nav){
         const act=nav.dataset.act;
@@ -477,6 +691,14 @@ class Calendar{
       if(day){ this.pick(day.dataset.date); }
     });
 
+    this.root.addEventListener('change',e=>{
+      const radio = e.target.closest('input[name="fulfillment_method"]');
+      if(radio){
+        this.state.fulfillment = this.getFulfillmentOption(radio.value);
+        this.renderSide();
+      }
+    });
+
     // Submit
     this.root.addEventListener('submit', async (e)=>{
       if(!e.target.matches('form[data-act="submit"]')) return;
@@ -489,9 +711,17 @@ class Calendar{
       const start=this.state.sel.start, end=this.state.sel.end || this.state.sel.start;
 
       // >>> NEU: Summen aus dem State (Fallback: on-the-fly berechnen)
-      const sum = this.state.summary || this.pricedTotal(this.state.box.id, start, end);
-      const total_amount = Number(sum?.total ?? 0);
-      const deposit_eur  = Number(sum?.deposit ?? 0);
+      const summaryInfo = this.state.summary;
+      const fallbackSum = this.pricedTotal(this.state.box.id, start, end);
+      const fulfillmentFromState = this.getFulfillmentOption(summaryInfo?.fulfillment_id || this.state.fulfillment?.id);
+      const baseTotal = Number(summaryInfo?.base_total ?? fallbackSum?.total ?? 0);
+      const shippingDelta = Number(summaryInfo?.shipping_delta ?? (fulfillmentFromState.addsToTotal !== false ? (fulfillmentFromState.priceDelta||0) : 0));
+      const total_amount = Number(summaryInfo?.total ?? (baseTotal + shippingDelta));
+      const deposit_eur  = Number(summaryInfo?.deposit ?? 0);
+      const fulfillmentMethod = summaryInfo?.fulfillment_id || fulfillmentFromState.id;
+      const fulfillmentLabel = summaryInfo?.fulfillment_label || fulfillmentFromState.shortLabel || fulfillmentFromState.label;
+      const fulfillmentPriceDelta = Number(summaryInfo?.fulfillment_price_delta ?? fulfillmentFromState.priceDelta ?? 0);
+      const fulfillmentNote = summaryInfo?.fulfillment_note || fulfillmentFromState.note || '';
 
       const payload={
         box_id:Number(this.state.box.id),
@@ -506,15 +736,19 @@ class Calendar{
 
         // >>> NEU: Preis an Backend übergeben (als reine Zahlen)
         total_amount: total_amount,
-        deposit_eur:  deposit_eur
+        deposit_eur:  deposit_eur,
+        fulfillment_method: fulfillmentMethod,
+        fulfillment_label: fulfillmentLabel,
+        fulfillment_price_delta: fulfillmentPriceDelta
       };
+      if(fulfillmentNote){ payload.fulfillment_note = fulfillmentNote; }
 
       const btn=e.target.querySelector('button'); const orig=btn.textContent; btn.disabled=true; btn.textContent='Senden…';
       try{
         const res=await sendBooking(MMB_CONFIG.createUrl, payload);
         const dispId = res?.booking?.display_id ? String(res.booking.display_id) : '–';
         this.modal('Buchungsanfrage gesendet','Danke! Deine Anfrage ist eingegangen.\n\nBuchungs-ID: '+dispId);
-        e.target.reset(); this.state.sel={start:null,end:null}; this.avgCache=null; this.state.summary=null;
+        e.target.reset(); this.state.sel={start:null,end:null}; this.avgCache=null; this.state.summary=null; this.state.fulfillment=FULFILLMENT_OPTIONS[0]; this.hideFulfillmentInfo();
         this.renderSide(); this.updateVisuals();
       }catch(err){
         console.error(err);
