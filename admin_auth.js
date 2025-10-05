@@ -15,8 +15,8 @@
 
   let overlay;
   let form;
-  let emailInput;
-  let passInput;
+  let usernameInput;
+  let passwordInput;
   let errorBox;
   let submitButton;
   let pendingResolve = null;
@@ -63,12 +63,12 @@
           <p class="mmb-login-hint">Bitte melden Sie sich an, um fortzufahren.</p>
           <div class="mmb-login-error" role="alert" hidden></div>
           <label class="mmb-login-field">
-            <span>E-Mail-Adresse</span>
-            <input type="email" name="email" autocomplete="username" required />
+            <span>Benutzername</span>
+            <input type="text" name="username" autocomplete="username" required />
           </label>
           <label class="mmb-login-field">
             <span>Passwort</span>
-            <input type="password" name="pass" autocomplete="current-password" required />
+            <input type="password" name="password" autocomplete="current-password" required />
           </label>
           <button type="submit" class="mmb-login-submit">Anmelden</button>
           <p class="mmb-login-footer">Die Übertragung erfolgt ausschließlich über HTTPS.</p>
@@ -77,8 +77,8 @@
     `;
     document.body.appendChild(overlay);
     form = overlay.querySelector('form');
-    emailInput = overlay.querySelector('input[name="email"]');
-    passInput = overlay.querySelector('input[name="pass"]');
+    usernameInput = overlay.querySelector('input[name="username"]');
+    passwordInput = overlay.querySelector('input[name="password"]');
     errorBox = overlay.querySelector('.mmb-login-error');
     submitButton = overlay.querySelector('.mmb-login-submit');
     form.addEventListener('submit', onSubmit);
@@ -89,7 +89,7 @@
     ensureOverlay();
     overlay.hidden = false;
     overlay.classList.add('is-visible');
-    setTimeout(() => { emailInput?.focus(); }, 50);
+    setTimeout(() => { usernameInput?.focus(); }, 50);
   }
 
   function hideOverlay(){
@@ -147,13 +147,13 @@
     return parts.join(' ') || 'Unbekannter Fehler';
   }
 
-  async function performLogin(email, password){
+  async function performLogin(username, password){
     if (!csrfToken) {
       await fetchState();
     }
     const body = new URLSearchParams();
-    body.set('email', email);
-    body.set('pass', password);
+    body.set('username', username);
+    body.set('password', password);
     if (csrfToken) {
       body.set('csrf_token', csrfToken);
     }
@@ -189,17 +189,17 @@
     event.preventDefault();
     if (!form) return;
     showError('');
-    const email = emailInput ? emailInput.value.trim() : '';
-    const password = passInput ? passInput.value : '';
-    if (!email || !password) {
-      showError('Bitte E-Mail-Adresse und Passwort eingeben.');
+    const username = usernameInput ? usernameInput.value.trim() : '';
+    const password = passwordInput ? passwordInput.value : '';
+    if (!username || !password) {
+      showError('Bitte Benutzername und Passwort eingeben.');
       return;
     }
     if (submitButton) {
       submitButton.disabled = true;
     }
     try {
-      await performLogin(email, password);
+      await performLogin(username, password);
       hideOverlay();
       showError('');
       form.reset();
