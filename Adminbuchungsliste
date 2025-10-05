@@ -117,10 +117,6 @@
       async updateBookingStatus(payload){
         return mmbApiPost('update_booking_status.php', payload);
       },
-      // Optional: Wenn du weiterhin ein separates update_booking.php benutzt
-      async updateBooking(payload){
-        return mmbApiPost('update_booking.php', payload);
-      }
     };
   </script>
 
@@ -158,6 +154,10 @@
         .mmb-modal-content{background:var(--mmb-bg);color:var(--mmb-text);padding:1.5rem;border-radius:8px;max-width:640px;width:92%;max-height:85vh;overflow:auto;box-shadow:0 10px 25px rgba(0,0,0,.3);}
         .mmb-modal h3{margin:0 0 .75rem 0;color:var(--mmb-text);}
         .mmb-modal .mmb-field{display:flex;flex-direction:column;gap:.25rem;margin:.5rem 0;}
+        .mmb-modal .mmb-field-switch label{display:flex;align-items:center;gap:.5rem;font-weight:500;}
+        .mmb-modal .mmb-field-switch input[type="checkbox"]{width:1.1rem;height:1.1rem;}
+        .mmb-modal .mmb-field-switch small{font-size:.75rem;color:var(--mmb-text-light,#6b7280);font-weight:400;display:block;margin-top:.25rem;}
+        #mmb-modal-form.mmb-email-disabled [data-email-field]{opacity:.6;}
         .mmb-modal input,.mmb-modal select,.mmb-modal textarea{border:1px solid var(--mmb-border);background:var(--mmb-bg);color:var(--mmb-text);border-radius:6px;padding:.5rem;font-family:inherit;font-size:.9rem;}
         .mmb-modal textarea{min-height:140px;resize:vertical;}
         .mmb-modal-actions{display:flex;gap:.5rem;justify-content:flex-end;margin-top:1rem;}
@@ -529,7 +529,23 @@
         const b = this.state.originalBookings.find(x=>x.id===id); if(!b) return;
         const boxOptions = [{id:'1',name:BOX_MAP['1']},{id:'2',name:BOX_MAP['2']},{id:'3',name:BOX_MAP['3']}]
           .map(x => `<option value="${x.id}" ${x.id===b.box_id?'selected':''}>${this.escape(x.name)}</option>`).join('');
-        const subject = `Buchung aktualisiert – ${displayId(id)}`;
+        const baseSubject = `Buchung aktualisiert – ${displayId(id)}`;
+        const parseAmount = (val)=>{
+          if(val===null || val===undefined) return NaN;
+          if(typeof val==='number') return val;
+          let str = String(val).trim();
+          if(!str) return NaN;
+          str = str.replace(/€/g,'').replace(/\s+/g,'');
+          if(str.includes(',')){
+            str = str.replace(/\./g,'').replace(',','.');
+          }
+          const num = Number(str);
+          if(Number.isNaN(num) && str.includes('.')){
+            const fallback = Number(str.replace(/\./g,''));
+            return Number.isNaN(fallback) ? NaN : fallback;
+          }
+          return num;
+        };
         const body = this.tplEditInfo(b);
         const html = `
           <div class="mmb-grid-2">
@@ -556,48 +572,178 @@
             <div class="mmb-field"><label>Preis (EUR)</label><input name="total_amount" value="${this.escape(b.price_total)}"/></div>
           </div>
           <hr style="border:none;border-top:1px solid var(--mmb-border);margin:.75rem 0"/>
-          <div class="mmb-field"><label>Betreff (E-Mail an Kund*in)</label><input name="subject" value="${this.escape(subject)}"/></div>
-          <div class="mmb-field"><label>Nachricht (E-Mail an Kund*in)</label><textarea name="message">${this.escape(body)}</textarea></div>
+          <div class="mmb-field mmb-field-switch">
+            <label><input type="checkbox" name="send_email" value="1" checked/> <span>Kund*in per E-Mail informieren</span></label>
+            <small>Wenn aktiviert, wird die aktualisierte Buchung an ${this.escape(b.customer_email)} gesendet.</small>
+          </div>
+          <div class="mmb-field" data-email-field><label>Betreff (E-Mail an Kund*in)</label><input name="subject" value="${this.escape(baseSubject)}"/></div>
+          <div class="mmb-field" data-email-field><label>Nachricht (E-Mail an Kund*in)</label><textarea name="message">${this.escape(body)}</textarea></div>
         `;
-        const values = await this.openModal({ title:`Buchung bearbeiten – ${displayId(id)}`, html, confirmText:'Änderungen speichern' });
+        const values = await this.openModal({
+          title:`Buchung bearbeiten – ${displayId(id)}`,
+          html,
+          confirmText:'Änderungen speichern',
+          onMount:(form)=>{
+            const subjectInput = form.querySelector('input[name="subject"]');
+            const messageInput = form.querySelector('textarea[name="message"]');
+            const sendSwitch = form.querySelector('input[name="send_email"]');
+            const watchFields = ['customer_name','customer_email','customer_phone','box_id','start_date','end_date','status','total_amount'];
+            let subjectDirty = false;
+            let messageDirty = false;
+
+            const collectCurrentValues = ()=>{
+              const data = {};
+              watchFields.forEach((name)=>{
+                const field = form.querySelector(`[name="${name}"]`);
+                if(!field) return;
+                data[name] = field.value;
+              });
+              return data;
+            };
+
+            const buildBookingForEmail = (vals)=>{
+              const boxId = String(vals.box_id ?? b.box_id ?? '');
+              const parsedAmount = parseAmount(vals.total_amount ?? b.price_total);
+              return {
+                ...b,
+                customer_name: vals.customer_name ?? b.customer_name,
+                customer_email: vals.customer_email ?? b.customer_email,
+                customer_phone: vals.customer_phone ?? b.customer_phone,
+                box_id: boxId,
+                box_name: BOX_MAP[boxId] || BOX_MAP[String(b.box_id)] || b.box_name,
+                start_date: vals.start_date ?? b.start_date,
+                end_date: vals.end_date ?? b.end_date,
+                status: vals.status ?? b.status,
+                price_total: Number.isFinite(parsedAmount) ? parsedAmount : b.price_total
+              };
+            };
+
+            const syncEmailFields = (force=false)=>{
+              if(!subjectInput || !messageInput) return;
+              const current = buildBookingForEmail(collectCurrentValues());
+              if(force || !subjectDirty){
+                subjectInput.value = baseSubject;
+              }
+              if(force || !messageDirty){
+                messageInput.value = this.tplEditInfo(current);
+              }
+            };
+
+            if(subjectInput){
+              subjectInput.addEventListener('input', ()=>{ subjectDirty = subjectInput.value !== baseSubject; });
+            }
+            if(messageInput){
+              messageInput.addEventListener('input', ()=>{ messageDirty = true; });
+            }
+
+            watchFields.forEach((name)=>{
+              const field = form.querySelector(`[name="${name}"]`);
+              if(!field) return;
+              const evt = field.tagName === 'SELECT' ? 'change' : 'input';
+              field.addEventListener(evt, ()=> syncEmailFields());
+            });
+
+            const applyEmailToggleState = ()=>{
+              if(!subjectInput || !messageInput || !sendSwitch) return;
+              const enabled = sendSwitch.checked;
+              subjectInput.disabled = !enabled;
+              messageInput.disabled = !enabled;
+              form.classList.toggle('mmb-email-disabled', !enabled);
+            };
+
+            if(sendSwitch){
+              applyEmailToggleState();
+              sendSwitch.addEventListener('change', ()=>{
+                applyEmailToggleState();
+                if(sendSwitch.checked){
+                  syncEmailFields();
+                }
+              });
+            }
+
+            syncEmailFields(true);
+          }
+        });
         if(!values) return;
 
-        // Server: alles über den EINEN Endpoint – inkl. Mail
+        const nextBoxIdRaw = values.box_id ?? b.box_id;
+        const nextBoxIdNum = Number(nextBoxIdRaw);
+        const finalBoxId = Number.isFinite(nextBoxIdNum) && nextBoxIdNum > 0 ? nextBoxIdNum : Number(b.box_id);
+        const normalizedTotal = (()=>{
+          const parsed = parseAmount(values.total_amount);
+          if(Number.isFinite(parsed)) return Math.round(parsed * 100) / 100;
+          const fallback = parseAmount(b.price_total);
+          if(Number.isFinite(fallback)) return Math.round(fallback * 100) / 100;
+          return Number(b.price_total) || 0;
+        })();
+        const startDate = ((values.start_date||'').trim()) || b.start_date;
+        const endDate = ((values.end_date||'').trim()) || b.end_date;
         const update = {
-          customer_name: values.customer_name,
-          customer_email: values.customer_email,
-          customer_phone: values.customer_phone,
-          box_id: Number(values.box_id),
-          start_date: values.start_date,
-          end_date: values.end_date,
-          status: values.status,
-          total_amount: Number(values.total_amount)
+          customer_name: (values.customer_name||'').trim(),
+          customer_email: (values.customer_email||'').trim(),
+          customer_phone: (values.customer_phone||'').trim(),
+          box_id: finalBoxId,
+          start_date: startDate,
+          end_date: endDate,
+          status: values.status || b.status,
+          total_amount: normalizedTotal
         };
-        await MMBApi.updateBookingStatus({
-          booking_id: Number(id),
-          update,
-          send_email: 1,
-          subject: values.subject,
-          message: values.message
-        });
+        const shouldSendEmail = values.send_email === '1' || values.send_email === 'on' || values.send_email === 'true';
 
-        // Optimistisches Update in der Liste:
-        const updated = {
-          ...b,
-          customer_name: values.customer_name,
-          customer_email: values.customer_email,
-          customer_phone: values.customer_phone,
-          box_id: String(values.box_id),
-          box_name: BOX_MAP[String(values.box_id)] || b.box_name,
-          start_date: values.start_date,
-          end_date: values.end_date,
-          status: values.status,
-          price_total: Number(values.total_amount)
+        const payload = {
+          booking_id: Number(id),
+          send_email: shouldSendEmail ? 1 : 0,
         };
-        this.state.originalBookings = this.state.originalBookings.map(x=> x.id===id ? updated : x);
-        const snap = this.snapshotFocus();
-        this.applyFilters(snap);
-        MMBCore.Utils.showNotification('Buchung aktualisiert & Mail gesendet');
+
+        const normalizedUpdate = {
+          customer_name: update.customer_name,
+          customer_email: update.customer_email,
+          customer_phone: update.customer_phone,
+          box_id: update.box_id,
+          start_date: update.start_date,
+          end_date: update.end_date,
+          status: update.status,
+          total_amount: update.total_amount
+        };
+
+        // Status separat setzen, damit die API denselben Weg wie bei den Schnellaktionen nutzt.
+        if(update.status && update.status !== b.status){
+          payload.status = update.status;
+        }
+
+        // Die API erwartet ein Objekt mit den zu übernehmenden Feldern.
+        payload.update = normalizedUpdate;
+
+        if(shouldSendEmail){
+          payload.subject = (values.subject || baseSubject).trim();
+          payload.message = (values.message || '').trim();
+        }
+
+        let apiResponse;
+        try {
+          apiResponse = await MMBApi.updateBookingStatus(payload);
+        } catch (err) {
+          console.error('updateBookingStatus failed:', err);
+          const errorMessage = err && err.message ? err.message : 'Aktualisierung fehlgeschlagen';
+          MMBCore.Utils.showNotification(errorMessage, 'error');
+          return;
+        }
+
+        await this.loadBookings();
+
+        const mailInfo = apiResponse && apiResponse.mail ? apiResponse.mail : null;
+        if(shouldSendEmail){
+          if(mailInfo && mailInfo.sent){
+            MMBCore.Utils.showNotification('Buchung aktualisiert & Mail gesendet');
+          }else if(mailInfo && mailInfo.sent === false){
+            const info = mailInfo.error ? ` (Fehler: ${mailInfo.error})` : '';
+            MMBCore.Utils.showNotification('Buchung aktualisiert (E-Mail konnte nicht gesendet werden)'+info,'error');
+          }else{
+            MMBCore.Utils.showNotification('Buchung aktualisiert');
+          }
+        }else{
+          MMBCore.Utils.showNotification('Buchung aktualisiert');
+        }
       }
 
       // ---------- Modal & Utils ----------
@@ -705,12 +851,32 @@ Telefon: 01742015500`;
       }
 
       tplEditInfo(b){
-        const range = `${new Date(b.start_date).toLocaleDateString('de-DE')} – ${new Date(b.end_date).toLocaleDateString('de-DE')}`;
-        return `Hallo ${b.customer_name},
+        const start = new Date(b.start_date);
+        const end = new Date(b.end_date);
+        const validStart = !Number.isNaN(start.getTime());
+        const validEnd = !Number.isNaN(end.getTime());
+        const range = (validStart && validEnd)
+          ? `${start.toLocaleDateString('de-DE')} – ${end.toLocaleDateString('de-DE')}`
+          : `${b.start_date} – ${b.end_date}`;
+        const price = Number(b.price_total ?? b.total_amount ?? 0);
+        const priceLabel = Number.isFinite(price)
+          ? price.toLocaleString('de-DE', {minimumFractionDigits:2, maximumFractionDigits:2})
+          : (b.price_total ?? b.total_amount ?? '0');
+        const statusLabel = this.translateStatus(b.status || 'pending');
+        const name = b.customer_name || 'Kund*in';
+        const email = b.customer_email || '–';
+        const box = b.box_name || BOX_MAP[String(b.box_id)] || '—';
+        return `Hallo ${name},
 
 wir haben deine Buchung (${displayId(b.id)}) aktualisiert.
+
+Aktualisierte Buchungsdaten:
+• Name: ${name}
+• E-Mail: ${email}
+• Musikbox: ${box}
 • Zeitraum: ${range}
-• Box: ${b.box_name}
+• Status: ${statusLabel}
+• Preis: ${priceLabel}€
 
 Falls etwas nicht passt, antworte einfach auf diese E-Mail.
 
