@@ -79,7 +79,7 @@ function build_submission_mail(array $data): array {
   $endDisp   = $endDate->format('d.m.Y');
   $range     = ($startDisp === $endDisp) ? $startDisp : ($startDisp . ' – ' . $endDisp);
 
-  $subject = "Deine Buchung wurde übermittelt – Buchungs-ID: {$data['display_id']}";
+  $subject = "Deine Buchung wurde übermittelt 🚀 – Buchungs-ID: {$data['display_id']}";
 
   $text = <<<TXT
 Hallo {$name},
