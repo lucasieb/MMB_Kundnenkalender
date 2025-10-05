@@ -25,7 +25,7 @@
   </div>
 
   <!-- ======================= MMB CORE ======================= -->
-  <script src="admin_auth.js"></script>
+  <script src="https://firebrick-squirrel-568721.hostingersite.com/admin_auth.js" data-api-base="https://firebrick-squirrel-568721.hostingersite.com/"></script>
   <script>
   (function(global){'use strict';
 
