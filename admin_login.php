@@ -13,6 +13,15 @@ if ($method !== 'POST') {
     exit;
 }
 
+if (is_admin_auth_disabled()) {
+    echo json_encode([
+        'ok' => true,
+        'user' => admin_public_user(),
+        'auth_disabled' => true,
+    ]);
+    exit;
+}
+
 $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
     || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower((string) $_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https');
 if (!$https) {
