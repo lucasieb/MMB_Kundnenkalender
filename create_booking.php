@@ -140,12 +140,12 @@ function build_internal_submission_mail(array $data): array {
   $displayId = $data['display_id'];
 
   $linkUrl   = 'https://mietmichbox.de/buchungsverwaltung';
-  $subject   = "Neue Buchungsanfrage – Buchungs-ID: {$displayId}";
+  $subject   = "👋🏼 Neue Buchungsanfrage 👷🏽 – Buchungs-ID: {$displayId}";
 
   $text = <<<TXT
 Hallo MietMichBox Team,
 
-eine neue Buchungsanfrage ist eingegangen. Der Status steht bislang auf Ausstehend.
+eine neue Buchungsanfrage ist eingegangen. Der Status steht bislang auf Ausstehend. ⚠️
 
 Buchung im Überblick:
 👤 Name: {$name}
