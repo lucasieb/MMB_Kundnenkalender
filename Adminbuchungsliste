@@ -670,7 +670,6 @@
         });
         if(!values) return;
 
-        // Server: alles über den EINEN Endpoint – inkl. Mail
         const nextBoxIdRaw = values.box_id ?? b.box_id;
         const nextBoxIdNum = Number(nextBoxIdRaw);
         const finalBoxId = Number.isFinite(nextBoxIdNum) && nextBoxIdNum > 0 ? nextBoxIdNum : Number(b.box_id);
@@ -694,34 +693,56 @@
           total_amount: normalizedTotal
         };
         const shouldSendEmail = values.send_email === '1' || values.send_email === 'on' || values.send_email === 'true';
-        const payload = {
-          booking_id: Number(id),
-          update,
-          send_email: shouldSendEmail ? 1 : 0
-        };
-        if(shouldSendEmail){
-          payload.subject = (values.subject||baseSubject).trim();
-          payload.message = (values.message||'').trim();
-        }
-        await MMBApi.updateBookingStatus(payload);
 
-        // Optimistisches Update in der Liste:
-        const updated = {
-          ...b,
-          customer_name: update.customer_name,
-          customer_email: update.customer_email,
-          customer_phone: update.customer_phone,
-          box_id: String(finalBoxId),
-          box_name: BOX_MAP[String(finalBoxId)] || b.box_name,
-          start_date: startDate,
-          end_date: endDate,
-          status: update.status,
-          price_total: update.total_amount
-        };
-        this.state.originalBookings = this.state.originalBookings.map(x=> x.id===id ? updated : x);
-        const snap = this.snapshotFocus();
-        this.applyFilters(snap);
-        MMBCore.Utils.showNotification(shouldSendEmail ? 'Buchung aktualisiert & Mail gesendet' : 'Buchung aktualisiert');
+        try {
+          await MMBApi.updateBooking({
+            id: Number(id),
+            customer_name: update.customer_name,
+            customer_email: update.customer_email,
+            customer_phone: update.customer_phone,
+            box_id: update.box_id,
+            start_date: update.start_date,
+            end_date: update.end_date,
+            status: update.status,
+            total_amount: update.total_amount
+          });
+        } catch (err) {
+          console.error('updateBooking failed:', err);
+          MMBCore.Utils.showNotification('Aktualisierung fehlgeschlagen','error');
+          return;
+        }
+
+        let mailInfo = null;
+        if(shouldSendEmail){
+          const emailPayload = {
+            booking_id: Number(id),
+            status: update.status,
+            send_email: 1,
+            subject: (values.subject||baseSubject).trim(),
+            message: (values.message||'').trim()
+          };
+          try {
+            const resp = await MMBApi.updateBookingStatus(emailPayload);
+            mailInfo = resp && resp.mail ? resp.mail : null;
+          } catch (err) {
+            console.error('send update mail failed:', err);
+            mailInfo = { sent: false };
+          }
+        }
+
+        await this.loadBookings();
+
+        if(shouldSendEmail){
+          if(mailInfo && mailInfo.sent){
+            MMBCore.Utils.showNotification('Buchung aktualisiert & Mail gesendet');
+          }else if(mailInfo && mailInfo.sent === false){
+            MMBCore.Utils.showNotification('Buchung aktualisiert (E-Mail konnte nicht gesendet werden)','error');
+          }else{
+            MMBCore.Utils.showNotification('Buchung aktualisiert');
+          }
+        }else{
+          MMBCore.Utils.showNotification('Buchung aktualisiert');
+        }
       }
 
       // ---------- Modal & Utils ----------
