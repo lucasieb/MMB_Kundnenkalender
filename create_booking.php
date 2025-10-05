@@ -12,6 +12,11 @@ declare(strict_types=1);
 require __DIR__ . '/cors.php';
 header('Content-Type: application/json; charset=utf-8');
 
+$HAS_MAILER = is_file(__DIR__ . '/mailer.php');
+if ($HAS_MAILER) {
+  require_once __DIR__ . '/mailer.php';
+}
+
 const DEFAULT_ALLOW_OVERLAP = true;
 
 /* ------------ Utils ------------ */
@@ -41,6 +46,72 @@ function num($v, ?float $fallback = 0.0): ?float {
   $n = str_replace(['€',' '], '', (string)$v);
   $n = str_replace(',', '.', $n);
   return is_numeric($n) ? (float)$n : $fallback;
+}
+
+function box_name_by_id(int $id): string {
+  $map = [
+    1 => 'Marshall Bromley 750',
+    2 => 'Teufel Rockster Neo',
+    3 => 'Soundboks 4',
+  ];
+  return $map[$id] ?? ('Box #' . $id);
+}
+
+function format_price(float $amount): string {
+  return number_format($amount, 0, ',', '.') . '€';
+}
+
+/**
+ * Erstellt Betreff + Text für die automatische Eingangsbestätigung.
+ *
+ * @param array{customer_name:string,customer_email:string,box_id:int,start_date:string,end_date:string,total_amount:float,display_id:string} $data
+ * @return array{subject:string,text:string,html:string}
+ */
+function build_submission_mail(array $data): array {
+  $name      = trim($data['customer_name']) ?: 'Guten Tag';
+  $email     = trim($data['customer_email']);
+  $boxName   = box_name_by_id((int)$data['box_id']);
+  $totalDisp = format_price((float)$data['total_amount']);
+
+  $startDate = new DateTimeImmutable($data['start_date']);
+  $endDate   = new DateTimeImmutable($data['end_date']);
+  $startDisp = $startDate->format('d.m.Y');
+  $endDisp   = $endDate->format('d.m.Y');
+  $range     = ($startDisp === $endDisp) ? $startDisp : ($startDisp . ' – ' . $endDisp);
+
+  $subject = "Deine Buchung wurde übermittelt – Buchungs-ID: {$data['display_id']}";
+
+  $text = <<<TXT
+Hallo {$name},
+
+deine Buchung wurde an uns erfolgreich übermittelt.
+
+Deine Buchung im Überblick:
+👤 Name: {$name}
+📧 E-Mail: {$email}
+🎵 Musikbox: {$boxName}
+🕰️ Zeitraum: {$range}
+💶 Gesamtkosten: {$totalDisp}
+
+Bitte überprüfe einmal, ob das so stimmt.
+
+Aktuell steht deine Buchung noch auf Ausstehend. Wir bearbeiten deine Anfrage und melden uns schnellstmöglich mit der Bestätigung. Bis dahin musst du nichts weiter tun.
+
+Falls du noch offene Fragen hast, kannst du uns jederzeit kontaktieren.
+
+Viele Grüße
+Dein MietMichBox Team
+www.mietmichbox.de
+
+E-Mail: info@mietmichbox.de
+Telefon: 01742015500
+TXT;
+
+  return [
+    'subject' => $subject,
+    'text'    => $text,
+    'html'    => nl2br($text, false),
+  ];
 }
 
 /* ------------ DB ------------ */
@@ -160,17 +231,68 @@ try {
     throw $ex;
   }
 
-  $newId = (int)$pdo->lastInsertId();
+  $newId  = (int)$pdo->lastInsertId();
+  $dispId = display_id_from_int($newId);
+
+  $mailInfo = null;
+  if ($HAS_MAILER) {
+    try {
+      $mailData = build_submission_mail([
+        'customer_name'  => $name,
+        'customer_email' => $email,
+        'box_id'         => $box_id,
+        'start_date'     => $start,
+        'end_date'       => $end,
+        'total_amount'   => $total,
+        'display_id'     => $dispId,
+      ]);
+
+      $sent = false;
+      if (function_exists('send_mail')) {
+        $html = $mailData['html'];
+        $text = $mailData['text'];
+        try {
+          $ref = new ReflectionFunction('send_mail');
+          $paramCount = $ref->getNumberOfParameters();
+        } catch (Throwable $re) {
+          $paramCount = 0;
+        }
+        if ($paramCount >= 5) {
+          $sent = (bool)send_mail($email, $name, $mailData['subject'], $html, $text);
+        } else {
+          $sent = (bool)send_mail($email, $name, $mailData['subject'], $html);
+        }
+      } elseif (function_exists('sendMail')) {
+        $sent = (bool)sendMail($email, $mailData['subject'], $mailData['text'], $name);
+      } else {
+        $mailInfo = ['sent' => false, 'error' => 'no mail function'];
+      }
+
+      if ($mailInfo === null) {
+        $mailInfo = ['sent' => $sent, 'subject' => $mailData['subject']];
+        if (!$sent) {
+          $mailInfo['error'] = 'Mailer lieferte false zurück';
+        }
+      }
+    } catch (Throwable $mailEx) {
+      $mailInfo = ['sent' => false, 'error' => $mailEx->getMessage()];
+      error_log('[create_booking][MAIL ERROR] ' . $mailEx->getMessage());
+    }
+  } else {
+    $mailInfo = ['sent' => false, 'error' => 'mailer.php missing'];
+  }
+
   json_response([
     'ok'=>true,
     'booking'=>[
       'id'=>$newId,
-      'display_id'=>display_id_from_int($newId),
+      'display_id'=>$dispId,
       'status'=>'pending',
       'overlap'=>$conflicts ? 'allowed' : 'none',
       'total_amount'=>$total,
       'deposit_eur'=>$deposit
-    ]
+    ],
+    'mail'=>$mailInfo
   ]);
 
 } catch (Throwable $e) {
