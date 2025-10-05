@@ -562,7 +562,7 @@
         const b = this.state.originalBookings.find(x=>x.id===id); if(!b) return;
         const boxOptions = [{id:'1',name:BOX_MAP['1']},{id:'2',name:BOX_MAP['2']},{id:'3',name:BOX_MAP['3']}]
           .map(x => `<option value="${x.id}" ${x.id===b.box_id?'selected':''}>${this.escape(x.name)}</option>`).join('');
-        const baseSubject = `Buchung aktualisiert – ${displayId(id)}`;
+        const baseSubject = `Deine Buchung wurde aktualisiert 👷🏽 – Buchungs-ID: ${displayId(id)}`;
         const parseAmount = (val)=>{
           if(val===null || val===undefined) return NaN;
           if(typeof val==='number') return val;
@@ -991,20 +991,25 @@ Telefon: 01742015500`;
         const box = b.box_name || BOX_MAP[String(b.box_id)] || '—';
         return `Hallo ${name},
 
-wir haben deine Buchung (${displayId(b.id)}) aktualisiert.
+wir haben Details in deiner Buchung (${displayId(b.id)}) aktualisiert.
 
-Aktualisierte Buchungsdaten:
-• Name: ${name}
-• E-Mail: ${email}
-• Musikbox: ${box}
-• Zeitraum: ${range}
-• Status: ${statusLabel}
-• Preis: ${priceLabel}€
+Deine aktualisierte Buchung im Überblick:
+👤 Name: ${name}
+📧 E-Mail: ${email}
+🎵 Musikbox: ${box}
+🕰️ Zeitraum: ${range}
+💶 Preis: ${priceLabel}€
 
-Falls etwas nicht passt, antworte einfach auf diese E-Mail.
+Bitte überprüfe einmal, ob wir deine Buchung korrekt hinterlegt haben.
+
+Falls du noch offene Fragen hast, kannst du uns jederzeit kontaktieren.
 
 Viele Grüße
-Dein MietMichBox Team`;
+Dein MietMichBox Team
+www.mietmichbox.de
+
+E-Mail: info@mietmichbox.de
+Telefon: 01742015500`;
       }
     }
 
