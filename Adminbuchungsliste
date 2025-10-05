@@ -158,6 +158,9 @@
         .mmb-modal h3{margin:0 0 .75rem 0;color:var(--mmb-text);}
         .mmb-modal .mmb-field{display:flex;flex-direction:column;gap:.25rem;margin:.5rem 0;}
         .mmb-modal .mmb-field-switch label{display:flex;align-items:center;gap:.5rem;font-weight:500;}
+        .mmb-alt-options{display:flex;flex-direction:column;gap:.35rem;}
+        .mmb-alt-options label{display:flex;align-items:center;gap:.5rem;cursor:pointer;}
+        .mmb-alt-options input[type="checkbox"]{width:16px;height:16px;}
         .mmb-modal .mmb-field-switch input[type="checkbox"]{width:1.1rem;height:1.1rem;}
         .mmb-modal .mmb-field-switch small{font-size:.75rem;color:var(--mmb-text-light,#6b7280);font-weight:400;display:block;margin-top:.25rem;}
         #mmb-modal-form.mmb-email-disabled [data-email-field]{opacity:.6;}
@@ -490,42 +493,69 @@
           .filter(x => x.id !== b.box_id);
         const altMap = Object.fromEntries(alternatives.map(a=>[a.id,a]));
         const subject = `Konflikt bei deiner Buchung ⚠️ – Buchungs-ID: ${displayId(id)}`;
-        const initialAlt = alternatives[0];
-        let body = this.tplAlternative(b, initialAlt);
+        const initialSelection = alternatives.length ? [alternatives[0]] : [];
         const html = `
           <div class="mmb-field"><strong>Buchung:</strong> ${displayId(id)} – ${this.escape(b.customer_name)}</div>
-          <div class="mmb-field"><label>Alternative Box</label>
-            <select name="alternative_box_id">
-              ${alternatives.map(x=>`<option value="${x.id}">${this.escape(x.name)}</option>`).join('')}
-            </select>
+          <div class="mmb-field"><label>Alternative Box(en)</label>
+            <div class="mmb-alt-options">
+              ${alternatives.map((x,idx)=>`
+                <label><input type="checkbox" name="alternative_box_ids" value="${x.id}" ${idx===0?'checked':''}/> ${this.escape(x.name)}</label>
+              `).join('')}
+            </div>
           </div>
           <div class="mmb-field"><label>Betreff</label><input name="subject" value="${this.escape(subject)}"/></div>
-          <div class="mmb-field"><label>Nachricht an Kund*in</label><textarea name="message">${this.escape(body)}</textarea></div>
+          <div class="mmb-field"><label>Nachricht an Kund*in</label><textarea name="message">${this.escape(this.tplAlternative(b, initialSelection))}</textarea></div>
         `;
         const values = await this.openModal({
           title:'Alternative Box vorschlagen',
           html,
           confirmText:'Alternative senden',
           onMount: (form)=>{
-            const sel = form.querySelector('select[name="alternative_box_id"]');
+            const boxes = Array.from(form.querySelectorAll('input[name="alternative_box_ids"]'));
             const ta  = form.querySelector('textarea[name="message"]');
             const sync = ()=>{
-              const alt = altMap[sel.value];
-              ta.value = (alt ? this.tplAlternative(b, alt) : this.tplAlternative(b, initialAlt));
+              const checked = boxes.filter(cb=>cb.checked);
+              if(!checked.length && boxes.length){
+                boxes[0].checked = true;
+                return sync();
+              }
+              const selected = checked.map(cb=>altMap[cb.value]).filter(Boolean);
+              const fallback = selected.length ? selected : initialSelection;
+              ta.value = this.tplAlternative(b, fallback);
             };
-            sel.addEventListener('change', sync);
+            boxes.forEach(cb=>cb.addEventListener('change', sync));
             sync();
           }
         });
         if(!values) return;
-        await MMBApi.updateBookingStatus({
+
+        const rawAlt = values.alternative_box_ids;
+        const selectedIds = Array.isArray(rawAlt) ? rawAlt : (rawAlt ? [rawAlt] : []);
+        const selected = selectedIds.map(v=>altMap[v]).filter(Boolean);
+        if(!selected.length){
+          MMBCore.Utils.showNotification('Bitte wähle mindestens eine Alternative aus.', 'error');
+          return;
+        }
+
+        const payload = {
           booking_id: Number(id),
-          alternative_box_id: Number(values.alternative_box_id),
+          status: 'rejected',
+          alternative_box_ids: selected.map(alt=>Number(alt.id)),
           send_email: 1,
           subject: values.subject,
           message: values.message
-        });
-        MMBCore.Utils.showNotification('Alternative vorgeschlagen (Mail gesendet)');
+        };
+
+        const response = await MMBApi.updateBookingStatus(payload);
+        await this.loadBookings();
+
+        const mailInfo = response?.mail || null;
+        if(mailInfo && mailInfo.sent === false){
+          const err = mailInfo.error ? ` – ${mailInfo.error}` : '';
+          MMBCore.Utils.showNotification('Alternative versendet, aber E-Mail fehlgeschlagen'+err, 'error');
+        }else{
+          MMBCore.Utils.showNotification('Alternative vorgeschlagen (Status: Abgelehnt)');
+        }
       }
 
       async editBooking(id){
@@ -846,7 +876,14 @@
             ev.preventDefault();
             const data = new FormData(form);
             const values = {};
-            data.forEach((v,k)=>{ values[k]=v; });
+            data.forEach((v,k)=>{
+              if(Object.prototype.hasOwnProperty.call(values,k)){
+                if(Array.isArray(values[k])) values[k].push(v);
+                else values[k] = [values[k], v];
+              }else{
+                values[k]=v;
+              }
+            });
             modal.remove();
             resolve(values);
           });
@@ -901,13 +938,28 @@ E-Mail: info@mietmichbox.de
 Telefon: 01742015500`;
       }
 
-      tplAlternative(b, alt){
+      tplAlternative(b, alternatives){
         const range = `${new Date(b.start_date).toLocaleDateString('de-DE')} – ${new Date(b.end_date).toLocaleDateString('de-DE')}`;
+        const names = Array.isArray(alternatives)
+          ? alternatives.map(x=>x?.name).filter(Boolean)
+          : (alternatives && alternatives.name ? [alternatives.name] : []);
+        let altSentence;
+        if(names.length === 0){
+          altSentence = 'Wir schlagen dir als Alternative aktuell keine weitere Box vor.';
+        }else if(names.length === 1){
+          altSentence = `Wir schlagen dir als Alternative die ${names[0]} vor.`;
+        }else if(names.length === 2){
+          altSentence = `Wir schlagen dir als Alternative die ${names[0]} oder die ${names[1]} vor.`;
+        }else{
+          const list = names.slice();
+          const last = list.pop();
+          altSentence = `Wir schlagen dir als Alternative die ${list.join(', die ')} oder die ${last} vor.`;
+        }
         return `Hallo ${b.customer_name},
 
 tut uns leid, aber unsere Musikboxen sind sehr gefragt 🔥
 
-Für deine Buchung (${displayId(b.id)}) ist die Musikbox ${b.box_name} für den Zeitraum ${range} leider nicht mehr verfügbar. Wir schlagen dir als Alternative die ${alt?.name||'—'} vor.
+Für deine Buchung (${displayId(b.id)}) ist die Musikbox ${b.box_name} für den Zeitraum ${range} leider nicht mehr verfügbar. ${altSentence}
 
 Du kannst gerne direkt in unserem <a href="https://www.mietmichbox.de/buchungskalender" target="_blank" rel="noopener">Buchungskalender</a> eine neue Buchung mit einer anderen Musikbox oder zu einem anderen Zeitraum anfragen. Alternativ kannst du uns auch als Antwort auf diese E-Mail die alternative Musikbox oder den alternativen Zeitraum nennen, sodass wir deine Buchung aktualisieren können. Wir helfen dir gerne schnellstmöglich weiter.
 
