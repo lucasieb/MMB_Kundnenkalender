@@ -271,6 +271,9 @@ try {
 
       if ($mailInfo === null) {
         $mailInfo = ['sent'=>$sent,'subject'=>$subject];
+        if (!$sent) {
+          $mailInfo['error'] = 'Mailer lieferte false zurück';
+        }
       }
     }
   }
