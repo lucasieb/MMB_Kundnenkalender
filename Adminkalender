@@ -55,7 +55,7 @@
     </div>
   </div>
 
-  <script src="admin_auth.js"></script>
+  <script src="/admin_auth.js"></script>
   <script>
   /* ============ CORE ============ */
   (function(global){'use strict';
