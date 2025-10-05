@@ -12,7 +12,13 @@ declare(strict_types=1);
 require __DIR__ . '/cors.php';
 header('Content-Type: application/json; charset=utf-8');
 
+$HAS_MAILER = is_file(__DIR__ . '/mailer.php');
+if ($HAS_MAILER) {
+  require_once __DIR__ . '/mailer.php';
+}
+
 const DEFAULT_ALLOW_OVERLAP = true;
+const INTERNAL_NOTIFICATION_EMAIL = 'info@mietmichbox.de';
 
 /* ------------ Utils ------------ */
 function json_response(array $data, int $status = 200): void {
@@ -41,6 +47,166 @@ function num($v, ?float $fallback = 0.0): ?float {
   $n = str_replace(['€',' '], '', (string)$v);
   $n = str_replace(',', '.', $n);
   return is_numeric($n) ? (float)$n : $fallback;
+}
+
+function box_name_by_id(int $id): string {
+  $map = [
+    1 => 'Marshall Bromley 750',
+    2 => 'Teufel Rockster Neo',
+    3 => 'Soundboks 4',
+  ];
+  return $map[$id] ?? ('Box #' . $id);
+}
+
+function format_price(float $amount): string {
+  return number_format($amount, 0, ',', '.') . '€';
+}
+
+/**
+ * Erstellt Betreff + Text für die automatische Eingangsbestätigung.
+ *
+ * @param array{customer_name:string,customer_email:string,box_id:int,start_date:string,end_date:string,total_amount:float,display_id:string} $data
+ * @return array{subject:string,text:string,html:string}
+ */
+function booking_mail_context(array $data): array {
+  $name      = trim($data['customer_name']) ?: 'Guten Tag';
+  $email     = trim($data['customer_email']);
+  $boxName   = box_name_by_id((int)$data['box_id']);
+  $totalDisp = format_price((float)$data['total_amount']);
+
+  $startDate = new DateTimeImmutable($data['start_date']);
+  $endDate   = new DateTimeImmutable($data['end_date']);
+  $startDisp = $startDate->format('d.m.Y');
+  $endDisp   = $endDate->format('d.m.Y');
+  $range     = ($startDisp === $endDisp) ? $startDisp : ($startDisp . ' – ' . $endDisp);
+
+  return [
+    'name'        => $name,
+    'email'       => $email,
+    'boxName'     => $boxName,
+    'totalDisp'   => $totalDisp,
+    'range'       => $range,
+  ];
+}
+
+function build_submission_mail(array $data): array {
+  $ctx = booking_mail_context($data);
+  $name      = $ctx['name'];
+  $email     = $ctx['email'];
+  $boxName   = $ctx['boxName'];
+  $range     = $ctx['range'];
+  $totalDisp = $ctx['totalDisp'];
+
+  $subject = "Deine Buchung wurde übermittelt – Buchungs-ID: {$data['display_id']}";
+
+  $text = <<<TXT
+Hallo {$name},
+
+deine Buchung wurde an uns erfolgreich übermittelt.
+
+Deine Buchung im Überblick:
+👤 Name: {$name}
+📧 E-Mail: {$email}
+🎵 Musikbox: {$boxName}
+🕰️ Zeitraum: {$range}
+💶 Gesamtkosten: {$totalDisp}
+
+Bitte überprüfe einmal, ob das so stimmt.
+
+Aktuell steht deine Buchung noch auf Ausstehend. Wir bearbeiten deine Anfrage und melden uns schnellstmöglich mit der Bestätigung. Bis dahin musst du nichts weiter tun.
+
+Falls du noch offene Fragen hast, kannst du uns jederzeit kontaktieren.
+
+Viele Grüße
+Dein MietMichBox Team
+www.mietmichbox.de
+
+E-Mail: info@mietmichbox.de
+Telefon: 01742015500
+TXT;
+
+  return [
+    'subject' => $subject,
+    'text'    => $text,
+    'html'    => nl2br($text, false),
+  ];
+}
+
+function build_internal_submission_mail(array $data): array {
+  $ctx = booking_mail_context($data);
+  $name      = $ctx['name'];
+  $email     = $ctx['email'];
+  $boxName   = $ctx['boxName'];
+  $range     = $ctx['range'];
+  $totalDisp = $ctx['totalDisp'];
+  $displayId = $data['display_id'];
+
+  $linkUrl   = 'https://mietmichbox.de/buchungsverwaltung';
+  $subject   = "Neue Buchungsanfrage – Buchungs-ID: {$displayId}";
+
+  $text = <<<TXT
+Hallo MietMichBox Team,
+
+eine neue Buchungsanfrage ist eingegangen. Der Status steht bislang auf Ausstehend.
+
+Buchung im Überblick:
+👤 Name: {$name}
+📧 E-Mail: {$email}
+🎵 Musikbox: {$boxName}
+🕰️ Zeitraum: {$range}
+💶 Gesamtkosten: {$totalDisp}
+
+Buchung in der Buchungsverwaltung einsehen: {$linkUrl}
+TXT;
+
+  $html = <<<HTML
+<p>Hallo MietMichBox Team,</p>
+<p>eine neue Buchungsanfrage ist eingegangen. Der Status steht bislang auf Ausstehend.</p>
+<p>Buchung im Überblick:<br>
+👤 Name: {$name}<br>
+📧 E-Mail: {$email}<br>
+🎵 Musikbox: {$boxName}<br>
+🕰️ Zeitraum: {$range}<br>
+💶 Gesamtkosten: {$totalDisp}</p>
+<p>Buchung in der <a href="{$linkUrl}">Buchungsverwaltung</a> einsehen.</p>
+HTML;
+
+  return [
+    'subject' => $subject,
+    'text'    => $text,
+    'html'    => $html,
+  ];
+}
+
+function send_mail_via_available(string $email, string $name, array $mailData): array {
+  $info = ['sent' => false, 'subject' => $mailData['subject']];
+
+  if (function_exists('send_mail')) {
+    $html = $mailData['html'];
+    $text = $mailData['text'];
+    try {
+      $ref = new ReflectionFunction('send_mail');
+      $paramCount = $ref->getNumberOfParameters();
+    } catch (Throwable $re) {
+      $paramCount = 0;
+    }
+    if ($paramCount >= 5) {
+      $sent = (bool)send_mail($email, $name, $mailData['subject'], $html, $text);
+    } else {
+      $sent = (bool)send_mail($email, $name, $mailData['subject'], $html);
+    }
+  } elseif (function_exists('sendMail')) {
+    $sent = (bool)sendMail($email, $mailData['subject'], $mailData['text'], $name);
+  } else {
+    $info['error'] = 'no mail function';
+    return $info;
+  }
+
+  $info['sent'] = $sent;
+  if (!$sent) {
+    $info['error'] = 'Mailer lieferte false zurück';
+  }
+  return $info;
 }
 
 /* ------------ DB ------------ */
@@ -160,17 +326,51 @@ try {
     throw $ex;
   }
 
-  $newId = (int)$pdo->lastInsertId();
+  $newId  = (int)$pdo->lastInsertId();
+  $dispId = display_id_from_int($newId);
+
+  $mailInfo = ['sent' => false, 'error' => 'mailer.php missing'];
+  $internalMailInfo = ['sent' => false, 'error' => 'mailer.php missing'];
+  if ($HAS_MAILER) {
+    $payload = [
+      'customer_name'  => $name,
+      'customer_email' => $email,
+      'box_id'         => $box_id,
+      'start_date'     => $start,
+      'end_date'       => $end,
+      'total_amount'   => $total,
+      'display_id'     => $dispId,
+    ];
+
+    try {
+      $mailData = build_submission_mail($payload);
+      $mailInfo = send_mail_via_available($email, $name, $mailData);
+    } catch (Throwable $mailEx) {
+      $mailInfo = ['sent' => false, 'error' => $mailEx->getMessage()];
+      error_log('[create_booking][MAIL ERROR customer] ' . $mailEx->getMessage());
+    }
+
+    try {
+      $internalData = build_internal_submission_mail($payload);
+      $internalMailInfo = send_mail_via_available(INTERNAL_NOTIFICATION_EMAIL, 'MietMichBox Team', $internalData);
+    } catch (Throwable $mailEx) {
+      $internalMailInfo = ['sent' => false, 'error' => $mailEx->getMessage()];
+      error_log('[create_booking][MAIL ERROR internal] ' . $mailEx->getMessage());
+    }
+  }
+
   json_response([
     'ok'=>true,
     'booking'=>[
       'id'=>$newId,
-      'display_id'=>display_id_from_int($newId),
+      'display_id'=>$dispId,
       'status'=>'pending',
       'overlap'=>$conflicts ? 'allowed' : 'none',
       'total_amount'=>$total,
       'deposit_eur'=>$deposit
-    ]
+    ],
+    'mail'=>$mailInfo,
+    'internal_mail'=>$internalMailInfo
   ]);
 
 } catch (Throwable $e) {

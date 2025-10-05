@@ -12,6 +12,7 @@ declare(strict_types=1);
  *  status (string)             – optional: pending|confirmed|rejected|cancelled
  *  update (object)             – optional: customer_name, customer_email, customer_phone, box_id, start_date, end_date, total_amount, status
  *  alternative_box_id (int)    – optional: für „Alternative vorschlagen“ (nur Protokoll + E-Mail-Text)
+ *  alternative_box_ids (array) – optional: mehrere Boxen als Vorschlag (ersetzt alternative_box_id)
  *  send_email (int/bool)       – optional: 1 = E-Mail senden
  *  subject (string)            – optional: E-Mail-Betreff (überschreibt Vorlage)
  *  message (string)            – optional: E-Mail-Text (überschreibt Vorlage)
@@ -55,7 +56,7 @@ function displayId(int $id): string {
 }
 
 // E-Mail-Vorlagen (werden von Custom-Subject/-Message übersteuert)
-function buildEmailTemplates(array $bk, ?int $alternativeBoxId = null): array {
+function buildEmailTemplates(array $bk, array $alternativeBoxIds = []): array {
   $name   = trim((string)($bk['customer_name'] ?? ''));
   if ($name === '') $name = 'Guten Tag';
   $box    = boxNameById((int)$bk['box_id']);
@@ -111,10 +112,13 @@ Dein MIETMICHBOX Team
 TXT
   ];
 
-  if ($alternativeBoxId) {
-    $alt = boxNameById($alternativeBoxId);
-    $subjects['alternative'] = "Alternative Box: {$alt} – {$dispId}";
-    $bodies['alternative'] = <<<TXT
+  $alternativeBoxIds = array_values(array_unique(array_map('intval', $alternativeBoxIds)));
+  if ($alternativeBoxIds) {
+    $altNames = array_map('boxNameById', $alternativeBoxIds);
+    if (count($altNames) === 1) {
+      $alt = $altNames[0];
+      $subjects['alternative'] = "Alternative Box: {$alt} – {$dispId}";
+      $bodies['alternative'] = <<<TXT
 Hallo {$name},
 
 für deine Anfrage ({$dispId}) vom {$s} bis {$e} schlagen wir dir als Alternative die folgende Box vor:
@@ -126,6 +130,22 @@ Gib uns kurz Bescheid, ob das für dich passt – dann reservieren wir dir die A
 Viele Grüße
 Dein MIETMICHBOX Team
 TXT;
+    } else {
+      $subjects['alternative'] = "Alternative Boxen verfügbar – {$dispId}";
+      $list = "• " . implode("\n• ", $altNames);
+      $bodies['alternative'] = <<<TXT
+Hallo {$name},
+
+für deine Anfrage ({$dispId}) vom {$s} bis {$e} schlagen wir dir die folgenden Boxen als Alternative vor:
+
+{$list}
+
+Gib uns kurz Bescheid, welche Alternative für dich passt – dann reservieren wir sie dir sehr gerne.
+
+Viele Grüße
+Dein MIETMICHBOX Team
+TXT;
+    }
   } else {
     $bodies['alternative'] = <<<TXT
 Hallo {$name},
@@ -162,6 +182,30 @@ try {
   $newStatus     = isset($in['status']) ? trim((string)$in['status']) : null;
   $updates       = (isset($in['update']) && is_array($in['update'])) ? $in['update'] : [];
   $altBoxId      = isset($in['alternative_box_id']) ? (int)$in['alternative_box_id'] : 0;
+  $altBoxIdsIn   = $in['alternative_box_ids'] ?? null;
+  $altBoxIds     = [];
+  if (is_array($altBoxIdsIn)) {
+    foreach ($altBoxIdsIn as $val) {
+      $val = (int)$val;
+      if ($val > 0 && !in_array($val, $altBoxIds, true)) {
+        $altBoxIds[] = $val;
+      }
+    }
+  } elseif ($altBoxIdsIn !== null) {
+    $val = (int)$altBoxIdsIn;
+    if ($val > 0) {
+      $altBoxIds[] = $val;
+    }
+  }
+  if ($altBoxId > 0 && !in_array($altBoxId, $altBoxIds, true)) {
+    $altBoxIds[] = $altBoxId;
+  }
+  if ($altBoxIds) {
+    $newStatus = 'rejected';
+    if (isset($updates['status'])) {
+      $updates['status'] = 'rejected';
+    }
+  }
   $sendEmail     = !empty($in['send_email']);
   $customMsg     = isset($in['message']) ? trim((string)$in['message']) : '';
   $customSubject = isset($in['subject']) ? trim((string)$in['subject']) : '';
@@ -220,13 +264,16 @@ try {
   }
 
   // 3) Alternative protokollieren (optional, falls Tabelle existiert)
-  if ($altBoxId > 0) {
-    try {
-      $pdo->prepare("INSERT INTO booking_alternatives (booking_id, suggested_box_id, created_at) VALUES (?,?,NOW())")
-          ->execute([$id, $altBoxId]);
-    } catch (Throwable $e) {
-      // Nicht kritisch – nur loggen, falls Tabelle nicht existiert
-      error_log('booking_alternatives insert failed: '.$e->getMessage());
+  if ($altBoxIds) {
+    foreach ($altBoxIds as $altId) {
+      try {
+        $pdo->prepare("INSERT INTO booking_alternatives (booking_id, suggested_box_id, created_at) VALUES (?,?,NOW())")
+            ->execute([$id, $altId]);
+      } catch (Throwable $e) {
+        // Nicht kritisch – nur loggen, falls Tabelle nicht existiert
+        error_log('booking_alternatives insert failed: '.$e->getMessage());
+        break;
+      }
     }
   }
 
@@ -243,12 +290,12 @@ try {
     if (!$HAS_MAILER) {
       $mailInfo = ['sent'=>false,'error'=>'mailer.php missing'];
     } else {
-      [$subjects, $bodies] = buildEmailTemplates($bk, $altBoxId);
+      [$subjects, $bodies] = buildEmailTemplates($bk, $altBoxIds);
 
       // Modus bestimmen
       $mode = 'updated';
       $st = strtolower((string)($bk['status'] ?? ''));
-      if ($altBoxId > 0)                 $mode = 'alternative';
+      if (!empty($altBoxIds))            $mode = 'alternative';
       elseif ($st === 'confirmed')       $mode = 'confirmed';
       elseif ($st === 'rejected' || $st === 'cancelled') $mode = 'rejected';
 
@@ -271,6 +318,9 @@ try {
 
       if ($mailInfo === null) {
         $mailInfo = ['sent'=>$sent,'subject'=>$subject];
+        if (!$sent) {
+          $mailInfo['error'] = 'Mailer lieferte false zurück';
+        }
       }
     }
   }
@@ -290,6 +340,7 @@ try {
       'end_date'       => (string)$bk['end_date'],
       'total_amount'   => (float)$bk['total_amount'],
     ],
+    'alternative_box_ids' => $altBoxIds,
     'mail' => $mailInfo,
   ];
 
