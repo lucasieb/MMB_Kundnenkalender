@@ -84,7 +84,7 @@ function build_submission_mail(array $data): array {
   $text = <<<TXT
 Hallo {$name},
 
-deine Buchung wurde an uns erfolgreich übermittelt.
+deine Buchung wurde erfolgreich an uns übermittelt. Aktuell steht der Status noch auf Ausstehend. Wir bearbeiten deine Anfrage schnellstmöglich und melden uns dann mit der Bestätigung. Bis dahin musst du nichts weiter tun.
 
 Deine Buchung im Überblick:
 👤 Name: {$name}
@@ -93,9 +93,7 @@ Deine Buchung im Überblick:
 🕰️ Zeitraum: {$range}
 💶 Gesamtkosten: {$totalDisp}
 
-Bitte überprüfe einmal, ob das so stimmt.
-
-Aktuell steht deine Buchung noch auf Ausstehend. Wir bearbeiten deine Anfrage und melden uns schnellstmöglich mit der Bestätigung. Bis dahin musst du nichts weiter tun.
+Bitte überprüfe einmal, ob deine Buchung korrekt bei uns eingegangen ist.
 
 Falls du noch offene Fragen hast, kannst du uns jederzeit kontaktieren.
 
