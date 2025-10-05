@@ -150,13 +150,16 @@
         .mmb-admin-filters select,.mmb-admin-filters input{ padding:.6rem;border:1px solid var(--mmb-border);border-radius:6px;background:var(--mmb-bg);color:var(--mmb-text);font-size:.9rem; }
         .mmb-admin-list-wrap{height:70vh;overflow:auto;margin:.75rem 0;border-radius:6px;}
         .mmb-bookings-table{width:100%;border-collapse:collapse;background:var(--mmb-bg);border-radius:6px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.1);}
-        .mmb-bookings-table th,.mmb-bookings-table td{padding:.75rem;text-align:left;border-bottom:1px solid var(--mmb-border);}
+        .mmb-bookings-table th,.mmb-bookings-table td{padding:.75rem .85rem;border-bottom:1px solid var(--mmb-border);text-align:left;vertical-align:middle;}
         .mmb-bookings-table th{background:var(--mmb-muted);font-weight:600;position:sticky;top:0;z-index:2;}
-        .mmb-bookings-table th.cell-head-box,.mmb-bookings-table td.cell--box{min-width:200px;white-space:nowrap;}
-        .mmb-bookings-table th.cell-head-date,.mmb-bookings-table td.cell--date{min-width:150px;width:150px;}
-        .mmb-bookings-table td.cell--date{display:flex;flex-direction:column;gap:.15rem;white-space:normal;line-height:1.35;}
-        .mmb-bookings-table th.cell-head-status,.mmb-bookings-table td.cell--status{width:130px;}
-        .mmb-bookings-table th.cell-head-actions,.mmb-bookings-table td.cell--actions{min-width:310px;}
+        .mmb-bookings-table th.cell-head-box,.mmb-bookings-table td.cell--box{min-width:210px;white-space:nowrap;}
+        .mmb-bookings-table th.cell-head-date,.mmb-bookings-table td.cell--date{min-width:138px;width:138px;}
+        .mmb-bookings-table td.cell--date{display:flex;flex-direction:column;gap:.2rem;white-space:normal;line-height:1.35;align-items:center;justify-content:center;text-align:center;min-height:58px;}
+        .mmb-bookings-table th.cell-head-fulfillment,.mmb-bookings-table td.cell--fulfillment{min-width:170px;}
+        .mmb-bookings-table th.cell-head-status,.mmb-bookings-table td.cell--status{width:120px;}
+        .mmb-bookings-table th.cell-head-price,.mmb-bookings-table td.cell--total{text-align:right;}
+        .mmb-bookings-table td.cell--total{font-variant-numeric:tabular-nums;}
+        .mmb-bookings-table th.cell-head-actions,.mmb-bookings-table td.cell--actions{min-width:340px;}
         .mmb-btn{background:var(--mmb-accent);color:#fff;border:none;padding:.5rem .75rem;border-radius:6px;font-size:.875rem;font-weight:500;cursor:pointer;transition:background-color .2s;}
         .mmb-btn:hover{background:#0284c7;} .mmb-btn:disabled{opacity:.45;cursor:not-allowed;filter:saturate(0.6) contrast(0.9);}
         .mmb-btn-small{padding:.25rem .5rem;font-size:.75rem;min-width:28px;}
@@ -191,7 +194,8 @@
         .badge-id{font-variant-numeric:tabular-nums;letter-spacing:.5px;}
         .mmb-footer{display:flex;justify-content:center;align-items:center;height:36px;color:var(--mmb-text-light);font-size:.9rem;background:var(--mmb-muted);border-radius:6px;}
         .mmb-text-muted{color:var(--mmb-text-light,#6b7280);}
-        .cell--actions-row{display:flex;gap:.3rem;flex-wrap:nowrap;align-items:center;}
+        .cell--actions-row{display:flex;gap:.35rem;flex-wrap:nowrap;align-items:center;}
+        .cell--actions-row .mmb-btn-small{width:52px;min-width:52px;height:36px;padding:0;display:inline-flex;align-items:center;justify-content:center;}
       `; document.head.appendChild(s);
     }
 
@@ -325,7 +329,7 @@
           return `
             <table class="mmb-bookings-table">
               <thead>
-                <tr><th>ID</th><th>Kunde</th><th class="cell-head-box">Box</th><th class="cell-head-date">Zeitraum</th><th class="cell-head-status">Status</th><th>Preis</th><th>Abwicklung</th><th class="cell-head-actions">Aktionen</th></tr>
+                <tr><th>ID</th><th>Kunde</th><th class="cell-head-box">Box</th><th class="cell-head-date">Zeitraum</th><th class="cell-head-fulfillment">Abwicklung</th><th class="cell-head-price">Preis</th><th class="cell-head-status">Status</th><th class="cell-head-actions">Aktionen</th></tr>
               </thead>
               <tbody><tr><td colspan="8" style="padding:1rem;color:var(--mmb-text-light);">Keine Buchungen vorhanden</td></tr></tbody>
             </table>`;
@@ -333,7 +337,7 @@
         return `
         <table class="mmb-bookings-table">
           <thead>
-            <tr><th>ID</th><th>Kunde</th><th class="cell-head-box">Box</th><th class="cell-head-date">Zeitraum</th><th class="cell-head-status">Status</th><th>Preis</th><th>Abwicklung</th><th class="cell-head-actions">Aktionen</th></tr>
+            <tr><th>ID</th><th>Kunde</th><th class="cell-head-box">Box</th><th class="cell-head-date">Zeitraum</th><th class="cell-head-fulfillment">Abwicklung</th><th class="cell-head-price">Preis</th><th class="cell-head-status">Status</th><th class="cell-head-actions">Aktionen</th></tr>
           </thead>
           <tbody>
             ${rows.map(b=>this.renderRow(b)).join('')}
@@ -354,9 +358,9 @@
           <td><div class="cell--name">${this.escape(b.customer_name)}</div><div class="cell--email" style="font-size:.75rem;color:var(--mmb-text-light);">${this.escape(b.customer_email)}</div></td>
           <td class="cell--box">${this.escape(b.box_name)}</td>
           <td class="cell--date">${this.renderDateCell(b)}</td>
-          <td class="cell--status"><span class="mmb-status-badge mmb-status-${b.status}">${this.translateStatus(b.status)}</span></td>
-          <td class="cell--total">${Number(b.price_total).toLocaleString('de-DE')}€</td>
           <td class="cell--fulfillment"${fulfillmentNoteAttr}>${this.escape(this.formatFulfillmentCell(b))}</td>
+          <td class="cell--total">${Number(b.price_total).toLocaleString('de-DE')}€</td>
+          <td class="cell--status"><span class="mmb-status-badge mmb-status-${b.status}">${this.translateStatus(b.status)}</span></td>
           <td class="cell--actions">
             <div class="cell--actions-row">
               <button class="mmb-btn mmb-btn-small mmb-btn-secondary"

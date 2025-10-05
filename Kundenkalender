@@ -30,39 +30,38 @@
   .mmb-widget{background:var(--mmb-dark);border-radius:var(--mmb-radius);overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.1);max-width:1200px;margin:0 auto;}
 
   /* Header */
-  .mmb-header{display:flex;flex-direction:column;gap:.45rem;padding:1rem 1.15rem;background:#2f2f2f;border-bottom:1px solid var(--mmb-border);}
+  .mmb-header{display:flex;flex-direction:column;gap:.45rem;padding:1rem;background:#2f2f2f;border-bottom:1px solid var(--mmb-border);}
   .mmb-section-title{font-size:.9rem;font-weight:600;letter-spacing:.01em;color:var(--mmb-light);}
-  .mmb-box-buttons{display:flex;gap:.55rem;flex-wrap:nowrap;overflow-x:auto;padding-bottom:.25rem;}
-  .mmb-box-buttons::-webkit-scrollbar{height:6px;}
-  .mmb-box-buttons::-webkit-scrollbar-thumb{background:rgba(255,255,255,.25);border-radius:999px;}
-  .mmb-box-buttons::-webkit-scrollbar-track{background:transparent;}
-  .mmb-box-btn{flex:1 1 0;min-width:0;background:transparent;border:1px solid var(--mmb-border);padding:.55rem .8rem;border-radius:6px;cursor:pointer;
+  .mmb-box-buttons{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.55rem;}
+  .mmb-box-btn{background:transparent;border:1px solid var(--mmb-border);padding:.55rem .8rem;border-radius:6px;cursor:pointer;
                font-size:.85rem;font-weight:600;color:var(--mmb-light);display:inline-flex;align-items:center;justify-content:center;text-align:center;white-space:nowrap;transition:background .2s,border-color .2s,color .2s;}
   .mmb-box-btn:hover{background:#3a3a3a;}
   .mmb-box-btn.mmb-box-btn--active{background:var(--mmb-accent);color:#fff;border-color:var(--mmb-accent);}
 
-  .mmb-nav{display:flex;align-items:center;gap:8px;}
+  .mmb-nav{display:flex;align-items:center;gap:6px;}
   .mmb-nav-btn{background:transparent;border:1px solid var(--mmb-border);padding:.45rem .7rem;border-radius:6px;cursor:pointer;
                color:var(--mmb-light);font-weight:600;}
   .mmb-nav-btn:hover{background:#3a3a3a;}
-  .mmb-month-title{font-weight:600;font-size:1rem;min-width:160px;text-align:center;color:var(--mmb-light);}
-  .mmb-calendar-meta{display:flex;align-items:center;justify-content:space-between;gap:.75rem;margin-bottom:.6rem;flex-wrap:wrap;}
+  .mmb-month-title{font-weight:600;font-size:1rem;min-width:0;padding:0 .25rem;text-align:center;color:var(--mmb-light);}
+  .mmb-calendar-meta{display:grid;grid-template-columns:1fr auto;align-items:center;column-gap:.75rem;row-gap:.45rem;margin-bottom:.55rem;}
+  .mmb-calendar-meta .mmb-nav{justify-self:end;}
   .mmb-calendar-meta .mmb-section-title{font-size:.95rem;}
 
   /* Layout – feste Min-Höhen, kein Springen */
   .mmb-content{display:grid;grid-template-columns:1fr 440px;gap:18px;padding:1rem;}
   @media (max-width:900px){.mmb-content{grid-template-columns:1fr;}}
   .mmb-calendar-wrap{min-height:560px;display:flex;width:100%;justify-content:center;}
-  .mmb-calendar-wrap .cal{display:flex;flex-direction:column;gap:1.1rem;width:100%;}
+  .mmb-calendar-wrap .cal{display:flex;flex-direction:column;gap:1rem;width:100%;}
   .mmb-side-wrap{min-height:560px;display:flex;width:100%;justify-content:center;}
 
   @media (max-width:600px){
     .mmb-widget{margin:0 auto;border-radius:18px;width:min(100%,calc(100vw - 1.5rem));}
     .mmb-header{gap:.65rem;padding:.85rem .7rem;}
-    .mmb-box-buttons{gap:.5rem;}
-    .mmb-box-btn{flex:1 0 calc(50% - .6rem);min-width:140px;text-align:center;white-space:normal;padding:.6rem .6rem;}
-    .mmb-calendar-meta{flex-direction:column;align-items:flex-start;gap:.5rem;}
+    .mmb-box-buttons{grid-template-columns:repeat(2,minmax(0,1fr));gap:.5rem;}
+    .mmb-box-btn{min-width:0;text-align:center;white-space:normal;padding:.6rem .6rem;}
+    .mmb-calendar-meta{grid-template-columns:1fr;row-gap:.35rem;}
     .mmb-nav{width:100%;justify-content:space-between;}
+    .mmb-calendar-meta .mmb-nav{justify-self:stretch;}
     .mmb-month-title{min-width:0;font-size:1.05rem;}
     .mmb-content{padding:.8rem .7rem;gap:12px;}
     .mmb-calendar-wrap,.mmb-side-wrap{min-height:0;width:100%;justify-content:center;}
@@ -74,7 +73,7 @@
     .mmb-day::after{font-size:.82rem;}
     .mmb-booking-form{padding:16px;border-radius:14px;gap:.7rem;}
     .mmb-fulfillment-group{grid-template-columns:1fr;}
-    .mmb-fulfillment-option{min-height:120px;padding:.85rem .85rem;}
+    .mmb-fulfillment-option{min-height:118px;padding:.85rem .85rem;}
     .mmb-fulfillment-info{top:10px;right:10px;}
     .mmb-terms{font-size:.85rem;}
     .mmb-btn{font-size:.95rem;padding:.6rem .95rem;}
@@ -148,22 +147,24 @@
   .mmb-price-summary{background:#2f2f2f;padding:.75rem;border-radius:6px;border:1px solid var(--mmb-border);}
   .mmb-price-line{display:flex;justify-content:space-between;align-items:center;margin:.35rem 0;font-size:.9rem;}
   .mmb-hr{height:1px;background:rgba(255,255,255,.12);margin:.35rem 0;}
-  .mmb-total{display:flex;justify-content:space-between;align-items:center;margin-top:.35rem;}
-  .mmb-total .label{font-weight:600;}
+  .mmb-total{display:flex;justify-content:space-between;align-items:flex-start;gap:.75rem;margin-top:.35rem;}
+  .mmb-total .label{font-weight:600;display:block;}
   .mmb-total .value{font-weight:600;font-size:1.05rem;}
+  .mmb-total-label{display:flex;flex-direction:column;gap:.1rem;}
+  .mmb-total-sub{font-weight:600;font-size:.95rem;}
   .mmb-price-small{font-size:.8rem;color:#cfcfcf;}
   .mmb-price-note{font-size:.78rem;color:rgba(255,255,255,.7);margin-top:.35rem;}
 
-  .mmb-fulfillment-block{margin-top:1.15rem;}
-  .mmb-fulfillment-group{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.75rem;margin-top:.55rem;}
-  .mmb-fulfillment-option{position:relative;padding:1rem .95rem;border-radius:10px;border:1px solid var(--mmb-border);background:#2a2a2a;display:flex;flex-direction:column;gap:.4rem;min-height:126px;cursor:pointer;transition:background .2s,border-color .2s,box-shadow .2s,color .2s;}
+  .mmb-fulfillment-block{margin-top:.9rem;}
+  .mmb-fulfillment-group{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.65rem;margin-top:.45rem;}
+  .mmb-fulfillment-option{position:relative;padding:.9rem .9rem;border-radius:10px;border:1px solid var(--mmb-border);background:#2a2a2a;display:flex;flex-direction:column;gap:.32rem;min-height:112px;cursor:pointer;transition:background .2s,border-color .2s,box-shadow .2s,color .2s;}
   .mmb-fulfillment-option:hover{border-color:var(--mmb-accent);box-shadow:0 0 0 1px var(--mmb-accent-200);}
   .mmb-fulfillment-option.is-active{background:var(--mmb-accent);border-color:var(--mmb-accent);color:#fff;box-shadow:0 0 0 1px rgba(14,165,233,.35);}
   .mmb-fulfillment-option input{position:absolute;opacity:0;pointer-events:none;}
-  .mmb-fulfillment-label{font-weight:600;font-size:1.05rem;}
-  .mmb-fulfillment-region{font-size:.85rem;opacity:.85;}
-  .mmb-fulfillment-price{font-size:.92rem;font-weight:600;text-align:center;margin-top:.35rem;}
-  .mmb-fulfillment-price-note{font-size:.78rem;text-align:center;opacity:.95;}
+  .mmb-fulfillment-label{font-weight:600;font-size:1.05rem;margin-bottom:.05rem;line-height:1.25;}
+  .mmb-fulfillment-region{font-size:.85rem;opacity:.88;line-height:1.3;}
+  .mmb-fulfillment-price{font-size:.92rem;font-weight:600;text-align:center;margin-top:.3rem;font-variant-numeric:tabular-nums;}
+  .mmb-fulfillment-price-note{font-size:.76rem;text-align:center;opacity:.95;line-height:1.3;}
   .mmb-fulfillment-option.is-active .mmb-fulfillment-region{opacity:.95;}
   .mmb-fulfillment-info{position:absolute;top:12px;right:12px;width:24px;height:24px;border-radius:999px;border:1px solid currentColor;background:rgba(0,0,0,.14);color:inherit;display:inline-flex;align-items:center;justify-content:center;font-weight:600;font-size:.75rem;cursor:pointer;}
   .mmb-fulfillment-option.is-active .mmb-fulfillment-info{background:rgba(255,255,255,.18);}
@@ -223,10 +224,11 @@ const FULFILLMENT_OPTIONS = [
     subLabel:'Kostenfreie Selbstabholung vor Ort',
     displayTitle:'Abholung',
     displayRegion:'in Wesel, NRW',
-    displayPrice:'plus 0 Euro',
+    displayPrice:'+ 0 €',
     priceDelta:0,
     addsToTotal:true,
     summaryLabel:'Abholung in Wesel',
+    summaryValue:'+ 0 €',
     note:'',
     infoTitle:'Abholung in Wesel',
     infoHtml:`<p>📍 Wir stimmen den Treffpunkt in Wesel individuell mit dir ab.</p>
@@ -240,16 +242,18 @@ const FULFILLMENT_OPTIONS = [
     shortLabel:'Versand',
     subLabel:'Express-Hin- & Rückversand inkl. QR-Code',
     displayTitle:'Versand',
-    displayRegion:'ganz DE 🇩🇪',
-    displayPrice:'plus 80 Euro',
+    displayRegion:'ganz Deutschland 🇩🇪',
+    displayPrice:'+ 80 €',
     priceDelta:80,
     addsToTotal:true,
     summaryLabel:'Versand (deutschlandweit)',
-    note:'inkl. Express-Hin- & Rückversand sowie Vorbereitungspauschale',
+    summaryValue:'+ 80 €',
+    note:'',
+    totalSubline:'inklusive Hin- und Rückversand',
     infoTitle:'Versand deutschlandweit',
     infoHtml:`<p>🚚 Wir versenden deine Musikbox einen Tag vor Mietbeginn per Express, damit sie pünktlich ankommt.</p>
       <p>📦 Am letzten Miettag gibst du das Paket mit dem mitgelieferten QR-Code wieder auf – so ist es direkt am Folgetag bei uns.</p>
-      <p>💶 Die Pauschale von 80€ deckt Hin- und Rückversand sowie den zusätzlichen Aufwand und Ausfalltage ab.</p>
+      <p>💶 Die Pauschale von 80 € deckt Hin- und Rückversand sowie den zusätzlichen Aufwand und Ausfalltage ab.</p>
       <p>✅ Du erhältst alle Versandinfos rechtzeitig per E-Mail.</p>`
   },
   {
@@ -258,14 +262,15 @@ const FULFILLMENT_OPTIONS = [
     shortLabel:'Lieferung',
     subLabel:'Individuelles Angebot durch unser Team',
     displayTitle:'Lieferung',
-    displayRegion:'ganz NRW',
+    displayRegion:'ganz Nordrhein-Westfalen',
     displayPriceNote:'* Individuelles Preisangebot durch unser Team',
     priceDelta:0,
     addsToTotal:false,
     summaryLabel:'Lieferung (NRW-weit)',
     summaryValue:'individuell',
-    note:'zzgl. individueller Lieferpauschale – wir melden uns mit einem Angebot',
+    note:'',
     totalLabel:'Vorläufig Gesamt',
+    totalSubline:'zuzüglich Lieferkosten',
     infoTitle:'Lieferung NRW-weit',
     infoHtml:`<p>🚗 Wir liefern dir die Musikbox persönlich innerhalb von NRW – auf Wunsch inkl. Aufbau & Abholung.</p>
       <p>💶 Die Kosten bestehen aus einer Grundpauschale plus einer Kilometerpauschale – daher berechnen wir den Preis individuell.</p>
@@ -426,20 +431,22 @@ class Calendar{
     const summaryValue = opt.summaryValue ?? (addsToTotal ? (priceDelta>0?`+${Euro.fmt(priceDelta)}`:'gratis') : 'gratis');
     const note = opt.note || '';
     const totalLabel = opt.totalLabel || (addsToTotal ? 'Gesamt' : 'Vorläufig Gesamt');
+    const totalSubline = opt.totalSubline || '';
     const shortLabel = opt.shortLabel || summaryLabel;
-    return {addsToTotal, priceDelta, summaryLabel, summaryValue, note, totalLabel, shortLabel};
+    return {addsToTotal, priceDelta, summaryLabel, summaryValue, note, totalLabel, totalSubline, shortLabel};
   }
 
   buildRangeSummary(sum, option){
     const meta = this.fulfillmentMeta(option);
     const shipping = meta.addsToTotal ? meta.priceDelta : 0;
     const totalWithShipping = sum.total + shipping;
+    const totalRow = `<div class="mmb-total"><div class="mmb-total-label"><span class="label">${meta.totalLabel}</span>${meta.totalSubline?`<span class="mmb-total-sub">${meta.totalSubline}</span>`:''}</div><span class="value">${Euro.fmt(totalWithShipping)}</span></div>`;
     const lines = [
       `<div class="mmb-price-line"><span>Original (ohne Rabatt)</span><span>${Euro.fmt(sum.original)}</span></div>`,
       `<div class="mmb-price-line"><span>Rabatt (${sum.discountPercentDisplay}%)</span><span>–${Euro.fmt(sum.discountAmount)}</span></div>`,
       `<div class="mmb-price-line"><span>${meta.summaryLabel}</span><span>${meta.summaryValue}</span></div>`,
       `<div class="mmb-hr"></div>`,
-      `<div class="mmb-total"><span class="label">${meta.totalLabel}</span><span class="value">${Euro.fmt(totalWithShipping)}</span></div>`,
+      totalRow,
       `<div class="mmb-price-line"><span class="mmb-price-small">Ø pro Tag</span><span class="mmb-price-small">${Euro.fmt(sum.avgPerDay)}</span></div>`,
       `<div class="mmb-price-line"><span class="mmb-price-small">Kaution</span><span class="mmb-price-small">gratis</span></div>`
     ];
@@ -466,11 +473,12 @@ class Calendar{
     const meta = this.fulfillmentMeta(option);
     const shipping = meta.addsToTotal ? meta.priceDelta : 0;
     const totalWithShipping = base + shipping;
+    const totalRow = `<div class="mmb-total"><div class="mmb-total-label"><span class="label">${meta.totalLabel}</span>${meta.totalSubline?`<span class="mmb-total-sub">${meta.totalSubline}</span>`:''}</div><span class="value">${Euro.fmt(totalWithShipping)}</span></div>`;
     const lines = [
       `<div class="mmb-price-line"><span>Aktueller Rabatt</span><span>0%</span></div>`,
       `<div class="mmb-price-line"><span>${meta.summaryLabel}</span><span>${meta.summaryValue}</span></div>`,
       `<div class="mmb-hr"></div>`,
-      `<div class="mmb-total"><span class="label">${meta.totalLabel}</span><span class="value">${Euro.fmt(totalWithShipping)}</span></div>`,
+      totalRow,
       `<div class="mmb-price-line"><span class="mmb-price-small">Ø pro Tag</span><span class="mmb-price-small">${Euro.fmt(base)}</span></div>`,
       `<div class="mmb-price-line"><span class="mmb-price-small">Kaution</span><span class="mmb-price-small">gratis</span></div>`
     ];
