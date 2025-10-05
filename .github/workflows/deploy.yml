@@ -2,7 +2,7 @@ name: Deploy via SFTP to Hostinger
 
 on:
   push:
-    branches: [ "public_html" ]     # ggf. auf "main" ändern
+    branches: [ "public_html" ]     # ggf. "main", je nachdem, von wo du deployst
   workflow_dispatch: {}
 
 jobs:
@@ -13,17 +13,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Build a clean deploy dir (ohne .git/.github/node_modules/Maps etc.)
-      - name: Prepare deploy folder
+      - name: Remove unnecessary files before deploy
         run: |
-          mkdir -p deploy
-          rsync -a \
-            --exclude='.git' \
-            --exclude='.github' \
-            --exclude='node_modules' \
-            --exclude='**/*.map' \
-            --exclude='**/.DS_Store' \
-            ./ deploy/
+          rm -rf .git
+          rm -rf .github
+          rm -rf node_modules
+          find . -name "*.map" -type f -delete
+          find . -name ".DS_Store" -type f -delete
 
       - name: Deploy to Hostinger via SFTP
         uses: wlixcc/SFTP-Deploy-Action@v1.2.4
@@ -32,7 +28,7 @@ jobs:
           port: ${{ secrets.PORT }}
           username: ${{ secrets.USER }}
           ssh_private_key: ${{ secrets.SSH_PRIVATE_KEY }}
-          local_path: "./deploy"    # <— nur der bereinigte Ordner!
-          remote_path: "domains/firebrick-squirrel-568721.hostingersite.com/public_html/"  # RELATIV, nicht /home/...
+          local_path: "./"   # <-- nutzt jetzt dein gesamtes Repo
+          remote_path: "domains/firebrick-squirrel-568721.hostingersite.com/public_html/"
           sftp_only: true
-          delete_remote_files: false   # auf true stellen, wenn du 1:1 spiegeln willst
+          delete_remote_files: false
