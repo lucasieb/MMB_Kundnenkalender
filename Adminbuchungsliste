@@ -151,18 +151,19 @@
         .mmb-admin-filters select,.mmb-admin-filters input{ padding:.6rem;border:1px solid var(--mmb-border);border-radius:6px;background:var(--mmb-bg);color:var(--mmb-text);font-size:.9rem; }
         .mmb-admin-list-wrap{height:70vh;overflow:auto;margin:.75rem 0;border-radius:6px;}
         .mmb-bookings-table{width:100%;border-collapse:collapse;background:var(--mmb-bg);border-radius:6px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.1);}
-        .mmb-bookings-table th,.mmb-bookings-table td{padding:.52rem .55rem;border-bottom:1px solid var(--mmb-border);text-align:left;vertical-align:middle;box-sizing:border-box;}
+        .mmb-bookings-table th,.mmb-bookings-table td{padding:.45rem .5rem;border-bottom:1px solid var(--mmb-border);text-align:left;vertical-align:middle;box-sizing:border-box;line-height:1.3;}
         .mmb-bookings-table th{background:var(--mmb-muted);font-weight:600;position:sticky;top:0;z-index:2;}
-        .mmb-bookings-table tbody tr{height:auto;min-height:60px;}
-        .mmb-bookings-table th.cell-head-box,.mmb-bookings-table td.cell--box{min-width:188px;white-space:nowrap;}
-        .mmb-bookings-table th.cell-head-date,.mmb-bookings-table td.cell--date{min-width:116px;width:116px;}
-        .mmb-bookings-table td.cell--date{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.14rem;white-space:normal;line-height:1.28;text-align:center;min-height:52px;padding:.5rem .45rem;}
-        .mmb-bookings-table td.cell--date span{display:block;width:100%;}
-        .mmb-bookings-table th.cell-head-fulfillment,.mmb-bookings-table td.cell--fulfillment{min-width:108px;white-space:nowrap;}
-        .mmb-bookings-table th.cell-head-price,.mmb-bookings-table td.cell--total{text-align:right;width:88px;}
-        .mmb-bookings-table th.cell-head-status,.mmb-bookings-table td.cell--status{width:94px;}
+        .mmb-bookings-table tbody tr{height:56px;}
+        .mmb-bookings-table th.cell-head-box,.mmb-bookings-table td.cell--box{min-width:172px;white-space:nowrap;}
+        .mmb-bookings-table th.cell-head-date,.mmb-bookings-table td.cell--date{min-width:120px;width:120px;text-align:center;}
+        .mmb-bookings-table td.cell--date{padding:.4rem .4rem;text-align:center;white-space:normal;line-height:1.25;}
+        .mmb-bookings-table .cell-date-stack{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.15rem;min-height:100%;}
+        .mmb-bookings-table .cell-date-stack span{display:block;width:100%;}
+        .mmb-bookings-table th.cell-head-fulfillment,.mmb-bookings-table td.cell--fulfillment{min-width:96px;white-space:nowrap;}
+        .mmb-bookings-table th.cell-head-price,.mmb-bookings-table td.cell--total{text-align:right;width:80px;}
+        .mmb-bookings-table th.cell-head-status,.mmb-bookings-table td.cell--status{width:92px;}
         .mmb-bookings-table td.cell--total{font-variant-numeric:tabular-nums;white-space:nowrap;}
-        .mmb-bookings-table th.cell-head-actions,.mmb-bookings-table td.cell--actions{min-width:248px;}
+        .mmb-bookings-table th.cell-head-actions,.mmb-bookings-table td.cell--actions{min-width:232px;}
         .mmb-bookings-table td.cell--actions{white-space:nowrap;}
         .mmb-btn{background:var(--mmb-accent);color:#fff;border:none;padding:.45rem .65rem;border-radius:6px;font-size:.83rem;font-weight:500;cursor:pointer;transition:background-color .2s;}
         .mmb-btn:hover{background:#0284c7;} .mmb-btn:disabled{opacity:.45;cursor:not-allowed;filter:saturate(0.6) contrast(0.9);}
@@ -406,14 +407,15 @@
         const start=parse(b.start_date);
         const end=parse(b.end_date);
         const fmt=(d)=>d?d.toLocaleDateString('de-DE'):'–';
+        const wrap = (content)=>`<div class="cell-date-stack">${content}</div>`;
         if(start && end){
           const same=start.getFullYear()===end.getFullYear() && start.getMonth()===end.getMonth() && start.getDate()===end.getDate();
-          if(same){ return `<span>${fmt(start)}</span>`; }
-          return `<span>${fmt(start)}</span><span>${fmt(end)}</span>`;
+          if(same){ return wrap(`<span>${fmt(start)}</span>`); }
+          return wrap(`<span>${fmt(start)}</span><span>${fmt(end)}</span>`);
         }
-        if(start){ return `<span>${fmt(start)}</span>`; }
-        if(end){ return `<span>${fmt(end)}</span>`; }
-        return `<span>–</span>`;
+        if(start){ return wrap(`<span>${fmt(start)}</span>`); }
+        if(end){ return wrap(`<span>${fmt(end)}</span>`); }
+        return wrap(`<span>–</span>`);
       }
 
       renderFooter(){
