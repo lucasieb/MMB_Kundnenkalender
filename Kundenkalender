@@ -68,6 +68,12 @@
   .mmb-side-wrap{min-height:560px;display:flex;width:100%;justify-content:center;align-items:stretch;}
   .mmb-side-wrap .side{display:flex;width:100%;justify-content:center;align-items:stretch;}
 
+  .mmb-error-state{min-height:420px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:2.5rem 1.5rem;background:var(--mmb-dark);color:var(--mmb-light);border-radius:var(--mmb-radius);box-shadow:0 12px 30px rgba(0,0,0,.25);}
+  .mmb-error-state h2{margin:0 0 .75rem;font-size:1.35rem;font-weight:600;letter-spacing:.01em;}
+  .mmb-error-state p{margin:.25rem 0;font-size:.95rem;max-width:460px;line-height:1.6;}
+  .mmb-error-state button{margin-top:1.25rem;padding:.65rem 1.4rem;border-radius:8px;border:1px solid rgba(239,239,230,.45);background:var(--mmb-light);color:var(--mmb-dark);font-weight:600;cursor:pointer;transition:background .2s,color .2s;}
+  .mmb-error-state button:hover{background:#fff;color:#111;}
+
   @media (max-width:600px){
     .mmb-widget{margin:0 auto;border-radius:18px;width:min(100%,calc(100vw - 1.5rem));}
     .mmb-header{gap:.65rem;padding:.85rem .7rem;}
@@ -246,9 +252,10 @@
 <script>
 /* ========= KONFIG ========= */
 const MMB_CONFIG = {
-  pricingUrl: 'pricing.php',
-  createUrl:  'create_booking.php',
-  submitDetailsUrl: 'submit_fulfillment_details.php'
+  remoteBase: 'https://firebrick-squirrel-568721.hostingersite.com/',
+  pricingUrl: '',
+  createUrl:  '',
+  submitDetailsUrl: ''
 };
 /* ========================= */
 
@@ -352,9 +359,42 @@ function parseJsonLoose(txt){
 async function fetchText(url, opts){ const r=await fetch(url, opts||{}); const t=await r.text(); return {ok:r.ok,status:r.status,text:t}; }
 
 /* ===== API Endpoints ===== */
-const PRICING_URLS = [MMB_CONFIG.pricingUrl,'pricing.php','api/pricing.php'].filter(Boolean);
-const BOOKING_URLS = [MMB_CONFIG.createUrl,'create_booking.php','api/create_booking.php'].filter(Boolean);
-const SUBMIT_DETAILS_URLS = [MMB_CONFIG.submitDetailsUrl,'submit_fulfillment_details.php','api/submit_fulfillment_details.php'].filter(Boolean);
+function uniqueUrls(list){
+  const seen=new Set();
+  const cleaned=[];
+  for(const raw of list){
+    const url=(raw||'').toString().trim();
+    if(!url) continue;
+    if(seen.has(url)) continue;
+    seen.add(url);
+    cleaned.push(url);
+  }
+  return cleaned;
+}
+function remoteUrl(path){
+  const base=(MMB_CONFIG.remoteBase||'').trim();
+  if(!base) return null;
+  return base.replace(/\/+$/,'/') + path.replace(/^\/+/, '');
+}
+
+const PRICING_URLS = uniqueUrls([
+  MMB_CONFIG.pricingUrl,
+  remoteUrl('pricing.php'),
+  'pricing.php',
+  'api/pricing.php'
+]);
+const BOOKING_URLS = uniqueUrls([
+  MMB_CONFIG.createUrl,
+  remoteUrl('create_booking.php'),
+  'create_booking.php',
+  'api/create_booking.php'
+]);
+const SUBMIT_DETAILS_URLS = uniqueUrls([
+  MMB_CONFIG.submitDetailsUrl,
+  remoteUrl('submit_fulfillment_details.php'),
+  'submit_fulfillment_details.php',
+  'api/submit_fulfillment_details.php'
+]);
 
 /* — Ableitungslogik: erzwinge Verfügbarkeit ja/nein — */
 function deriveEnforcement(pr){
@@ -463,23 +503,6 @@ async function attemptSubmitFulfillmentDetails(url, payload){
   return data;
 }
 
-async function submitFulfillmentDetails(url, payload){
-  const response = await fetchText(url, {
-    method:'POST',
-    headers:{'Content-Type':'application/json','Accept':'application/json'},
-    body: JSON.stringify(payload),
-    credentials:'omit'
-  });
-  if(!response.ok){
-    throw new Error('HTTP '+response.status+' / '+response.text.slice(0,180));
-  }
-  const data = parseJsonLoose(response.text);
-  if(!data || data.ok !== true){
-    throw new Error((data && data.error) ? data.error : 'Unbekannter Fehler beim Übermitteln der Abwicklungsdaten');
-  }
-  return data;
-}
-
 /* ===== Kalender ===== */
 class Calendar{
   constructor(container){
@@ -488,6 +511,24 @@ class Calendar{
     this.dayElMap=new Map(); this.avgCache=null; this.infoOverlay=null;
     this.handleInfoKeyDown=this.handleInfoKeyDown.bind(this);
     this.init();
+  }
+  escapeHtml(value){
+    const map={"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"};
+    return String(value ?? '').replace(/[&<>"']/g, ch => map[ch]);
+  }
+  showFatalError(error){
+    const fallback='Der Kalender konnte aktuell nicht geladen werden. Bitte versuche es in Kürze erneut.';
+    const message = (error && error.message) ? error.message : (typeof error === 'string' ? error : fallback);
+    const detail = this.escapeHtml(message);
+    this.root.innerHTML = `
+      <div class="mmb-error-state">
+        <h2>Kalender vorübergehend nicht verfügbar</h2>
+        <p>${detail}</p>
+        <p>Falls das Problem bestehen bleibt, kontaktiere uns bitte direkt – wir kümmern uns sofort darum.</p>
+        <button type="button" data-act="retry">Neu laden</button>
+      </div>`;
+    const retry = this.root.querySelector('[data-act="retry"]');
+    if(retry){ retry.addEventListener('click', ()=>window.location.reload()); }
   }
   async init(){
     this.root.innerHTML=`
@@ -503,11 +544,16 @@ class Calendar{
           <div class="mmb-side-wrap"><div class="side" style="flex:1"></div></div>
         </div>
       </div>`;
-    const pr=await getPricing(); this.state.pricing=pr.pricing; this.state.enforceAvailability = deriveEnforcement(pr);
-    const boxes=Object.entries(pr.pricing.boxes).map(([id,b])=>({id,name:b.name})).sort((a,b)=>Number(a.id)-Number(b.id));
-    this.state.boxes=boxes; this.state.box=boxes[0];
+    try{
+      const pr=await getPricing(); this.state.pricing=pr.pricing; this.state.enforceAvailability = deriveEnforcement(pr);
+      const boxes=Object.entries(pr.pricing.boxes).map(([id,b])=>({id,name:b.name})).sort((a,b)=>Number(a.id)-Number(b.id));
+      this.state.boxes=boxes; this.state.box=boxes[0];
 
-    this.renderHeader(); this.renderCalendar(); this.renderSide(); this.wire();
+      this.renderHeader(); this.renderCalendar(); this.renderSide(); this.wire();
+    }catch(err){
+      console.error('Kalender konnte nicht initialisiert werden', err);
+      this.showFatalError(err);
+    }
   }
 
   getFulfillmentOption(id){
