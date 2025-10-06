@@ -66,23 +66,41 @@ const FULFILLMENT_DEFS = [
   'pickup' => [
     'label' => 'Abholung',
     'full' => 'Abholung in Wesel',
+    'display_suffix' => 'in Wesel',
     'price_delta' => 0.0,
     'adds_to_total' => true,
     'note' => '',
+    'info_lines' => [
+      '📍 Treffpunkt stimmen wir individuell in Wesel ab.',
+      '🕚 Abholung ab deinem Miettag um 11:00 Uhr möglich.',
+      '🔁 Rückgabe am Folgetag nach Mietende bis 10:00 Uhr.',
+    ],
   ],
   'shipping' => [
     'label' => 'Versand',
     'full' => 'Versand (deutschlandweit)',
+    'display_suffix' => 'ganz.de',
     'price_delta' => 80.0,
     'adds_to_total' => true,
     'note' => 'inkl. Express-Hin- & Rückversand sowie Vorbereitungspauschale',
+    'info_lines' => [
+      '🚚 Wir versenden deine Musikbox einen Tag vor Mietbeginn per Express.',
+      '📦 Rückversand am letzten Miettag mit dem beiliegenden QR-Code.',
+      '📝 Bitte halte Lieferadresse sowie Kontaktinfos bereit, falls noch nicht übermittelt.',
+    ],
   ],
   'delivery' => [
     'label' => 'Lieferung',
     'full' => 'Lieferung (NRW-weit)',
+    'display_suffix' => 'ganz.nrb',
     'price_delta' => 0.0,
     'adds_to_total' => false,
     'note' => 'zzgl. individueller Lieferpauschale – wir melden uns mit einem Angebot',
+    'info_lines' => [
+      '🚗 Wir liefern dir die Musikbox persönlich innerhalb von NRW.',
+      '🕒 Wir stimmen deine Wunschzeit (Mittag, halbstündlich) individuell ab.',
+      '📍 Bitte teile uns deinen Treffpunkt oder die Lieferadresse mit.',
+    ],
   ],
 ];
 
@@ -103,6 +121,8 @@ function normalize_fulfillment_from_request(array $input): array {
     'note' => (string)$def['note'],
     'price_delta' => (float)$def['price_delta'],
     'adds_to_total' => (bool)$def['adds_to_total'],
+    'display_suffix' => (string)($def['display_suffix'] ?? ''),
+    'info_lines' => (array)($def['info_lines'] ?? []),
   ];
 }
 
@@ -110,18 +130,26 @@ function normalize_fulfillment_from_request(array $input): array {
  * @param array{method:string,label:string,full:string,note:string,price_delta:float,adds_to_total:bool} $info
  */
 function fulfillment_email_line(array $info): string {
-  $method = $info['method'];
-  $full   = $info['full'];
-  $price  = (float)$info['price_delta'];
-  $note   = trim((string)$info['note']);
+  $suffix = trim((string)($info['display_suffix'] ?? ''));
+  $label  = (string)$info['label'];
+  return $suffix !== '' ? ($label . ' (' . $suffix . ')') : $label;
+}
 
-  if ($method === 'pickup') {
-    return $price > 0 ? ($full . ' +' . format_price($price)) : ($full . ' (gratis)');
+/**
+ * @param array{info_lines?:array<int,string>} $info
+ * @return list<string>
+ */
+function fulfillment_instruction_lines(array $info): array {
+  $lines = [];
+  if (!empty($info['info_lines']) && is_array($info['info_lines'])) {
+    foreach ($info['info_lines'] as $line) {
+      $line = trim((string)$line);
+      if ($line !== '') {
+        $lines[] = $line;
+      }
+    }
   }
-  if ($method === 'shipping') {
-    return $full . ' +' . format_price($price);
-  }
-  return $note !== '' ? ($full . ' (' . $note . ')') : $full;
+  return $lines;
 }
 
 /**
@@ -138,6 +166,7 @@ function booking_mail_context(array $data): array {
 
   $fulfillmentInfo = normalize_fulfillment_from_request($data);
   $fulfillmentLine = fulfillment_email_line($fulfillmentInfo);
+  $fulfillmentInstructions = fulfillment_instruction_lines($fulfillmentInfo);
 
   $startDate = new DateTimeImmutable($data['start_date']);
   $endDate   = new DateTimeImmutable($data['end_date']);
@@ -153,6 +182,7 @@ function booking_mail_context(array $data): array {
     'range'       => $range,
     'fulfillment' => $fulfillmentLine,
     'fulfillment_info' => $fulfillmentInfo,
+    'fulfillment_instructions' => $fulfillmentInstructions,
   ];
 }
 
@@ -164,8 +194,13 @@ function build_submission_mail(array $data): array {
   $range     = $ctx['range'];
   $totalDisp = $ctx['totalDisp'];
   $fulfillment = $ctx['fulfillment'];
+  $fulfillmentInstructions = $ctx['fulfillment_instructions'];
 
   $subject = "Deine Buchung wurde übermittelt 🚀 – Buchungs-ID: {$data['display_id']}";
+  $instructionLines = $fulfillmentInstructions;
+  $instructionText = $instructionLines
+    ? ('• ' . implode("\n• ", array_map('strval', $instructionLines)))
+    : '• Wir melden uns kurzfristig mit allen weiteren Details.';
 
   $text = <<<TXT
 Hallo {$name},
@@ -179,6 +214,9 @@ Deine Buchung im Überblick:
 🕰️ Zeitraum: {$range}
 🚚 Abwicklung: {$fulfillment}
 💶 Gesamtkosten: {$totalDisp}
+
+Informationen für deine gewählte Abwicklung:
+{$instructionText}
 
 Bitte überprüfe einmal, ob deine Buchung korrekt bei uns eingegangen ist.
 
@@ -207,10 +245,19 @@ function build_internal_submission_mail(array $data): array {
   $range     = $ctx['range'];
   $totalDisp = $ctx['totalDisp'];
   $fulfillment = $ctx['fulfillment'];
+  $fulfillmentInstructions = $ctx['fulfillment_instructions'];
   $displayId = $data['display_id'];
 
   $linkUrl   = 'https://mietmichbox.de/buchungsverwaltung';
   $subject   = "👋🏼 Neue Buchungsanfrage 👷🏽 – Buchungs-ID: {$displayId}";
+
+  $instructionLines = $fulfillmentInstructions;
+  $instructionText = $instructionLines
+    ? ('• ' . implode("\n• ", array_map('strval', $instructionLines)))
+    : '• Wir melden uns kurzfristig mit allen weiteren Details.';
+  $instructionListHtml = $instructionLines
+    ? implode("\n", array_map(fn($line) => '<li>'.htmlspecialchars((string)$line, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8').'</li>', $instructionLines))
+    : '<li>Wir melden uns kurzfristig mit allen weiteren Details.</li>';
 
   $text = <<<TXT
 Hallo MietMichBox Team,
@@ -225,6 +272,9 @@ Buchung im Überblick:
 🚚 Abwicklung: {$fulfillment}
 💶 Gesamtkosten: {$totalDisp}
 
+Informationen für die gewählte Abwicklung:
+{$instructionText}
+
 Buchung in der Buchungsverwaltung einsehen: {$linkUrl}
 TXT;
 
@@ -238,6 +288,10 @@ TXT;
 🕰️ Zeitraum: {$range}<br>
 🚚 Abwicklung: {$fulfillment}<br>
 💶 Gesamtkosten: {$totalDisp}</p>
+<p>Informationen für die gewählte Abwicklung:</p>
+<ul>
+{$instructionListHtml}
+</ul>
 <p>Buchung in der <a href="{$linkUrl}">Buchungsverwaltung</a> einsehen.</p>
 HTML;
 
@@ -321,6 +375,7 @@ try {
   $fulfillmentLabel  = $fulfillment['label'];
   $fulfillmentNote   = $fulfillment['note'];
   $fulfillmentPrice  = (float)$fulfillment['price_delta'];
+  $initialFulfillmentDetails = json_encode(['method' => $fulfillmentMethod], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '{}';
 
   // Overlap-Flag: nur TRUE zählt; FALSE wird ignoriert (Server-Default bleibt)
   $force = null;
@@ -386,6 +441,16 @@ try {
   if (has_col($pdo,'fulfillment_label'))  { $fields[]='fulfillment_label';  $place[]=':fulfillment_label';  $params[':fulfillment_label']=$fulfillmentLabel; }
   if (has_col($pdo,'fulfillment_note'))   { $fields[]='fulfillment_note';   $place[]=':fulfillment_note';   $params[':fulfillment_note']=$fulfillmentNote; }
   if (has_col($pdo,'fulfillment_price_delta')) { $fields[]='fulfillment_price_delta'; $place[]=':fulfillment_price_delta'; $params[':fulfillment_price_delta']=$fulfillmentPrice; }
+  if (has_col($pdo,'fulfillment_details_json')) {
+    $fields[] = 'fulfillment_details_json';
+    $place[]  = ':fulfillment_details_json';
+    $params[':fulfillment_details_json'] = $initialFulfillmentDetails;
+  }
+  if (has_col($pdo,'fulfillment_details')) {
+    $fields[] = 'fulfillment_details';
+    $place[]  = ':fulfillment_details';
+    $params[':fulfillment_details'] = $initialFulfillmentDetails;
+  }
 
   // created_at → NOW() (nur wenn Spalte existiert)
   if (has_col($pdo,'created_at')) { $fields[]='created_at'; $place[]='NOW()'; }
@@ -455,7 +520,8 @@ try {
       'fulfillment_method'=>$fulfillmentMethod,
       'fulfillment_label'=>$fulfillmentLabel,
       'fulfillment_price_delta'=>$fulfillmentPrice,
-      'fulfillment_note'=>$fulfillmentNote
+      'fulfillment_note'=>$fulfillmentNote,
+      'fulfillment_details_json' => $initialFulfillmentDetails
     ],
     'mail'=>$mailInfo,
     'internal_mail'=>$internalMailInfo

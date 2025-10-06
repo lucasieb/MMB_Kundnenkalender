@@ -68,6 +68,12 @@
   .mmb-side-wrap{min-height:560px;display:flex;width:100%;justify-content:center;align-items:stretch;}
   .mmb-side-wrap .side{display:flex;width:100%;justify-content:center;align-items:stretch;}
 
+  .mmb-error-state{min-height:420px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:2.5rem 1.5rem;background:var(--mmb-dark);color:var(--mmb-light);border-radius:var(--mmb-radius);box-shadow:0 12px 30px rgba(0,0,0,.25);}
+  .mmb-error-state h2{margin:0 0 .75rem;font-size:1.35rem;font-weight:600;letter-spacing:.01em;}
+  .mmb-error-state p{margin:.25rem 0;font-size:.95rem;max-width:460px;line-height:1.6;}
+  .mmb-error-state button{margin-top:1.25rem;padding:.65rem 1.4rem;border-radius:8px;border:1px solid rgba(239,239,230,.45);background:var(--mmb-light);color:var(--mmb-dark);font-weight:600;cursor:pointer;transition:background .2s,color .2s;}
+  .mmb-error-state button:hover{background:#fff;color:#111;}
+
   @media (max-width:600px){
     .mmb-widget{margin:0 auto;border-radius:18px;width:min(100%,calc(100vw - 1.5rem));}
     .mmb-header{gap:.65rem;padding:.85rem .7rem;}
@@ -206,6 +212,26 @@
   #mmb-modal .inner{background:#efefe6; color:#3b3b3b; padding:1rem 1.25rem; border-radius:10px; max-width:560px; width:92%;}
   #mmb-modal .title{font-weight:600; margin-bottom:.4rem;}
   #mmb-modal .text{white-space:pre-wrap; line-height:1.5;}
+
+  /* Dialog für Zusatzinfos */
+  .mmb-dialog-backdrop{position:fixed; inset:0; background:rgba(0,0,0,.48); display:flex; align-items:center; justify-content:center; z-index:10000; padding:1rem;}
+  .mmb-dialog{background:#efefe6; color:#3b3b3b; border-radius:12px; padding:1.25rem 1.35rem; width:min(520px, 100%); max-height:90vh; overflow:auto; box-shadow:0 12px 36px rgba(0,0,0,.18);}
+  .mmb-dialog h3{margin:0 0 .35rem; font-size:1.15rem; font-weight:600;}
+  .mmb-dialog p{margin:.5rem 0; line-height:1.45;}
+  .mmb-dialog form{margin-top:1rem;}
+  .mmb-dialog label{display:block; margin-bottom:.65rem; font-weight:500;}
+  .mmb-dialog .mmb-dialog-row{display:flex; flex-wrap:wrap; gap:.75rem;}
+  .mmb-dialog .mmb-dialog-row > label{flex:1 1 200px; margin-bottom:0;}
+  .mmb-dialog input,.mmb-dialog textarea,.mmb-dialog select{width:100%; padding:.55rem .65rem; border:1px solid #d2d2c7; border-radius:8px; font-size:1rem; box-sizing:border-box; background:#fff; color:#3b3b3b;}
+  .mmb-dialog textarea{min-height:70px;}
+  .mmb-dialog small{display:block; margin-top:.25rem; color:#6b6b65; font-size:.85rem;}
+  .mmb-dialog .mmb-dialog-actions{display:flex; flex-wrap:wrap; gap:.75rem; justify-content:flex-end; margin-top:1.1rem;}
+  .mmb-dialog button{cursor:pointer; border-radius:8px; border:1px solid #c9c9c1; background:#f5f5eb; color:#3b3b3b; padding:.55rem .95rem; font-size:1rem;}
+  .mmb-dialog button[type="submit"]{background:#0EA5E9; border-color:#0EA5E9; color:#fff;}
+  .mmb-dialog button[disabled]{opacity:.6; cursor:not-allowed;}
+  .mmb-dialog .mmb-dialog-error{color:#b91c1c; margin-bottom:.6rem; font-size:.95rem;}
+  .mmb-dialog .mmb-checkbox{display:flex; align-items:flex-start; gap:.55rem; font-weight:400;}
+  .mmb-dialog .mmb-checkbox input{width:auto; margin-top:.2rem;}
 </style>
 </head>
 <body>
@@ -226,8 +252,10 @@
 <script>
 /* ========= KONFIG ========= */
 const MMB_CONFIG = {
-  pricingUrl: 'https://firebrick-squirrel-568721.hostingersite.com/pricing.php',
-  createUrl:  'https://firebrick-squirrel-568721.hostingersite.com/create_booking.php'
+  remoteBase: 'https://firebrick-squirrel-568721.hostingersite.com/',
+  pricingUrl: '',
+  createUrl:  '',
+  submitDetailsUrl: ''
 };
 /* ========================= */
 
@@ -331,8 +359,42 @@ function parseJsonLoose(txt){
 async function fetchText(url, opts){ const r=await fetch(url, opts||{}); const t=await r.text(); return {ok:r.ok,status:r.status,text:t}; }
 
 /* ===== API Endpoints ===== */
-const PRICING_URLS = [MMB_CONFIG.pricingUrl,'pricing.php','api/pricing.php'].filter(Boolean);
-const BOOKING_URLS = [MMB_CONFIG.createUrl];
+function uniqueUrls(list){
+  const seen=new Set();
+  const cleaned=[];
+  for(const raw of list){
+    const url=(raw||'').toString().trim();
+    if(!url) continue;
+    if(seen.has(url)) continue;
+    seen.add(url);
+    cleaned.push(url);
+  }
+  return cleaned;
+}
+function remoteUrl(path){
+  const base=(MMB_CONFIG.remoteBase||'').trim();
+  if(!base) return null;
+  return base.replace(/\/+$/,'/') + path.replace(/^\/+/, '');
+}
+
+const PRICING_URLS = uniqueUrls([
+  MMB_CONFIG.pricingUrl,
+  remoteUrl('pricing.php'),
+  'pricing.php',
+  'api/pricing.php'
+]);
+const BOOKING_URLS = uniqueUrls([
+  MMB_CONFIG.createUrl,
+  remoteUrl('create_booking.php'),
+  'create_booking.php',
+  'api/create_booking.php'
+]);
+const SUBMIT_DETAILS_URLS = uniqueUrls([
+  MMB_CONFIG.submitDetailsUrl,
+  remoteUrl('submit_fulfillment_details.php'),
+  'submit_fulfillment_details.php',
+  'api/submit_fulfillment_details.php'
+]);
 
 /* — Ableitungslogik: erzwinge Verfügbarkeit ja/nein — */
 function deriveEnforcement(pr){
@@ -358,33 +420,87 @@ async function getPricing(){
 }
 
 /* ==== Senden: urlencoded (bevorzugt), Fallback JSON ==== */
-async function sendBooking(url, payload){
-  const makeUrlEnc = (p)=>{ const u=new URLSearchParams(); Object.entries(p).forEach(([k,v])=>u.append(k,String(v))); return u; };
-  // 1) application/x-www-form-urlencoded
-  const r1 = await fetchText(url, {
-    method:'POST',
-    body: makeUrlEnc(payload),
-    headers:{'Content-Type':'application/x-www-form-urlencoded','Accept':'application/json'},
-    credentials:'omit'
-  });
-  if (r1.ok){
+async function sendBooking(urls, payload){
+  const candidates = Array.isArray(urls) ? urls : [urls];
+  let lastError = null;
+  for(const url of candidates){
+    try{
+      const result = await attemptSendBooking(url, payload);
+      if(result) return result;
+    }catch(err){
+      lastError = err;
+    }
+  }
+  throw lastError || new Error('Konnte Buchung nicht senden');
+}
+
+async function attemptSendBooking(url, payload){
+  const makeUrlEnc = (p)=>{ const u=new URLSearchParams(); Object.entries(p).forEach(([k,v])=>u.append(k,String(v))); return u;};
+  let r1;
+  try{
+    r1 = await fetchText(url, {
+      method:'POST',
+      body: makeUrlEnc(payload),
+      headers:{'Content-Type':'application/x-www-form-urlencoded','Accept':'application/json'},
+      credentials:'omit'
+    });
+  }catch(networkErr){
+    throw networkErr;
+  }
+  if(r1.ok){
     const j = parseJsonLoose(r1.text);
-    if (j && j.ok===true) return j;
+    if(j && j.ok===true) return j;
     throw new Error((j && j.error) ? j.error : ('HTTP '+r1.status+' / '+r1.text.slice(0,200)));
   }
-  // 2) JSON Fallback
-  const r2 = await fetchText(url, {
-    method:'POST',
-    body: JSON.stringify(payload),
-    headers:{'Content-Type':'application/json','Accept':'application/json'},
-    credentials:'omit'
-  });
-  if (r2.ok){
+
+  let r2;
+  try{
+    r2 = await fetchText(url, {
+      method:'POST',
+      body: JSON.stringify(payload),
+      headers:{'Content-Type':'application/json','Accept':'application/json'},
+      credentials:'omit'
+    });
+  }catch(networkErr){
+    throw networkErr;
+  }
+  if(r2.ok){
     const j = parseJsonLoose(r2.text);
-    if (j && j.ok===true) return j;
+    if(j && j.ok===true) return j;
     throw new Error((j && j.error) ? j.error : ('HTTP '+r2.status+' / '+r2.text.slice(0,200)));
   }
+
   throw new Error('HTTP '+r1.status+' / '+r1.text.slice(0,140));
+}
+
+async function submitFulfillmentDetails(urls, payload){
+  const candidates = Array.isArray(urls) ? urls : [urls];
+  let lastError = null;
+  for(const url of candidates){
+    try{
+      return await attemptSubmitFulfillmentDetails(url, payload);
+    }catch(err){
+      lastError = err;
+    }
+  }
+  throw lastError || new Error('Konnte Abwicklungsdetails nicht senden');
+}
+
+async function attemptSubmitFulfillmentDetails(url, payload){
+  const response = await fetchText(url, {
+    method:'POST',
+    headers:{'Content-Type':'application/json','Accept':'application/json'},
+    body: JSON.stringify(payload),
+    credentials:'omit'
+  });
+  if(!response.ok){
+    throw new Error('HTTP '+response.status+' / '+response.text.slice(0,180));
+  }
+  const data = parseJsonLoose(response.text);
+  if(!data || data.ok !== true){
+    throw new Error((data && data.error) ? data.error : 'Unbekannter Fehler beim Übermitteln der Abwicklungsdaten');
+  }
+  return data;
 }
 
 /* ===== Kalender ===== */
@@ -395,6 +511,24 @@ class Calendar{
     this.dayElMap=new Map(); this.avgCache=null; this.infoOverlay=null;
     this.handleInfoKeyDown=this.handleInfoKeyDown.bind(this);
     this.init();
+  }
+  escapeHtml(value){
+    const map={"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"};
+    return String(value ?? '').replace(/[&<>"']/g, ch => map[ch]);
+  }
+  showFatalError(error){
+    const fallback='Der Kalender konnte aktuell nicht geladen werden. Bitte versuche es in Kürze erneut.';
+    const message = (error && error.message) ? error.message : (typeof error === 'string' ? error : fallback);
+    const detail = this.escapeHtml(message);
+    this.root.innerHTML = `
+      <div class="mmb-error-state">
+        <h2>Kalender vorübergehend nicht verfügbar</h2>
+        <p>${detail}</p>
+        <p>Falls das Problem bestehen bleibt, kontaktiere uns bitte direkt – wir kümmern uns sofort darum.</p>
+        <button type="button" data-act="retry">Neu laden</button>
+      </div>`;
+    const retry = this.root.querySelector('[data-act="retry"]');
+    if(retry){ retry.addEventListener('click', ()=>window.location.reload()); }
   }
   async init(){
     this.root.innerHTML=`
@@ -410,11 +544,16 @@ class Calendar{
           <div class="mmb-side-wrap"><div class="side" style="flex:1"></div></div>
         </div>
       </div>`;
-    const pr=await getPricing(); this.state.pricing=pr.pricing; this.state.enforceAvailability = deriveEnforcement(pr);
-    const boxes=Object.entries(pr.pricing.boxes).map(([id,b])=>({id,name:b.name})).sort((a,b)=>Number(a.id)-Number(b.id));
-    this.state.boxes=boxes; this.state.box=boxes[0];
+    try{
+      const pr=await getPricing(); this.state.pricing=pr.pricing; this.state.enforceAvailability = deriveEnforcement(pr);
+      const boxes=Object.entries(pr.pricing.boxes).map(([id,b])=>({id,name:b.name})).sort((a,b)=>Number(a.id)-Number(b.id));
+      this.state.boxes=boxes; this.state.box=boxes[0];
 
-    this.renderHeader(); this.renderCalendar(); this.renderSide(); this.wire();
+      this.renderHeader(); this.renderCalendar(); this.renderSide(); this.wire();
+    }catch(err){
+      console.error('Kalender konnte nicht initialisiert werden', err);
+      this.showFatalError(err);
+    }
   }
 
   getFulfillmentOption(id){
@@ -785,6 +924,13 @@ class Calendar{
       const fulfillmentPriceDelta = Number(summaryInfo?.fulfillment_price_delta ?? fulfillmentFromState.priceDelta ?? 0);
       const fulfillmentNote = summaryInfo?.fulfillment_note || fulfillmentFromState.note || '';
 
+      const contactDefaults = {
+        customer_name:(data.customer_name||'').trim(),
+        customer_email:(data.customer_email||'').trim(),
+        customer_phone:(data.customer_phone||'').trim(),
+        consent_contact:true
+      };
+
       const payload={
         box_id:Number(this.state.box.id),
         start_date:Utils.formatDate(start),
@@ -807,9 +953,18 @@ class Calendar{
 
       const btn=e.target.querySelector('button'); const orig=btn.textContent; btn.disabled=true; btn.textContent='Senden…';
       try{
-        const res=await sendBooking(MMB_CONFIG.createUrl, payload);
-        const dispId = res?.booking?.display_id ? String(res.booking.display_id) : '–';
-        this.modal('Buchungsanfrage gesendet','Danke! Deine Anfrage ist eingegangen.\n\nBuchungs-ID: '+dispId);
+        const res=await sendBooking(BOOKING_URLS, payload);
+        const bookingInfo = res?.booking || null;
+        const dispId = bookingInfo?.display_id ? String(bookingInfo.display_id) : '–';
+        const needsDetails = fulfillmentMethod === 'shipping' || fulfillmentMethod === 'delivery';
+        let submittedDetails = false;
+        if(needsDetails){
+          submittedDetails = await this.promptFulfillmentDetails(fulfillmentMethod, bookingInfo, contactDefaults);
+        }
+        const suffix = needsDetails
+          ? (submittedDetails ? '\n\nDanke für die zusätzlichen Infos!' : '\n\nBitte sende uns die benötigten Liefer- oder Treffpunktdaten zeitnah per E-Mail oder Telefon.')
+          : '';
+        this.modal('Buchungsanfrage gesendet',`Danke! Deine Anfrage ist eingegangen.\n\nBuchungs-ID: ${dispId}${suffix}`);
         e.target.reset(); this.state.sel={start:null,end:null}; this.avgCache=null; this.state.summary=null; this.state.fulfillment=FULFILLMENT_OPTIONS[0]; this.hideFulfillmentInfo();
         this.renderCalendar(); this.renderSide(); this.updateVisuals();
       }catch(err){
@@ -851,6 +1006,132 @@ class Calendar{
     document.getElementById('mmb-modal-title').textContent=title;
     document.getElementById('mmb-modal-text').textContent=text;
     document.getElementById('mmb-modal').style.display='flex';
+  }
+
+  async promptFulfillmentDetails(method, booking, defaults){
+    const opt = this.getFulfillmentOption(method || '');
+    const displayId = booking?.display_id ? String(booking.display_id) : '–';
+    const baseName = (defaults?.customer_name || '').trim();
+    const baseEmail = (defaults?.customer_email || '').trim();
+    const basePhone = (defaults?.customer_phone || '').trim();
+    const consentDefault = defaults?.consent_contact ?? true;
+    const escapeAttr = (value)=>String(value ?? '').replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+    const isShipping = opt.id === 'shipping';
+    const isDelivery = opt.id === 'delivery';
+
+    return new Promise((resolve)=>{
+      const backdrop = document.createElement('div');
+      backdrop.className = 'mmb-dialog-backdrop';
+      const consentChecked = consentDefault ? 'checked' : '';
+      const shippingFields = isShipping ? `
+        <div class="mmb-dialog-row">
+          <label>Straße & Hausnummer *<input name="address_line1" required placeholder="z. B. Musterstraße 12" autocomplete="address-line1"></label>
+        </div>
+        <div class="mmb-dialog-row">
+          <label>PLZ *<input name="postal_code" required inputmode="numeric" autocomplete="postal-code" placeholder="z. B. 12345"></label>
+          <label>Ort *<input name="city" required autocomplete="address-level2" placeholder="z. B. Wesel"></label>
+        </div>
+        <label>Adresszusatz (optional)<input name="address_extra" placeholder="Etage, Besonderheiten"></label>
+      ` : '';
+      const deliveryFields = isDelivery ? `
+        <label>Treffpunkt oder Adresse *<textarea name="meeting_point" required placeholder="z. B. Vereinsheim Musterweg 5, Eingang rückseitig"></textarea></label>
+        <label>Bevorzugte Uhrzeit am Mittag *
+          <select name="preferred_time" required>
+            ${['11:00','11:30','12:00','12:30','13:00','13:30','14:00','14:30','15:00','15:30','16:00'].map(time=>`<option value="${time}">${time} Uhr</option>`).join('')}
+          </select>
+          <small>Wir bestätigen dir deine Wunschzeit oder schlagen eine Alternative vor.</small>
+        </label>
+      ` : '';
+
+      const title = `Zusätzliche Angaben – ${opt.displayTitle || opt.label}`;
+      const intro = isShipping
+        ? 'Deine Buchungsanfrage ist eingegangen. Damit wir den Versand vorbereiten können, benötigen wir jetzt deine Lieferadresse.'
+        : 'Deine Buchungsanfrage ist eingegangen. Damit wir die Lieferung planen können, benötigen wir jetzt deinen Treffpunkt und deine Wunschzeit.';
+      const urgency = 'Bitte sende uns die Angaben sofort, damit wir deine Buchung ohne Verzögerung bearbeiten können.';
+
+      backdrop.innerHTML = `
+        <div class="mmb-dialog" role="dialog" aria-modal="true">
+          <h3>${title}</h3>
+          <p>${intro}<br><strong>Buchungs-ID:</strong> ${escapeAttr(displayId)}</p>
+          <p>${urgency}</p>
+          <div class="mmb-dialog-error" data-role="error" aria-live="assertive"></div>
+          <form>
+            <div class="mmb-dialog-row">
+              <label>Kontaktname *<input name="contact_name" required value="${escapeAttr(baseName)}" autocomplete="name"></label>
+            </div>
+            <div class="mmb-dialog-row">
+              <label>E-Mail *<input type="email" name="contact_email" required value="${escapeAttr(baseEmail)}" autocomplete="email"></label>
+              <label>Telefon *<input name="contact_phone" required value="${escapeAttr(basePhone)}" autocomplete="tel"></label>
+            </div>
+            ${shippingFields}
+            ${deliveryFields}
+            <label class="mmb-checkbox"><input type="checkbox" name="consent_contact" value="1" ${consentChecked}> <span>Ich bin einverstanden, dass ihr mich telefonisch &amp; per WhatsApp zu dieser Buchung kontaktieren dürft.</span></label>
+            <div class="mmb-dialog-actions">
+              <button type="button" data-act="cancel">Später senden</button>
+              <button type="submit">Informationen senden</button>
+            </div>
+          </form>
+        </div>
+      `;
+
+      const form = backdrop.querySelector('form');
+      const errorEl = backdrop.querySelector('[data-role="error"]');
+      const submitBtn = form.querySelector('button[type="submit"]');
+      const cancelBtn = form.querySelector('[data-act="cancel"]');
+
+      const close = (submitted)=>{
+        backdrop.remove();
+        resolve(submitted);
+      };
+
+      cancelBtn.addEventListener('click', ()=>{
+        close(false);
+      });
+
+      form.addEventListener('submit', async (event)=>{
+        event.preventDefault();
+        errorEl.textContent='';
+        submitBtn.disabled=true;
+        const originalLabel = submitBtn.textContent;
+        submitBtn.textContent='Senden…';
+        try{
+          const formData = new FormData(form);
+          const payload = {
+            booking_id: Number(booking?.id) || 0,
+            booking_display_id: displayId,
+            method: opt.id,
+            customer_email: defaults?.customer_email || '',
+            contact_name: String(formData.get('contact_name')||'').trim(),
+            contact_email: String(formData.get('contact_email')||'').trim(),
+            contact_phone: String(formData.get('contact_phone')||'').trim(),
+            consent_contact: formData.get('consent_contact') ? 1 : 0
+          };
+          if(isShipping){
+            payload.address_line1 = String(formData.get('address_line1')||'').trim();
+            payload.postal_code = String(formData.get('postal_code')||'').trim();
+            payload.city = String(formData.get('city')||'').trim();
+            payload.address_extra = String(formData.get('address_extra')||'').trim();
+          }
+          if(isDelivery){
+            payload.meeting_point = String(formData.get('meeting_point')||'').trim();
+            payload.preferred_time = String(formData.get('preferred_time')||'').trim();
+          }
+
+          await submitFulfillmentDetails(SUBMIT_DETAILS_URLS, payload);
+          close(true);
+        }catch(err){
+          console.error(err);
+          errorEl.textContent = err && err.message ? err.message : String(err);
+        }finally{
+          submitBtn.disabled=false;
+          submitBtn.textContent=originalLabel;
+        }
+      });
+
+      document.body.appendChild(backdrop);
+      const firstInput = form.querySelector('input[name="contact_name"]');
+      if(firstInput){ firstInput.focus(); }
+    });
   }
 }
 document.getElementById('mmb-modal-close').addEventListener('click',()=>{document.getElementById('mmb-modal').style.display='none';});
