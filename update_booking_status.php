@@ -30,6 +30,27 @@ if ($HAS_MAILER) {
   require __DIR__ . '/mailer.php';
 }
 
+function bookingsColumns(PDO $pdo): array {
+  static $cache = null;
+  if ($cache !== null) {
+    return $cache;
+  }
+  $stmt = $pdo->query('SHOW COLUMNS FROM `bookings`');
+  $cols = [];
+  foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+    $name = strtolower((string)($row['Field'] ?? ''));
+    if ($name !== '') {
+      $cols[$name] = true;
+    }
+  }
+  return $cache = $cols;
+}
+
+function bookingsHasColumn(PDO $pdo, string $name): bool {
+  $cols = bookingsColumns($pdo);
+  return isset($cols[strtolower($name)]);
+}
+
 // Optionaler Admin-Schutz
 if (is_file(__DIR__ . '/auth.php')) {
   require __DIR__ . '/auth.php';
@@ -105,8 +126,54 @@ function formatEuro(float $amount): string {
  * @param array<string,mixed> $bk
  * @return array{method:string,label:string,full:string,note:string,price_delta:float,adds_to_total:bool}
  */
+function inferFulfillmentMethodFromRow(array $bk): string {
+  $method = strtolower(trim((string)($bk['fulfillment_method'] ?? '')));
+  if (in_array($method, ['pickup','shipping','delivery'], true)) {
+    return $method;
+  }
+
+  foreach (['fulfillment_details_json', 'fulfillment_details'] as $key) {
+    if (!array_key_exists($key, $bk)) {
+      continue;
+    }
+    $raw = $bk[$key];
+    if (is_array($raw)) {
+      $candidate = strtolower(trim((string)($raw['method'] ?? '')));
+      if (in_array($candidate, ['pickup','shipping','delivery'], true)) {
+        return $candidate;
+      }
+    } elseif (is_string($raw) && $raw !== '') {
+      $decoded = json_decode($raw, true);
+      if (is_array($decoded)) {
+        $candidate = strtolower(trim((string)($decoded['method'] ?? '')));
+        if (in_array($candidate, ['pickup','shipping','delivery'], true)) {
+          return $candidate;
+        }
+      }
+    }
+  }
+
+  foreach (['fulfillment_label', 'fulfillment_note'] as $textKey) {
+    if (!array_key_exists($textKey, $bk)) {
+      continue;
+    }
+    $text = strtolower((string)$bk[$textKey]);
+    if ($text === '') {
+      continue;
+    }
+    if (strpos($text, 'versand') !== false) {
+      return 'shipping';
+    }
+    if (strpos($text, 'liefer') !== false) {
+      return 'delivery';
+    }
+  }
+
+  return 'pickup';
+}
+
 function fulfillmentInfoFromBooking(array $bk): array {
-  $method = strtolower((string)($bk['fulfillment_method'] ?? ''));
+  $method = inferFulfillmentMethodFromRow($bk);
   if (!isset(FULFILLMENT_DEFS[$method])) {
     $method = 'pickup';
   }
@@ -457,7 +524,35 @@ try {
     $whitelist = ['customer_name','customer_email','customer_phone','box_id','start_date','end_date','total_amount','status','fulfillment_method','fulfillment_label','fulfillment_note','fulfillment_price_delta','fulfillment_details_json'];
     foreach ($updates as $col => $val) {
       if (!in_array($col, $whitelist, true)) continue;
-      $fields[] = "$col=?";
+      if ($col === 'fulfillment_details_json') {
+        $serialized = is_array($val)
+          ? json_encode($val, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+          : (string)$val;
+        if ($serialized === false) {
+          continue;
+        }
+        $targets = [];
+        if (bookingsHasColumn($pdo, 'fulfillment_details_json')) {
+          $targets['fulfillment_details_json'] = $serialized;
+        }
+        if (bookingsHasColumn($pdo, 'fulfillment_details')) {
+          $targets['fulfillment_details'] = $serialized;
+        }
+        if (!$targets) {
+          continue;
+        }
+        foreach ($targets as $targetCol => $targetVal) {
+          $fields[] = "`$targetCol`=?";
+          $vals[] = $targetVal;
+          $bk[$targetCol] = $targetVal;
+        }
+        continue;
+      }
+
+      if (!bookingsHasColumn($pdo, $col)) {
+        continue;
+      }
+
       // Typisierung:
       if ($col === 'box_id') {
         $val = (int)$val;
@@ -470,6 +565,7 @@ try {
           $val = (string)$val;
         }
       }
+      $fields[] = "`$col`=?";
       $vals[] = $val;
       $bk[$col] = $val;
     }
@@ -557,7 +653,7 @@ try {
       'start_date'     => (string)$bk['start_date'],
       'end_date'       => (string)$bk['end_date'],
       'total_amount'   => (float)$bk['total_amount'],
-      'fulfillment_method' => (string)($bk['fulfillment_method'] ?? ''),
+      'fulfillment_method' => inferFulfillmentMethodFromRow($bk),
       'fulfillment_label'  => (string)($bk['fulfillment_label'] ?? ''),
       'fulfillment_note'   => (string)($bk['fulfillment_note'] ?? ''),
       'fulfillment_price_delta' => isset($bk['fulfillment_price_delta']) ? (float)$bk['fulfillment_price_delta'] : 0.0,

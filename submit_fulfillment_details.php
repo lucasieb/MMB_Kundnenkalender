@@ -60,7 +60,14 @@ if ($customerEmail === '' || !filter_var($customerEmail, FILTER_VALIDATE_EMAIL))
   json_response(['ok'=>false,'error'=>'E-Mail-Adresse fehlt oder ist ungültig'], 422);
 }
 
-$stmt = $pdo->prepare('SELECT id, customer_email, fulfillment_method FROM bookings WHERE id = ? LIMIT 1');
+$selectCols = ['id', 'customer_email'];
+foreach (['fulfillment_method','fulfillment_label','fulfillment_note','fulfillment_details_json','fulfillment_details'] as $col) {
+  if (has_column($pdo, $col)) {
+    $selectCols[] = $col;
+  }
+}
+$colSql = implode(', ', array_map(static fn($c) => "`$c`", $selectCols));
+$stmt = $pdo->prepare("SELECT $colSql FROM bookings WHERE id = ? LIMIT 1");
 $stmt->execute([$bookingId]);
 $booking = $stmt->fetch(PDO::FETCH_ASSOC);
 if (!$booking) {
@@ -72,7 +79,49 @@ if ($storedMail !== '' && $storedMail !== $customerEmail) {
   json_response(['ok'=>false,'error'=>'E-Mail stimmt nicht mit der Buchung überein'], 403);
 }
 
-$method = strtolower(trim((string)($booking['fulfillment_method'] ?? '')));
+/**
+ * @param array<string,mixed> $row
+ */
+function infer_method_from_booking(array $row): string {
+  $method = strtolower(trim((string)($row['fulfillment_method'] ?? '')));
+  if (in_array($method, ['pickup','shipping','delivery'], true)) {
+    return $method;
+  }
+
+  foreach (['fulfillment_details_json','fulfillment_details'] as $detailKey) {
+    if (!isset($row[$detailKey])) continue;
+    $raw = $row[$detailKey];
+    if (is_array($raw)) {
+      $candidate = strtolower(trim((string)($raw['method'] ?? '')));
+      if (in_array($candidate, ['pickup','shipping','delivery'], true)) {
+        return $candidate;
+      }
+    } elseif (is_string($raw) && $raw !== '') {
+      $decoded = json_decode($raw, true);
+      if (is_array($decoded)) {
+        $candidate = strtolower(trim((string)($decoded['method'] ?? '')));
+        if (in_array($candidate, ['pickup','shipping','delivery'], true)) {
+          return $candidate;
+        }
+      }
+    }
+  }
+
+  foreach (['fulfillment_label','fulfillment_note'] as $textKey) {
+    $text = strtolower((string)($row[$textKey] ?? ''));
+    if ($text === '') continue;
+    if (strpos($text, 'versand') !== false) {
+      return 'shipping';
+    }
+    if (strpos($text, 'liefer') !== false) {
+      return 'delivery';
+    }
+  }
+
+  return 'pickup';
+}
+
+$method = infer_method_from_booking($booking);
 if (!in_array($method, ['shipping','delivery'], true)) {
   json_response(['ok'=>false,'error'=>'Für diese Abwicklung werden keine Zusatzinfos benötigt'], 422);
 }
@@ -129,8 +178,15 @@ if ($method === 'delivery') {
   $details['preferred_time'] = $preferred;
 }
 
-if (!has_column($pdo, 'fulfillment_details_json')) {
-  json_response(['ok'=>false,'error'=>'Spalte fulfillment_details_json fehlt in bookings-Tabelle'], 500);
+$targetColumns = [];
+if (has_column($pdo, 'fulfillment_details_json')) {
+  $targetColumns[] = 'fulfillment_details_json';
+}
+if (has_column($pdo, 'fulfillment_details')) {
+  $targetColumns[] = 'fulfillment_details';
+}
+if (!$targetColumns) {
+  json_response(['ok'=>false,'error'=>'Spalte für Abwicklungsdetails fehlt in bookings-Tabelle'], 500);
 }
 
 $json = json_encode($details, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
@@ -138,7 +194,15 @@ if ($json === false) {
   json_response(['ok'=>false,'error'=>'Konnte Details nicht serialisieren'], 500);
 }
 
-$stmt = $pdo->prepare('UPDATE bookings SET fulfillment_details_json = ? WHERE id = ?');
-$stmt->execute([$json, $bookingId]);
+$setParts = [];
+$params = [];
+foreach ($targetColumns as $col) {
+  $setParts[] = "`$col` = ?";
+  $params[] = $json;
+}
+$params[] = $bookingId;
+$sql = 'UPDATE bookings SET ' . implode(', ', $setParts) . ' WHERE id = ?';
+$stmt = $pdo->prepare($sql);
+$stmt->execute($params);
 
 json_response(['ok'=>true]);

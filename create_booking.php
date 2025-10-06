@@ -375,6 +375,7 @@ try {
   $fulfillmentLabel  = $fulfillment['label'];
   $fulfillmentNote   = $fulfillment['note'];
   $fulfillmentPrice  = (float)$fulfillment['price_delta'];
+  $initialFulfillmentDetails = json_encode(['method' => $fulfillmentMethod], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '{}';
 
   // Overlap-Flag: nur TRUE zählt; FALSE wird ignoriert (Server-Default bleibt)
   $force = null;
@@ -443,7 +444,12 @@ try {
   if (has_col($pdo,'fulfillment_details_json')) {
     $fields[] = 'fulfillment_details_json';
     $place[]  = ':fulfillment_details_json';
-    $params[':fulfillment_details_json'] = '{}';
+    $params[':fulfillment_details_json'] = $initialFulfillmentDetails;
+  }
+  if (has_col($pdo,'fulfillment_details')) {
+    $fields[] = 'fulfillment_details';
+    $place[]  = ':fulfillment_details';
+    $params[':fulfillment_details'] = $initialFulfillmentDetails;
   }
 
   // created_at → NOW() (nur wenn Spalte existiert)
@@ -515,7 +521,7 @@ try {
       'fulfillment_label'=>$fulfillmentLabel,
       'fulfillment_price_delta'=>$fulfillmentPrice,
       'fulfillment_note'=>$fulfillmentNote,
-      'fulfillment_details_json' => '{}'
+      'fulfillment_details_json' => $initialFulfillmentDetails
     ],
     'mail'=>$mailInfo,
     'internal_mail'=>$internalMailInfo

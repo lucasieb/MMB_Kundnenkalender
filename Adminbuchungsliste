@@ -206,6 +206,39 @@
       return suffix ? `${base} (${suffix})` : base;
     };
 
+    const inferFulfillmentMethod = (booking, parsedDetails = {})=>{
+      const direct = (booking?.fulfillment_method ?? '').toString().trim().toLowerCase();
+      if(['pickup','shipping','delivery'].includes(direct)) return direct;
+
+      const detailSources = [];
+      if(parsedDetails && typeof parsedDetails === 'object') detailSources.push(parsedDetails);
+      ['fulfillment_details_json','fulfillment_details'].forEach(key=>{
+        const raw = booking?.[key];
+        if(!raw) return;
+        if(typeof raw === 'object'){ detailSources.push(raw); return; }
+        if(typeof raw === 'string'){
+          try{
+            const decoded = JSON.parse(raw);
+            if(decoded && typeof decoded === 'object') detailSources.push(decoded);
+          }catch(_){}
+        }
+      });
+      for(const candidate of detailSources){
+        const method = (candidate?.method ?? '').toString().trim().toLowerCase();
+        if(['pickup','shipping','delivery'].includes(method)) return method;
+      }
+
+      const textSources = [booking?.fulfillment_label, booking?.fulfillment_note];
+      for(const text of textSources){
+        if(!text) continue;
+        const lower = text.toString().toLowerCase();
+        if(lower.includes('versand')) return 'shipping';
+        if(lower.includes('liefer')) return 'delivery';
+      }
+
+      return 'pickup';
+    };
+
     const fulfillmentInstructionLines = (info, details)=>{
       const base = Array.isArray(info.infoLines) ? info.infoLines.map(x=>String(x).trim()).filter(Boolean) : [];
       const lines = base.slice();
@@ -1144,8 +1177,10 @@
 
       getFulfillmentChoice(id){ return FULFILLMENT_LOOKUP[id] || FULFILLMENT_CHOICES[0]; }
       getFulfillmentInfo(b){
-        const raw = (b.fulfillment_method || '').toString().toLowerCase();
-        const choice = this.getFulfillmentChoice(raw);
+        const rawDetails = b.fulfillment_details || b.fulfillment_details_json || '';
+        const details = parseFulfillmentDetails(rawDetails);
+        const method = inferFulfillmentMethod(b, details);
+        const choice = this.getFulfillmentChoice(method);
         const price = Number(b.fulfillment_price_delta ?? choice.priceDelta);
         const rawDetails = b.fulfillment_details || b.fulfillment_details_json || '';
         const details = parseFulfillmentDetails(rawDetails);
