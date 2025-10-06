@@ -246,9 +246,9 @@
 <script>
 /* ========= KONFIG ========= */
 const MMB_CONFIG = {
-  pricingUrl: 'https://firebrick-squirrel-568721.hostingersite.com/pricing.php',
-  createUrl:  'https://firebrick-squirrel-568721.hostingersite.com/create_booking.php',
-  submitDetailsUrl: 'https://firebrick-squirrel-568721.hostingersite.com/submit_fulfillment_details.php'
+  pricingUrl: 'pricing.php',
+  createUrl:  'create_booking.php',
+  submitDetailsUrl: 'submit_fulfillment_details.php'
 };
 /* ========================= */
 
@@ -353,7 +353,8 @@ async function fetchText(url, opts){ const r=await fetch(url, opts||{}); const t
 
 /* ===== API Endpoints ===== */
 const PRICING_URLS = [MMB_CONFIG.pricingUrl,'pricing.php','api/pricing.php'].filter(Boolean);
-const BOOKING_URLS = [MMB_CONFIG.createUrl];
+const BOOKING_URLS = [MMB_CONFIG.createUrl,'create_booking.php','api/create_booking.php'].filter(Boolean);
+const SUBMIT_DETAILS_URLS = [MMB_CONFIG.submitDetailsUrl,'submit_fulfillment_details.php','api/submit_fulfillment_details.php'].filter(Boolean);
 
 /* — Ableitungslogik: erzwinge Verfügbarkeit ja/nein — */
 function deriveEnforcement(pr){
@@ -379,33 +380,87 @@ async function getPricing(){
 }
 
 /* ==== Senden: urlencoded (bevorzugt), Fallback JSON ==== */
-async function sendBooking(url, payload){
-  const makeUrlEnc = (p)=>{ const u=new URLSearchParams(); Object.entries(p).forEach(([k,v])=>u.append(k,String(v))); return u; };
-  // 1) application/x-www-form-urlencoded
-  const r1 = await fetchText(url, {
-    method:'POST',
-    body: makeUrlEnc(payload),
-    headers:{'Content-Type':'application/x-www-form-urlencoded','Accept':'application/json'},
-    credentials:'omit'
-  });
-  if (r1.ok){
+async function sendBooking(urls, payload){
+  const candidates = Array.isArray(urls) ? urls : [urls];
+  let lastError = null;
+  for(const url of candidates){
+    try{
+      const result = await attemptSendBooking(url, payload);
+      if(result) return result;
+    }catch(err){
+      lastError = err;
+    }
+  }
+  throw lastError || new Error('Konnte Buchung nicht senden');
+}
+
+async function attemptSendBooking(url, payload){
+  const makeUrlEnc = (p)=>{ const u=new URLSearchParams(); Object.entries(p).forEach(([k,v])=>u.append(k,String(v))); return u;};
+  let r1;
+  try{
+    r1 = await fetchText(url, {
+      method:'POST',
+      body: makeUrlEnc(payload),
+      headers:{'Content-Type':'application/x-www-form-urlencoded','Accept':'application/json'},
+      credentials:'omit'
+    });
+  }catch(networkErr){
+    throw networkErr;
+  }
+  if(r1.ok){
     const j = parseJsonLoose(r1.text);
-    if (j && j.ok===true) return j;
+    if(j && j.ok===true) return j;
     throw new Error((j && j.error) ? j.error : ('HTTP '+r1.status+' / '+r1.text.slice(0,200)));
   }
-  // 2) JSON Fallback
-  const r2 = await fetchText(url, {
-    method:'POST',
-    body: JSON.stringify(payload),
-    headers:{'Content-Type':'application/json','Accept':'application/json'},
-    credentials:'omit'
-  });
-  if (r2.ok){
+
+  let r2;
+  try{
+    r2 = await fetchText(url, {
+      method:'POST',
+      body: JSON.stringify(payload),
+      headers:{'Content-Type':'application/json','Accept':'application/json'},
+      credentials:'omit'
+    });
+  }catch(networkErr){
+    throw networkErr;
+  }
+  if(r2.ok){
     const j = parseJsonLoose(r2.text);
-    if (j && j.ok===true) return j;
+    if(j && j.ok===true) return j;
     throw new Error((j && j.error) ? j.error : ('HTTP '+r2.status+' / '+r2.text.slice(0,200)));
   }
+
   throw new Error('HTTP '+r1.status+' / '+r1.text.slice(0,140));
+}
+
+async function submitFulfillmentDetails(urls, payload){
+  const candidates = Array.isArray(urls) ? urls : [urls];
+  let lastError = null;
+  for(const url of candidates){
+    try{
+      return await attemptSubmitFulfillmentDetails(url, payload);
+    }catch(err){
+      lastError = err;
+    }
+  }
+  throw lastError || new Error('Konnte Abwicklungsdetails nicht senden');
+}
+
+async function attemptSubmitFulfillmentDetails(url, payload){
+  const response = await fetchText(url, {
+    method:'POST',
+    headers:{'Content-Type':'application/json','Accept':'application/json'},
+    body: JSON.stringify(payload),
+    credentials:'omit'
+  });
+  if(!response.ok){
+    throw new Error('HTTP '+response.status+' / '+response.text.slice(0,180));
+  }
+  const data = parseJsonLoose(response.text);
+  if(!data || data.ok !== true){
+    throw new Error((data && data.error) ? data.error : 'Unbekannter Fehler beim Übermitteln der Abwicklungsdaten');
+  }
+  return data;
 }
 
 async function submitFulfillmentDetails(url, payload){
@@ -852,7 +907,7 @@ class Calendar{
 
       const btn=e.target.querySelector('button'); const orig=btn.textContent; btn.disabled=true; btn.textContent='Senden…';
       try{
-        const res=await sendBooking(MMB_CONFIG.createUrl, payload);
+        const res=await sendBooking(BOOKING_URLS, payload);
         const bookingInfo = res?.booking || null;
         const dispId = bookingInfo?.display_id ? String(bookingInfo.display_id) : '–';
         const needsDetails = fulfillmentMethod === 'shipping' || fulfillmentMethod === 'delivery';
@@ -1016,7 +1071,7 @@ class Calendar{
             payload.preferred_time = String(formData.get('preferred_time')||'').trim();
           }
 
-          await submitFulfillmentDetails(MMB_CONFIG.submitDetailsUrl, payload);
+          await submitFulfillmentDetails(SUBMIT_DETAILS_URLS, payload);
           close(true);
         }catch(err){
           console.error(err);

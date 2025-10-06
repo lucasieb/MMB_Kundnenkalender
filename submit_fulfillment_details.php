@@ -53,6 +53,44 @@ $input = read_input();
 $bookingId = isset($input['booking_id']) ? (int)$input['booking_id'] : 0;
 $customerEmail = strtolower(trim((string)($input['customer_email'] ?? '')));
 
+/**
+ * @param mixed $value
+ */
+function normalize_method($value): string {
+  if (is_string($value)) {
+    $raw = $value;
+  } elseif (is_numeric($value) || is_bool($value)) {
+    $raw = (string) $value;
+  } else {
+    $raw = '';
+  }
+  $raw = strtolower(trim($raw));
+  if ($raw === '') {
+    return '';
+  }
+
+  if (in_array($raw, ['pickup', 'abholung', 'abholen'], true)) {
+    return 'pickup';
+  }
+  if ($raw === 'shipping' || $raw === 'ship') {
+    return 'shipping';
+  }
+  if ($raw === 'delivery' || $raw === 'deliver') {
+    return 'delivery';
+  }
+
+  if (strpos($raw, 'versand') !== false) {
+    return 'shipping';
+  }
+  if (strpos($raw, 'liefer') !== false) {
+    return 'delivery';
+  }
+
+  return '';
+}
+
+$requestedMethod = normalize_method($input['method'] ?? null);
+
 if ($bookingId <= 0) {
   json_response(['ok'=>false,'error'=>'Ungültige Buchungs-ID'], 400);
 }
@@ -121,10 +159,20 @@ function infer_method_from_booking(array $row): string {
   return 'pickup';
 }
 
-$method = infer_method_from_booking($booking);
+$methodFromBooking = infer_method_from_booking($booking);
+$method = $methodFromBooking;
+if ($requestedMethod !== '' && in_array($requestedMethod, ['pickup','shipping','delivery'], true)) {
+  $method = $requestedMethod;
+}
 if (!in_array($method, ['shipping','delivery'], true)) {
   json_response(['ok'=>false,'error'=>'Für diese Abwicklung werden keine Zusatzinfos benötigt'], 422);
 }
+$booking['fulfillment_method'] = $method;
+$methodLabels = [
+  'pickup' => 'Abholung',
+  'shipping' => 'Versand',
+  'delivery' => 'Lieferung',
+];
 
 $contactName  = trim((string)($input['contact_name'] ?? ''));
 $contactEmail = trim((string)($input['contact_email'] ?? ''));
@@ -154,6 +202,10 @@ $details = [
   'contact_phone' => $contactPhone,
   'consent_contact' => $consent,
 ];
+
+if (isset($methodLabels[$method])) {
+  $details['method_label'] = $methodLabels[$method];
+}
 
 if ($method === 'shipping') {
   $addressLine1 = trim((string)($input['address_line1'] ?? ''));
@@ -196,10 +248,41 @@ if ($json === false) {
 
 $setParts = [];
 $params = [];
+
+if (has_column($pdo, 'fulfillment_method')) {
+  $storedMethod = strtolower(trim((string)($booking['fulfillment_method'] ?? '')));
+  if ($storedMethod !== $method) {
+    $setParts[] = '`fulfillment_method` = ?';
+    $params[] = $method;
+  }
+}
+
+if (isset($methodLabels[$method]) && has_column($pdo, 'fulfillment_label')) {
+  $currentLabel = trim((string)($booking['fulfillment_label'] ?? ''));
+  $shouldUpdateLabel = ($currentLabel === '');
+  if (!$shouldUpdateLabel) {
+    $labelLower = strtolower($currentLabel);
+    if ($method === 'shipping' && strpos($labelLower, 'versand') === false) {
+      $shouldUpdateLabel = true;
+    } elseif ($method === 'delivery' && strpos($labelLower, 'liefer') === false) {
+      $shouldUpdateLabel = true;
+    }
+  }
+  if ($shouldUpdateLabel) {
+    $setParts[] = '`fulfillment_label` = ?';
+    $params[] = $methodLabels[$method];
+  }
+}
+
 foreach ($targetColumns as $col) {
   $setParts[] = "`$col` = ?";
   $params[] = $json;
 }
+
+if (!$setParts) {
+  json_response(['ok'=>false,'error'=>'Keine aktualisierbaren Spalten gefunden'], 500);
+}
+
 $params[] = $bookingId;
 $sql = 'UPDATE bookings SET ' . implode(', ', $setParts) . ' WHERE id = ?';
 $stmt = $pdo->prepare($sql);
