@@ -55,6 +55,72 @@ function displayId(int $id): string {
   return '00' . str_pad((string)(100 + $id), 3, '0', STR_PAD_LEFT);
 }
 
+const FULFILLMENT_DEFS = [
+  'pickup' => [
+    'label' => 'Abholung',
+    'full' => 'Abholung in Wesel',
+    'price_delta' => 0.0,
+    'adds_to_total' => true,
+    'note' => '',
+  ],
+  'shipping' => [
+    'label' => 'Versand',
+    'full' => 'Versand (deutschlandweit)',
+    'price_delta' => 80.0,
+    'adds_to_total' => true,
+    'note' => 'inkl. Express-Hin- & Rückversand sowie Vorbereitungspauschale',
+  ],
+  'delivery' => [
+    'label' => 'Lieferung',
+    'full' => 'Lieferung (NRW-weit)',
+    'price_delta' => 0.0,
+    'adds_to_total' => false,
+    'note' => 'zzgl. individueller Lieferpauschale – wir melden uns mit einem Angebot',
+  ],
+];
+
+function formatEuro(float $amount): string {
+  return number_format($amount, 0, ',', '.') . '€';
+}
+
+/**
+ * @param array<string,mixed> $bk
+ * @return array{method:string,label:string,full:string,note:string,price_delta:float,adds_to_total:bool}
+ */
+function fulfillmentInfoFromBooking(array $bk): array {
+  $method = strtolower((string)($bk['fulfillment_method'] ?? ''));
+  if (!isset(FULFILLMENT_DEFS[$method])) {
+    $method = 'pickup';
+  }
+  $def = FULFILLMENT_DEFS[$method];
+  return [
+    'method' => $method,
+    'label' => (string)($bk['fulfillment_label'] ?? $def['label']),
+    'full' => (string)$def['full'],
+    'note' => (string)($bk['fulfillment_note'] ?? $def['note']),
+    'price_delta' => isset($bk['fulfillment_price_delta']) ? (float)$bk['fulfillment_price_delta'] : (float)$def['price_delta'],
+    'adds_to_total' => (bool)$def['adds_to_total'],
+  ];
+}
+
+/**
+ * @param array{method:string,label:string,full:string,note:string,price_delta:float,adds_to_total:bool} $info
+ */
+function fulfillmentEmailLine(array $info): string {
+  $method = $info['method'];
+  $full   = $info['full'];
+  $price  = (float)$info['price_delta'];
+  $note   = trim((string)$info['note']);
+
+  if ($method === 'pickup') {
+    return $price > 0 ? ($full . ' +' . formatEuro($price)) : ($full . ' (gratis)');
+  }
+  if ($method === 'shipping') {
+    return $full . ' +' . formatEuro($price);
+  }
+  return $note !== '' ? ($full . ' (' . $note . ')') : $full;
+}
+
 // E-Mail-Vorlagen (werden von Custom-Subject/-Message übersteuert)
 function buildEmailTemplates(array $bk, array $alternativeBoxIds = []): array {
   $name   = trim((string)($bk['customer_name'] ?? ''));
@@ -63,6 +129,9 @@ function buildEmailTemplates(array $bk, array $alternativeBoxIds = []): array {
   $s      = (new DateTimeImmutable((string)$bk['start_date']))->format('d.m.Y');
   $e      = (new DateTimeImmutable((string)$bk['end_date']))->format('d.m.Y');
   $dispId = displayId((int)$bk['id']);
+
+  $fulfillmentInfo = fulfillmentInfoFromBooking($bk);
+  $fulfillmentLine = fulfillmentEmailLine($fulfillmentInfo);
 
   $subjects = [
     'confirmed'   => "Buchung bestätigt – {$dispId}",
@@ -79,6 +148,7 @@ gute Nachrichten – wir haben deine Buchung bestätigt.
 
 • Box: {$box}
 • Zeitraum: {$s} bis {$e}
+• Abwicklung: {$fulfillmentLine}
 • Buchungs-ID: {$dispId}
 
 Wir melden uns, falls noch Rückfragen bestehen. Ansonsten freuen wir uns auf dich!
@@ -104,6 +174,7 @@ wir haben deine Buchung ({$dispId}) aktualisiert.
 
 • Box: {$box}
 • Zeitraum: {$s} bis {$e}
+• Abwicklung: {$fulfillmentLine}
 
 Falls etwas nicht passt, antworte einfach auf diese E-Mail.
 
@@ -245,13 +316,16 @@ try {
     $fields = [];
     $vals   = [];
 
-    $whitelist = ['customer_name','customer_email','customer_phone','box_id','start_date','end_date','total_amount','status'];
+    $whitelist = ['customer_name','customer_email','customer_phone','box_id','start_date','end_date','total_amount','status','fulfillment_method','fulfillment_label','fulfillment_note','fulfillment_price_delta'];
     foreach ($updates as $col => $val) {
       if (!in_array($col, $whitelist, true)) continue;
       $fields[] = "$col=?";
       // Typisierung:
-      if ($col === 'box_id')        $val = (int)$val;
-      if ($col === 'total_amount')  $val = (float)$val;
+      if ($col === 'box_id') {
+        $val = (int)$val;
+      } elseif ($col === 'total_amount' || $col === 'fulfillment_price_delta') {
+        $val = (float)$val;
+      }
       $vals[] = $val;
       $bk[$col] = $val;
     }
@@ -339,6 +413,10 @@ try {
       'start_date'     => (string)$bk['start_date'],
       'end_date'       => (string)$bk['end_date'],
       'total_amount'   => (float)$bk['total_amount'],
+      'fulfillment_method' => (string)($bk['fulfillment_method'] ?? ''),
+      'fulfillment_label'  => (string)($bk['fulfillment_label'] ?? ''),
+      'fulfillment_note'   => (string)($bk['fulfillment_note'] ?? ''),
+      'fulfillment_price_delta' => isset($bk['fulfillment_price_delta']) ? (float)$bk['fulfillment_price_delta'] : 0.0,
     ],
     'alternative_box_ids' => $altBoxIds,
     'mail' => $mailInfo,
