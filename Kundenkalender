@@ -234,7 +234,7 @@ const MMB_CONFIG = {
 const FULFILLMENT_OPTIONS = [
   {
     id:'pickup',
-    label:'Abholung in Wesel',
+    label:'Abholung in Wesel, NRW',
     shortLabel:'Abholung',
     subLabel:'Kostenfreie Selbstabholung vor Ort',
     displayTitle:'Abholung',
@@ -242,10 +242,11 @@ const FULFILLMENT_OPTIONS = [
     displayPrice:'+ 0 €',
     priceDelta:0,
     addsToTotal:true,
-    summaryLabel:'Abholung in Wesel',
+    summaryLabel:'Abholung in Wesel, NRW',
     summaryValue:'+ 0 €',
     note:'',
-    infoTitle:'Abholung in Wesel',
+    totalSubline:'inkl. Abholung in Wesel, NRW',
+    infoTitle:'Abholung in Wesel, NRW',
     infoHtml:`<p>📍 Wir stimmen den Treffpunkt in Wesel individuell mit dir ab.</p>
       <p>🕚 Abholung ab deinem Miettag um 11:00 Uhr möglich.</p>
       <p>🔁 Rückgabe am selben Ort (sofern nichts anderes vereinbart) bis 10:00 Uhr am Folgetag nach Mietende.</p>
@@ -253,19 +254,19 @@ const FULFILLMENT_OPTIONS = [
   },
   {
     id:'shipping',
-    label:'Versand (deutschlandweit)',
+    label:'Versand (ganz Deutschland)',
     shortLabel:'Versand',
     subLabel:'Express-Hin- & Rückversand inkl. QR-Code',
-    displayTitle:'Versand (ganz Deutschland)',
+    displayTitle:'Versand',
     displayRegion:'ganz Deutschland 🇩🇪',
     displayPrice:'+ 80 €',
     priceDelta:80,
     addsToTotal:true,
-    summaryLabel:'Versand (deutschlandweit)',
+    summaryLabel:'Versand (ganz Deutschland)',
     summaryValue:'+ 80 €',
     note:'',
     totalSubline:'inkl. Hin- & Rückversand',
-    infoTitle:'Versand deutschlandweit',
+    infoTitle:'Versand (ganz Deutschland)',
     infoHtml:`<p>🚚 Wir versenden deine Musikbox einen Tag vor Mietbeginn per Express, damit sie pünktlich ankommt.</p>
       <p>📦 Am letzten Miettag gibst du das Paket mit dem mitgelieferten QR-Code wieder auf – so ist es direkt am Folgetag bei uns.</p>
       <p>💶 Die Pauschale von 80 € deckt Hin- und Rückversand sowie den zusätzlichen Aufwand und Ausfalltage ab.</p>
@@ -273,20 +274,20 @@ const FULFILLMENT_OPTIONS = [
   },
   {
     id:'delivery',
-    label:'Lieferung (NRW-weit)',
+    label:'Lieferung (ganz NRW)',
     shortLabel:'Lieferung',
     subLabel:'Individuelles Angebot durch unser Team',
-    displayTitle:'Lieferung (ganz NRW)',
+    displayTitle:'Lieferung',
     displayRegion:'ganz Nordrhein-Westfalen',
     displayPriceNote:'* Individuelles Preisangebot durch unser Team',
     priceDelta:0,
     addsToTotal:false,
-    summaryLabel:'Lieferung (NRW-weit)',
+    summaryLabel:'Lieferung (ganz NRW)',
     summaryValue:'individuell',
     note:'',
     totalLabel:'Vorläufig Gesamt',
-    totalSubline:'zzgl. Lieferkosten',
-    infoTitle:'Lieferung NRW-weit',
+    totalSubline:'zzgl. individuelle Lieferkosten',
+    infoTitle:'Lieferung (ganz NRW)',
     infoHtml:`<p>🚗 Wir liefern dir die Musikbox persönlich innerhalb von NRW – auf Wunsch inkl. Aufbau & Abholung.</p>
       <p>💶 Die Kosten bestehen aus einer Grundpauschale plus einer Kilometerpauschale – daher berechnen wir den Preis individuell.</p>
       <p>✉️ Du erhältst nach deiner Anfrage ein persönliches Angebot mit allen Details.</p>
@@ -460,8 +461,8 @@ class Calendar{
     const totalWithShipping = sum.total + shipping;
     const totalRow = `<div class="mmb-total"><div class="mmb-total-label"><span class="label">${meta.totalLabel}</span>${meta.totalSubline?`<span class="mmb-total-sub">${meta.totalSubline}</span>`:''}</div><span class="value">${Euro.fmt(totalWithShipping)}</span></div>`;
     const lines = [
-      `<div class="mmb-price-line"><span>Original (ohne Rabatt)</span><span>${Euro.fmt(sum.original)}</span></div>`,
-      `<div class="mmb-price-line"><span>Rabatt (${sum.discountPercentDisplay}%)</span><span>–${Euro.fmt(sum.discountAmount)}</span></div>`,
+      `<div class="mmb-price-line"><span>Grundpreis </span><span>${Euro.fmt(sum.original)}</span></div>`,
+      `<div class="mmb-price-line"><span>Langzeitrabatt (${sum.discountPercentDisplay}%)</span><span>–${Euro.fmt(sum.discountAmount)}</span></div>`,
       `<div class="mmb-price-line"><span>${meta.summaryLabel}</span><span>${meta.summaryValue}</span></div>`,
       `<div class="mmb-hr"></div>`,
       totalRow,
@@ -493,7 +494,8 @@ class Calendar{
     const totalWithShipping = base + shipping;
     const totalRow = `<div class="mmb-total"><div class="mmb-total-label"><span class="label">${meta.totalLabel}</span>${meta.totalSubline?`<span class="mmb-total-sub">${meta.totalSubline}</span>`:''}</div><span class="value">${Euro.fmt(totalWithShipping)}</span></div>`;
     const lines = [
-      `<div class="mmb-price-line"><span>Aktueller Rabatt</span><span>0%</span></div>`,
+      `<div class="mmb-price-line"><span>Grundpreis </span><span>${Euro.fmt(sum.original)}</span></div>`,
+      `<div class="mmb-price-line"><span>Langzeitrabatt</span><span>0%</span></div>`,
       `<div class="mmb-price-line"><span>${meta.summaryLabel}</span><span>${meta.summaryValue}</span></div>`,
       `<div class="mmb-hr"></div>`,
       totalRow,
