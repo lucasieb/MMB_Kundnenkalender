@@ -558,6 +558,12 @@ try {
         $val = (int)$val;
       } elseif ($col === 'total_amount' || $col === 'fulfillment_price_delta') {
         $val = (float)$val;
+      } elseif ($col === 'fulfillment_details_json') {
+        if (is_array($val)) {
+          $val = json_encode($val, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        } else {
+          $val = (string)$val;
+        }
       }
       $fields[] = "`$col`=?";
       $vals[] = $val;
