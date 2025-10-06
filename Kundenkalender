@@ -463,6 +463,23 @@ async function attemptSubmitFulfillmentDetails(url, payload){
   return data;
 }
 
+async function submitFulfillmentDetails(url, payload){
+  const response = await fetchText(url, {
+    method:'POST',
+    headers:{'Content-Type':'application/json','Accept':'application/json'},
+    body: JSON.stringify(payload),
+    credentials:'omit'
+  });
+  if(!response.ok){
+    throw new Error('HTTP '+response.status+' / '+response.text.slice(0,180));
+  }
+  const data = parseJsonLoose(response.text);
+  if(!data || data.ok !== true){
+    throw new Error((data && data.error) ? data.error : 'Unbekannter Fehler beim Übermitteln der Abwicklungsdaten');
+  }
+  return data;
+}
+
 /* ===== Kalender ===== */
 class Calendar{
   constructor(container){

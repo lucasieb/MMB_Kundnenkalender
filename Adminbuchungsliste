@@ -1182,6 +1182,8 @@
         const method = inferFulfillmentMethod(b, details);
         const choice = this.getFulfillmentChoice(method);
         const price = Number(b.fulfillment_price_delta ?? choice.priceDelta);
+        const rawDetails = b.fulfillment_details || b.fulfillment_details_json || '';
+        const details = parseFulfillmentDetails(rawDetails);
         return {
           id: choice.id,
           method: choice.id,
