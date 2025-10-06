@@ -85,25 +85,9 @@
   let csrfToken = null;
   let ensurePromise = null;
   let authenticated = false;
-  let publicMode = false;
-  let previousAuthState = false;
-
-  function setPublicMode(){
-    if (publicMode) {
-      return;
-    }
-    previousAuthState = authenticated;
-    publicMode = true;
-    authenticated = true;
-  }
-
-  function leavePublicMode(){
-    if (!publicMode) {
-      return;
-    }
-    publicMode = false;
-    authenticated = previousAuthState;
-  }
+  let authDisabled = false;
+  let bootstrapSkipped = false;
+  let lastState = null;
 
   function ensureStyle(){
     if (document.getElementById(STYLE_ID)) {
@@ -232,12 +216,11 @@
       err.payload = data;
       throw err;
     }
-
+    lastState = data;
     csrfToken = data.token || null;
-    if (data.auth_disabled || (data.authenticated && !data.token)) {
-      setPublicMode();
-    }
-    if (data.authenticated) {
+    authenticated = Boolean(data.authenticated);
+    authDisabled = Boolean(data.auth_disabled);
+    if (authDisabled && !authenticated) {
       authenticated = true;
     }
     return data;
@@ -365,19 +348,26 @@
       return ensurePromise;
     }
     ensurePromise = (async () => {
-      const state = await fetchState();
-      if (publicMode || state.authenticated) {
-        authenticated = true;
-        return;
-      }
-      return new Promise((resolve, reject) => {
-        pendingResolve = () => {
+      try {
+        const state = await fetchState();
+        bootstrapSkipped = false;
+        if (state.authenticated || authDisabled) {
           authenticated = true;
-          resolve();
-        };
-        pendingReject = reject;
-        showOverlay();
-      });
+          return;
+        }
+        return new Promise((resolve, reject) => {
+          pendingResolve = () => {
+            authenticated = true;
+            resolve();
+          };
+          pendingReject = reject;
+          showOverlay();
+        });
+      } catch (error) {
+        bootstrapSkipped = true;
+        authenticated = true;
+        console.warn('Admin auth bootstrap failed, fahre ohne Sitzung fort.', error);
+      }
     })();
     try {
       await ensurePromise;
@@ -389,8 +379,13 @@
   global.MMBAdminAuth = {
     ensureSession,
     getApiBase: () => API_BASE,
-    shouldSendCredentials: () => !publicMode,
-    enterPublicMode: () => { setPublicMode(); },
-    exitPublicMode: () => { leavePublicMode(); }
+    getSessionState: () => ({
+      authenticated,
+      authDisabled,
+      bootstrapSkipped,
+      lastState,
+    }),
+    isAuthDisabled: () => authDisabled,
+    wasBootstrapSkipped: () => bootstrapSkipped,
   };
 })(window);

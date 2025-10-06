@@ -89,157 +89,149 @@
   <!-- ======================= MMB API ======================= -->
   <script>
     const MMB_API_BASE = MMBAdminAuth.getApiBase();
-    let apiUsesCredentials = true;
+    let preferPublicRequests = false;
 
-    function syncApiCredentialPreference(){
-      if (typeof MMBAdminAuth.shouldSendCredentials !== 'function') {
-        return;
-      }
-      try {
-        const result = MMBAdminAuth.shouldSendCredentials();
-        if (typeof result === 'boolean') {
-          apiUsesCredentials = result;
+    function refreshPreferredCredentials(){
+      if (typeof MMBAdminAuth?.getSessionState === 'function') {
+        const state = MMBAdminAuth.getSessionState();
+        if (state && (state.authDisabled || state.bootstrapSkipped)) {
+          preferPublicRequests = true;
         }
-      } catch (_) {
-        /* Ignorieren – wir behalten den letzten bekannten Wert. */
-      }
-    }
-
-    syncApiCredentialPreference();
-
-    function switchToPublicMode(){
-      if (!apiUsesCredentials) {
-        return;
-      }
-      apiUsesCredentials = false;
-      if (typeof MMBAdminAuth.enterPublicMode === 'function') {
-        MMBAdminAuth.enterPublicMode();
-      }
-    }
-
-    function switchToCredentialMode(){
-      if (apiUsesCredentials) {
-        return;
-      }
-      apiUsesCredentials = true;
-      if (typeof MMBAdminAuth.exitPublicMode === 'function') {
-        MMBAdminAuth.exitPublicMode();
+      } else if (typeof MMBAdminAuth?.isAuthDisabled === 'function') {
+        if (MMBAdminAuth.isAuthDisabled()) {
+          preferPublicRequests = true;
+        }
       }
     }
 
     function shouldRetryWithoutCredentials(error){
-      if (!error) {
-        return false;
-      }
-      if (error.isNetworkError || error.isParseError) {
-        return true;
-      }
-      const status = typeof error.status === 'number' ? error.status : 0;
-      return status === 0 || status === 401 || status === 403;
+      if (!error) return true;
+      if (error.name === 'TypeError') return true;
+      const status = typeof error.status === 'number' ? error.status : null;
+      if (status === 0 || status === 401 || status === 403) return true;
+      const message = typeof error.message === 'string' ? error.message : '';
+      return /fetch|network|cors|unauthorized|credentials|cookie|json/i.test(message);
     }
 
     function shouldRetryWithCredentials(error){
-      if (!error) {
-        return false;
-      }
-      if (error.isNetworkError) {
-        return true;
-      }
-      const status = typeof error.status === 'number' ? error.status : 0;
-      return status === 401 || status === 403;
+      if (!error) return true;
+      if (error.name === 'TypeError') return true;
+      const status = typeof error.status === 'number' ? error.status : null;
+      if (status === 401 || status === 403) return true;
+      const message = typeof error.message === 'string' ? error.message : '';
+      return /unauthorized|anmeldung|login|session|json/i.test(message);
     }
 
-    async function executeApiRequest(path, init, useCredentials){
-      const requestInit = Object.assign({}, init, {
-        credentials: useCredentials ? 'include' : 'omit'
-      });
-
-      let response;
-      try {
-        response = await fetch(MMB_API_BASE + path, requestInit);
-      } catch (error) {
-        const err = error instanceof Error ? error : new Error(String(error));
-        err.isNetworkError = true;
-        if (typeof err.status !== 'number') {
-          err.status = 0;
-        }
+    async function requestJson(path,{method='GET',body=null}={},credentialsMode='include'){
+      const fetchOptions={
+        method,
+        credentials:credentialsMode,
+        headers:{},
+      };
+      if(method.toUpperCase()==='POST'){
+        fetchOptions.headers['Content-Type']='application/json';
+        fetchOptions.body=JSON.stringify(body||{});
+      }
+      let res;
+      try{
+        res=await fetch(MMB_API_BASE+path,fetchOptions);
+      }catch(networkError){
+        const err = networkError instanceof Error ? networkError : new Error(String(networkError));
+        if(typeof err.status!=='number') err.status=0;
+        err.credentialsMode=credentialsMode;
         throw err;
       }
-
-      const text = await response.text();
+      const text=await res.text();
       let data;
-      try {
-        data = text ? JSON.parse(text) : {};
-      } catch (error) {
-        const err = new Error('Server lieferte keine gültige JSON-Antwort');
-        err.cause = error instanceof Error ? error : new Error(String(error));
-        err.raw = text;
-        err.status = response.status;
-        err.isParseError = true;
+      try{
+        data=text?JSON.parse(text):{};
+      }catch(parseError){
+        const err=new Error('Server lieferte keine gültige JSON-Antwort');
+        err.raw=text;
+        err.status=res.status;
+        err.credentialsMode=credentialsMode;
+        err.cause=parseError;
         throw err;
       }
 
-      const payload = (data && typeof data === 'object') ? data : {};
-      const okFlag = Object.prototype.hasOwnProperty.call(payload, 'ok') ? Boolean(payload.ok) : true;
-      if (!response.ok || !okFlag) {
-        const message = payload.error || payload.message || `HTTP ${response.status}`;
-        const err = new Error(message);
-        err.details = payload;
-        err.status = response.status;
-        throw err;
+      const payload=(data&&typeof data==='object')?data:{};
+      const okFlag=Object.prototype.hasOwnProperty.call(payload,'ok')?Boolean(payload.ok):true;
+      if(!res.ok||!okFlag){
+        const message=(payload.error||payload.message||`HTTP ${res.status}`);
+        const error=new Error(message);
+        error.details=payload;
+        error.status=res.status;
+        error.credentialsMode=credentialsMode;
+        throw error;
       }
 
       return payload;
     }
 
-    async function performApiRequest(path, init = {}){
-      const credentialOrder = apiUsesCredentials ? ['include', 'omit'] : ['omit', 'include'];
-      let lastError = null;
-
-      for (let index = 0; index < credentialOrder.length; index++) {
-        const mode = credentialOrder[index];
-        const useCredentials = mode === 'include';
-        try {
-          const payload = await executeApiRequest(path, init, useCredentials);
-          if (useCredentials) {
-            switchToCredentialMode();
-          } else {
-            switchToPublicMode();
+    async function mmbApiGet(path){
+      refreshPreferredCredentials();
+      const order = preferPublicRequests ? ['omit','include'] : ['include','omit'];
+      let lastError=null;
+      let attemptedOmit=false;
+      for(const mode of order){
+        if(mode==='omit') attemptedOmit=true;
+        try{
+          const result=await requestJson(path,{method:'GET'},mode);
+          if(mode==='omit'){
+            preferPublicRequests=true;
+          }else if(mode==='include'&&attemptedOmit){
+            preferPublicRequests=false;
           }
-          return payload;
-        } catch (error) {
-          const err = error instanceof Error ? error : new Error(String(error));
-          lastError = err;
-          const hasNext = index < credentialOrder.length - 1;
-          if (!hasNext) {
-            throw lastError;
+          return result;
+        }catch(error){
+          lastError=error;
+          if(mode==='include'){
+            if(!preferPublicRequests && shouldRetryWithoutCredentials(error)){
+              continue;
+            }
+          }else if(mode==='omit'){
+            if(preferPublicRequests && shouldRetryWithCredentials(error)){
+              continue;
+            }
           }
-          const shouldRetry = useCredentials
-            ? shouldRetryWithoutCredentials(err)
-            : shouldRetryWithCredentials(err);
-          if (!shouldRetry) {
-            throw lastError;
-          }
-          if (useCredentials) {
-            console.warn('API-Anfrage mit Credentials fehlgeschlagen – versuche erneut ohne Credentials.', err);
-          } else {
-            console.warn('API-Anfrage ohne Credentials fehlgeschlagen – versuche erneut mit Credentials.', err);
-          }
+          throw error;
         }
       }
-
-      throw lastError || new Error('API-Anfrage fehlgeschlagen');
+      if(lastError) throw lastError;
+      throw new Error('Unbekannter API-Fehler');
     }
 
-    async function mmbApiGet(path){
-      return performApiRequest(path);
-    }
     async function mmbApiPost(path,body){
-      return performApiRequest(path, {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify(body||{})
-      });
+      refreshPreferredCredentials();
+      const order = preferPublicRequests ? ['omit','include'] : ['include','omit'];
+      let lastError=null;
+      let attemptedOmit=false;
+      for(const mode of order){
+        if(mode==='omit') attemptedOmit=true;
+        try{
+          const result=await requestJson(path,{method:'POST',body},mode);
+          if(mode==='omit'){
+            preferPublicRequests=true;
+          }else if(mode==='include'&&attemptedOmit){
+            preferPublicRequests=false;
+          }
+          return result;
+        }catch(error){
+          lastError=error;
+          if(mode==='include'){
+            if(!preferPublicRequests && shouldRetryWithoutCredentials(error)){
+              continue;
+            }
+          }else if(mode==='omit'){
+            if(preferPublicRequests && shouldRetryWithCredentials(error)){
+              continue;
+            }
+          }
+          throw error;
+        }
+      }
+      if(lastError) throw lastError;
+      throw new Error('Unbekannter API-Fehler');
     }
 
     const MMBApi={
