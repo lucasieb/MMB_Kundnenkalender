@@ -206,6 +206,26 @@
   #mmb-modal .inner{background:#efefe6; color:#3b3b3b; padding:1rem 1.25rem; border-radius:10px; max-width:560px; width:92%;}
   #mmb-modal .title{font-weight:600; margin-bottom:.4rem;}
   #mmb-modal .text{white-space:pre-wrap; line-height:1.5;}
+
+  /* Dialog für Zusatzinfos */
+  .mmb-dialog-backdrop{position:fixed; inset:0; background:rgba(0,0,0,.48); display:flex; align-items:center; justify-content:center; z-index:10000; padding:1rem;}
+  .mmb-dialog{background:#efefe6; color:#3b3b3b; border-radius:12px; padding:1.25rem 1.35rem; width:min(520px, 100%); max-height:90vh; overflow:auto; box-shadow:0 12px 36px rgba(0,0,0,.18);}
+  .mmb-dialog h3{margin:0 0 .35rem; font-size:1.15rem; font-weight:600;}
+  .mmb-dialog p{margin:.5rem 0; line-height:1.45;}
+  .mmb-dialog form{margin-top:1rem;}
+  .mmb-dialog label{display:block; margin-bottom:.65rem; font-weight:500;}
+  .mmb-dialog .mmb-dialog-row{display:flex; flex-wrap:wrap; gap:.75rem;}
+  .mmb-dialog .mmb-dialog-row > label{flex:1 1 200px; margin-bottom:0;}
+  .mmb-dialog input,.mmb-dialog textarea,.mmb-dialog select{width:100%; padding:.55rem .65rem; border:1px solid #d2d2c7; border-radius:8px; font-size:1rem; box-sizing:border-box; background:#fff; color:#3b3b3b;}
+  .mmb-dialog textarea{min-height:70px;}
+  .mmb-dialog small{display:block; margin-top:.25rem; color:#6b6b65; font-size:.85rem;}
+  .mmb-dialog .mmb-dialog-actions{display:flex; flex-wrap:wrap; gap:.75rem; justify-content:flex-end; margin-top:1.1rem;}
+  .mmb-dialog button{cursor:pointer; border-radius:8px; border:1px solid #c9c9c1; background:#f5f5eb; color:#3b3b3b; padding:.55rem .95rem; font-size:1rem;}
+  .mmb-dialog button[type="submit"]{background:#0EA5E9; border-color:#0EA5E9; color:#fff;}
+  .mmb-dialog button[disabled]{opacity:.6; cursor:not-allowed;}
+  .mmb-dialog .mmb-dialog-error{color:#b91c1c; margin-bottom:.6rem; font-size:.95rem;}
+  .mmb-dialog .mmb-checkbox{display:flex; align-items:flex-start; gap:.55rem; font-weight:400;}
+  .mmb-dialog .mmb-checkbox input{width:auto; margin-top:.2rem;}
 </style>
 </head>
 <body>
@@ -227,7 +247,8 @@
 /* ========= KONFIG ========= */
 const MMB_CONFIG = {
   pricingUrl: 'https://firebrick-squirrel-568721.hostingersite.com/pricing.php',
-  createUrl:  'https://firebrick-squirrel-568721.hostingersite.com/create_booking.php'
+  createUrl:  'https://firebrick-squirrel-568721.hostingersite.com/create_booking.php',
+  submitDetailsUrl: 'https://firebrick-squirrel-568721.hostingersite.com/submit_fulfillment_details.php'
 };
 /* ========================= */
 
@@ -385,6 +406,23 @@ async function sendBooking(url, payload){
     throw new Error((j && j.error) ? j.error : ('HTTP '+r2.status+' / '+r2.text.slice(0,200)));
   }
   throw new Error('HTTP '+r1.status+' / '+r1.text.slice(0,140));
+}
+
+async function submitFulfillmentDetails(url, payload){
+  const response = await fetchText(url, {
+    method:'POST',
+    headers:{'Content-Type':'application/json','Accept':'application/json'},
+    body: JSON.stringify(payload),
+    credentials:'omit'
+  });
+  if(!response.ok){
+    throw new Error('HTTP '+response.status+' / '+response.text.slice(0,180));
+  }
+  const data = parseJsonLoose(response.text);
+  if(!data || data.ok !== true){
+    throw new Error((data && data.error) ? data.error : 'Unbekannter Fehler beim Übermitteln der Abwicklungsdaten');
+  }
+  return data;
 }
 
 /* ===== Kalender ===== */
@@ -785,6 +823,13 @@ class Calendar{
       const fulfillmentPriceDelta = Number(summaryInfo?.fulfillment_price_delta ?? fulfillmentFromState.priceDelta ?? 0);
       const fulfillmentNote = summaryInfo?.fulfillment_note || fulfillmentFromState.note || '';
 
+      const contactDefaults = {
+        customer_name:(data.customer_name||'').trim(),
+        customer_email:(data.customer_email||'').trim(),
+        customer_phone:(data.customer_phone||'').trim(),
+        consent_contact:true
+      };
+
       const payload={
         box_id:Number(this.state.box.id),
         start_date:Utils.formatDate(start),
@@ -808,8 +853,17 @@ class Calendar{
       const btn=e.target.querySelector('button'); const orig=btn.textContent; btn.disabled=true; btn.textContent='Senden…';
       try{
         const res=await sendBooking(MMB_CONFIG.createUrl, payload);
-        const dispId = res?.booking?.display_id ? String(res.booking.display_id) : '–';
-        this.modal('Buchungsanfrage gesendet','Danke! Deine Anfrage ist eingegangen.\n\nBuchungs-ID: '+dispId);
+        const bookingInfo = res?.booking || null;
+        const dispId = bookingInfo?.display_id ? String(bookingInfo.display_id) : '–';
+        const needsDetails = fulfillmentMethod === 'shipping' || fulfillmentMethod === 'delivery';
+        let submittedDetails = false;
+        if(needsDetails){
+          submittedDetails = await this.promptFulfillmentDetails(fulfillmentMethod, bookingInfo, contactDefaults);
+        }
+        const suffix = needsDetails
+          ? (submittedDetails ? '\n\nDanke für die zusätzlichen Infos!' : '\n\nBitte sende uns die benötigten Liefer- oder Treffpunktdaten zeitnah per E-Mail oder Telefon.')
+          : '';
+        this.modal('Buchungsanfrage gesendet',`Danke! Deine Anfrage ist eingegangen.\n\nBuchungs-ID: ${dispId}${suffix}`);
         e.target.reset(); this.state.sel={start:null,end:null}; this.avgCache=null; this.state.summary=null; this.state.fulfillment=FULFILLMENT_OPTIONS[0]; this.hideFulfillmentInfo();
         this.renderCalendar(); this.renderSide(); this.updateVisuals();
       }catch(err){
@@ -851,6 +905,132 @@ class Calendar{
     document.getElementById('mmb-modal-title').textContent=title;
     document.getElementById('mmb-modal-text').textContent=text;
     document.getElementById('mmb-modal').style.display='flex';
+  }
+
+  async promptFulfillmentDetails(method, booking, defaults){
+    const opt = this.getFulfillmentOption(method || '');
+    const displayId = booking?.display_id ? String(booking.display_id) : '–';
+    const baseName = (defaults?.customer_name || '').trim();
+    const baseEmail = (defaults?.customer_email || '').trim();
+    const basePhone = (defaults?.customer_phone || '').trim();
+    const consentDefault = defaults?.consent_contact ?? true;
+    const escapeAttr = (value)=>String(value ?? '').replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+    const isShipping = opt.id === 'shipping';
+    const isDelivery = opt.id === 'delivery';
+
+    return new Promise((resolve)=>{
+      const backdrop = document.createElement('div');
+      backdrop.className = 'mmb-dialog-backdrop';
+      const consentChecked = consentDefault ? 'checked' : '';
+      const shippingFields = isShipping ? `
+        <div class="mmb-dialog-row">
+          <label>Straße & Hausnummer *<input name="address_line1" required placeholder="z. B. Musterstraße 12" autocomplete="address-line1"></label>
+        </div>
+        <div class="mmb-dialog-row">
+          <label>PLZ *<input name="postal_code" required inputmode="numeric" autocomplete="postal-code" placeholder="z. B. 12345"></label>
+          <label>Ort *<input name="city" required autocomplete="address-level2" placeholder="z. B. Wesel"></label>
+        </div>
+        <label>Adresszusatz (optional)<input name="address_extra" placeholder="Etage, Besonderheiten"></label>
+      ` : '';
+      const deliveryFields = isDelivery ? `
+        <label>Treffpunkt oder Adresse *<textarea name="meeting_point" required placeholder="z. B. Vereinsheim Musterweg 5, Eingang rückseitig"></textarea></label>
+        <label>Bevorzugte Uhrzeit am Mittag *
+          <select name="preferred_time" required>
+            ${['11:00','11:30','12:00','12:30','13:00','13:30','14:00','14:30','15:00','15:30','16:00'].map(time=>`<option value="${time}">${time} Uhr</option>`).join('')}
+          </select>
+          <small>Wir bestätigen dir deine Wunschzeit oder schlagen eine Alternative vor.</small>
+        </label>
+      ` : '';
+
+      const title = `Zusätzliche Angaben – ${opt.displayTitle || opt.label}`;
+      const intro = isShipping
+        ? 'Deine Buchungsanfrage ist eingegangen. Damit wir den Versand vorbereiten können, benötigen wir jetzt deine Lieferadresse.'
+        : 'Deine Buchungsanfrage ist eingegangen. Damit wir die Lieferung planen können, benötigen wir jetzt deinen Treffpunkt und deine Wunschzeit.';
+      const urgency = 'Bitte sende uns die Angaben sofort, damit wir deine Buchung ohne Verzögerung bearbeiten können.';
+
+      backdrop.innerHTML = `
+        <div class="mmb-dialog" role="dialog" aria-modal="true">
+          <h3>${title}</h3>
+          <p>${intro}<br><strong>Buchungs-ID:</strong> ${escapeAttr(displayId)}</p>
+          <p>${urgency}</p>
+          <div class="mmb-dialog-error" data-role="error" aria-live="assertive"></div>
+          <form>
+            <div class="mmb-dialog-row">
+              <label>Kontaktname *<input name="contact_name" required value="${escapeAttr(baseName)}" autocomplete="name"></label>
+            </div>
+            <div class="mmb-dialog-row">
+              <label>E-Mail *<input type="email" name="contact_email" required value="${escapeAttr(baseEmail)}" autocomplete="email"></label>
+              <label>Telefon *<input name="contact_phone" required value="${escapeAttr(basePhone)}" autocomplete="tel"></label>
+            </div>
+            ${shippingFields}
+            ${deliveryFields}
+            <label class="mmb-checkbox"><input type="checkbox" name="consent_contact" value="1" ${consentChecked}> <span>Ich bin einverstanden, dass ihr mich telefonisch &amp; per WhatsApp zu dieser Buchung kontaktieren dürft.</span></label>
+            <div class="mmb-dialog-actions">
+              <button type="button" data-act="cancel">Später senden</button>
+              <button type="submit">Informationen senden</button>
+            </div>
+          </form>
+        </div>
+      `;
+
+      const form = backdrop.querySelector('form');
+      const errorEl = backdrop.querySelector('[data-role="error"]');
+      const submitBtn = form.querySelector('button[type="submit"]');
+      const cancelBtn = form.querySelector('[data-act="cancel"]');
+
+      const close = (submitted)=>{
+        backdrop.remove();
+        resolve(submitted);
+      };
+
+      cancelBtn.addEventListener('click', ()=>{
+        close(false);
+      });
+
+      form.addEventListener('submit', async (event)=>{
+        event.preventDefault();
+        errorEl.textContent='';
+        submitBtn.disabled=true;
+        const originalLabel = submitBtn.textContent;
+        submitBtn.textContent='Senden…';
+        try{
+          const formData = new FormData(form);
+          const payload = {
+            booking_id: Number(booking?.id) || 0,
+            booking_display_id: displayId,
+            method: opt.id,
+            customer_email: defaults?.customer_email || '',
+            contact_name: String(formData.get('contact_name')||'').trim(),
+            contact_email: String(formData.get('contact_email')||'').trim(),
+            contact_phone: String(formData.get('contact_phone')||'').trim(),
+            consent_contact: formData.get('consent_contact') ? 1 : 0
+          };
+          if(isShipping){
+            payload.address_line1 = String(formData.get('address_line1')||'').trim();
+            payload.postal_code = String(formData.get('postal_code')||'').trim();
+            payload.city = String(formData.get('city')||'').trim();
+            payload.address_extra = String(formData.get('address_extra')||'').trim();
+          }
+          if(isDelivery){
+            payload.meeting_point = String(formData.get('meeting_point')||'').trim();
+            payload.preferred_time = String(formData.get('preferred_time')||'').trim();
+          }
+
+          await submitFulfillmentDetails(MMB_CONFIG.submitDetailsUrl, payload);
+          close(true);
+        }catch(err){
+          console.error(err);
+          errorEl.textContent = err && err.message ? err.message : String(err);
+        }finally{
+          submitBtn.disabled=false;
+          submitBtn.textContent=originalLabel;
+        }
+      });
+
+      document.body.appendChild(backdrop);
+      const firstInput = form.querySelector('input[name="contact_name"]');
+      if(firstInput){ firstInput.focus(); }
+    });
   }
 }
 document.getElementById('mmb-modal-close').addEventListener('click',()=>{document.getElementById('mmb-modal').style.display='none';});
