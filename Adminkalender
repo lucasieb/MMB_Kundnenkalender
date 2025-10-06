@@ -77,11 +77,88 @@
 
   /* ============ API ============ */
   const MMB_API_BASE = MMBAdminAuth.getApiBase();
-  async function mmbApiPost(path,body){
-    const res=await fetch(MMB_API_BASE+path,{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(body||{})});
-    const t=await res.text(); let d; try{d=JSON.parse(t);}catch{d={ok:false,raw:t};}
-    if(!res.ok||!d.ok) throw new Error('API Fehler'); return d;
+  let apiUsesCredentials = (typeof MMBAdminAuth.shouldSendCredentials === 'function')
+    ? MMBAdminAuth.shouldSendCredentials()
+    : true;
+
+  function refreshApiCredentialPreference(){
+    if (typeof MMBAdminAuth.shouldSendCredentials === 'function') {
+      apiUsesCredentials = MMBAdminAuth.shouldSendCredentials();
+    }
   }
+
+  function switchToPublicMode(){
+    if (!apiUsesCredentials) {
+      return;
+    }
+    apiUsesCredentials = false;
+    if (typeof MMBAdminAuth.enterPublicMode === 'function') {
+      MMBAdminAuth.enterPublicMode();
+    }
+  }
+
+  async function performApiRequest(path, init = {}, attemptFallback = true){
+    const requestInit = Object.assign({}, init, {
+      credentials: apiUsesCredentials ? 'include' : 'omit'
+    });
+
+    let response;
+    try {
+      response = await fetch(MMB_API_BASE + path, requestInit);
+    } catch (error) {
+      if (attemptFallback && apiUsesCredentials) {
+        console.warn('Kalender-API mit Credentials fehlgeschlagen – neuer Versuch ohne.', error);
+        switchToPublicMode();
+        refreshApiCredentialPreference();
+        return performApiRequest(path, init, false);
+      }
+      throw error;
+    }
+
+    const text = await response.text();
+    let data;
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch (error) {
+      if (attemptFallback && apiUsesCredentials) {
+        console.warn('Kalender-API lieferte kein JSON mit Credentials – neuer Versuch ohne.', error);
+        switchToPublicMode();
+        refreshApiCredentialPreference();
+        return performApiRequest(path, init, false);
+      }
+      const err = new Error('Server lieferte keine gültige JSON-Antwort');
+      err.raw = text;
+      err.status = response.status;
+      throw err;
+    }
+
+    const payload = (data && typeof data === 'object') ? data : {};
+    const okFlag = Object.prototype.hasOwnProperty.call(payload, 'ok') ? Boolean(payload.ok) : true;
+    if (!response.ok || !okFlag) {
+      if (attemptFallback && apiUsesCredentials && (response.status === 401 || response.status === 403)) {
+        console.warn('Kalender-API meldete Berechtigungsfehler – neuer Versuch ohne Credentials.');
+        switchToPublicMode();
+        refreshApiCredentialPreference();
+        return performApiRequest(path, init, false);
+      }
+      const message = payload.error || payload.message || `HTTP ${response.status}`;
+      const error = new Error(message);
+      error.details = payload;
+      error.status = response.status;
+      throw error;
+    }
+
+    return payload;
+  }
+
+  async function mmbApiPost(path,body){
+    return performApiRequest(path, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(body||{})
+    });
+  }
+
   const MMBApi={ async blockDays({box_id,start_date,end_date,reason='admin_block'}){ return mmbApiPost('block_days.php',{box_id,start_date,end_date,reason}); } };
 
   /* ============ Admin-Kalender mit Switch ============ */
@@ -185,6 +262,7 @@
     async function start(){
       try {
         await MMBAdminAuth.ensureSession();
+        refreshApiCredentialPreference();
         new AdminCalendar('#mmb-admin-cal');
       } catch (error) {
         console.error('Admin-Login konnte nicht initialisiert werden', error);

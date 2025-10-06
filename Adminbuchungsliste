@@ -89,37 +89,89 @@
   <!-- ======================= MMB API ======================= -->
   <script>
     const MMB_API_BASE = MMBAdminAuth.getApiBase();
+    let apiUsesCredentials = (typeof MMBAdminAuth.shouldSendCredentials === 'function')
+      ? MMBAdminAuth.shouldSendCredentials()
+      : true;
 
-    async function mmbApiGet(path){
-      const res = await fetch(MMB_API_BASE + path, { credentials: 'include' });
-      const text = await res.text();
+    function refreshApiCredentialPreference(){
+      if (typeof MMBAdminAuth.shouldSendCredentials === 'function') {
+        apiUsesCredentials = MMBAdminAuth.shouldSendCredentials();
+      }
+    }
+
+    function switchToPublicMode(){
+      if (!apiUsesCredentials) {
+        return;
+      }
+      apiUsesCredentials = false;
+      if (typeof MMBAdminAuth.enterPublicMode === 'function') {
+        MMBAdminAuth.enterPublicMode();
+      }
+    }
+
+    async function performApiRequest(path, init = {}, attemptFallback = true){
+      const requestInit = Object.assign({}, init, {
+        credentials: apiUsesCredentials ? 'include' : 'omit'
+      });
+
+      let response;
+      try {
+        response = await fetch(MMB_API_BASE + path, requestInit);
+      } catch (error) {
+        if (attemptFallback && apiUsesCredentials) {
+          console.warn('API request failed with credentials – retrying without credentials.', error);
+          switchToPublicMode();
+          refreshApiCredentialPreference();
+          return performApiRequest(path, init, false);
+        }
+        throw error;
+      }
+
+      const text = await response.text();
       let data;
       try {
         data = text ? JSON.parse(text) : {};
-      } catch (_) {
+      } catch (error) {
+        if (attemptFallback && apiUsesCredentials) {
+          console.warn('API response was not valid JSON with credentials – retrying without credentials.', error);
+          switchToPublicMode();
+          refreshApiCredentialPreference();
+          return performApiRequest(path, init, false);
+        }
         const err = new Error('Server lieferte keine gültige JSON-Antwort');
         err.raw = text;
-        err.status = res.status;
+        err.status = response.status;
         throw err;
       }
 
       const payload = (data && typeof data === 'object') ? data : {};
       const okFlag = Object.prototype.hasOwnProperty.call(payload, 'ok') ? Boolean(payload.ok) : true;
-      if (!res.ok || !okFlag) {
-        const message = (payload.error || payload.message || `HTTP ${res.status}`);
+      if (!response.ok || !okFlag) {
+        if (attemptFallback && apiUsesCredentials && (response.status === 401 || response.status === 403)) {
+          console.warn('API responded with an authorization error – retrying without credentials.');
+          switchToPublicMode();
+          refreshApiCredentialPreference();
+          return performApiRequest(path, init, false);
+        }
+        const message = (payload.error || payload.message || `HTTP ${response.status}`);
         const error = new Error(message);
         error.details = payload;
-        error.status = res.status;
+        error.status = response.status;
         throw error;
       }
+
       return payload;
     }
+
+    async function mmbApiGet(path){
+      return performApiRequest(path);
+    }
     async function mmbApiPost(path,body){
-      const res=await fetch(MMB_API_BASE+path,{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(body||{})});
-      const text=await res.text(); let data;
-      try{ data=JSON.parse(text);}catch{ data={ok:false,error:'Keine JSON-Antwort',raw:text};}
-      if(!res.ok||!data.ok) throw new Error(data.error||('HTTP '+res.status+'\n'+(data.raw||'')));
-      return data;
+      return performApiRequest(path, {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(body||{})
+      });
     }
 
     const MMBApi={
@@ -1455,23 +1507,12 @@ Telefon: 01742015500`;
       } catch (error) {
         authError = error instanceof Error ? error : new Error(String(error));
         console.warn('Admin-Login wurde übersprungen (externer Schutz aktiv?).', authError);
+      } finally {
+        refreshApiCredentialPreference();
       }
 
       try {
         MietMichBoxAdminList.init({ container:'#mmb-admin-list', locale:'de-DE', timezone:'Europe/Berlin' });
-        if (authError) {
-          const host = document.querySelector('#mmb-admin-list');
-          if (host && host.parentElement) {
-            const previous = host.previousElementSibling;
-            const hasWarning = previous && previous.classList && previous.classList.contains('mmb-warning');
-            if (!hasWarning) {
-              const notice = document.createElement('p');
-              notice.className = 'mmb-warning';
-              notice.textContent = 'Hinweis: Der zusätzliche Admin-Login wurde übersprungen, da diese Seite bereits extern geschützt ist.';
-              host.parentElement.insertBefore(notice, host);
-            }
-          }
-        }
       } catch (error) {
         console.error('Admin-Buchungsliste konnte nicht initialisiert werden', error);
         const container = document.querySelector('#mmb-admin-list');
