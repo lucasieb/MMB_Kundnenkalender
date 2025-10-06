@@ -130,11 +130,155 @@
     const BOX_MAP = { '1':'Marshall Bromley 750', '2':'Teufel Rockster Neo', '3':'Soundboks 4' };
     const EURO_FORMATTER = new Intl.NumberFormat('de-DE', {maximumFractionDigits:0});
     const FULFILLMENT_CHOICES = [
-      { id:'pickup',   label:'Abholung', full:'Abholung in Wesel', note:'', priceDelta:0 },
-      { id:'shipping', label:'Versand',  full:'Versand', note:'inkl. Express-Hin- & Rückversand sowie Vorbereitungspauschale', priceDelta:80 },
-      { id:'delivery', label:'Lieferung', full:'Lieferung', note:'zzgl. individueller Lieferpauschale – wir melden uns mit einem Angebot', priceDelta:0 }
+      {
+        id:'pickup',
+        label:'Abholung',
+        full:'Abholung in Wesel',
+        note:'',
+        priceDelta:0,
+        displaySuffix:'in Wesel',
+        infoLines:[
+          '📍 Treffpunkt stimmen wir individuell in Wesel ab.',
+          '🕚 Abholung ab deinem Miettag um 11:00 Uhr möglich.',
+          '🔁 Rückgabe am Folgetag nach Mietende bis 10:00 Uhr.'
+        ]
+      },
+      {
+        id:'shipping',
+        label:'Versand',
+        full:'Versand (deutschlandweit)',
+        note:'inkl. Express-Hin- & Rückversand sowie Vorbereitungspauschale',
+        priceDelta:80,
+        displaySuffix:'ganz.de',
+        infoLines:[
+          '🚚 Wir versenden die Musikbox einen Tag vor Mietbeginn per Express.',
+          '📦 Rückversand am letzten Miettag mit dem beiliegenden QR-Code.',
+          '📝 Bitte halte Lieferadresse sowie Kontaktinfos bereit, falls noch nicht übermittelt.'
+        ]
+      },
+      {
+        id:'delivery',
+        label:'Lieferung',
+        full:'Lieferung (NRW-weit)',
+        note:'zzgl. individueller Lieferpauschale – wir melden uns mit einem Angebot',
+        priceDelta:0,
+        displaySuffix:'ganz.nrb',
+        infoLines:[
+          '🚗 Wir liefern die Musikbox persönlich innerhalb von NRW.',
+          '🕒 Wunschzeit am Mittag (halbstündlich) stimmen wir individuell ab.',
+          '📍 Bitte teile uns Treffpunkt oder Lieferadresse mit.'
+        ]
+      }
     ];
     const FULFILLMENT_LOOKUP = Object.fromEntries(FULFILLMENT_CHOICES.map(opt=>[opt.id,opt]));
+
+    const boolish = (value)=>{
+      if(typeof value === 'boolean') return value;
+      if(typeof value === 'number') return value === 1;
+      if(typeof value === 'string'){
+        const v = value.trim().toLowerCase();
+        if(!v) return null;
+        if(['1','true','yes','ja','y','on'].includes(v)) return true;
+        if(['0','false','no','nein','off','n'].includes(v)) return false;
+      }
+      return null;
+    };
+
+    const parseFulfillmentDetails = (raw)=>{
+      if(!raw) return {};
+      if(typeof raw === 'object'){
+        try{ return JSON.parse(JSON.stringify(raw)); }catch{return {...raw}; }
+      }
+      if(typeof raw === 'string'){
+        const trimmed = raw.trim();
+        if(!trimmed) return {};
+        try{
+          const parsed = JSON.parse(trimmed);
+          return (parsed && typeof parsed === 'object') ? parsed : {};
+        }catch(err){ return {}; }
+      }
+      return {};
+    };
+
+    const fulfillmentDisplayLabel = (info)=>{
+      const suffix = (info.displaySuffix || '').toString().trim();
+      const base = (info.label || info.full || '').toString();
+      return suffix ? `${base} (${suffix})` : base;
+    };
+
+    const inferFulfillmentMethod = (booking, parsedDetails = {})=>{
+      const direct = (booking?.fulfillment_method ?? '').toString().trim().toLowerCase();
+      if(['pickup','shipping','delivery'].includes(direct)) return direct;
+
+      const detailSources = [];
+      if(parsedDetails && typeof parsedDetails === 'object') detailSources.push(parsedDetails);
+      ['fulfillment_details_json','fulfillment_details'].forEach(key=>{
+        const raw = booking?.[key];
+        if(!raw) return;
+        if(typeof raw === 'object'){ detailSources.push(raw); return; }
+        if(typeof raw === 'string'){
+          try{
+            const decoded = JSON.parse(raw);
+            if(decoded && typeof decoded === 'object') detailSources.push(decoded);
+          }catch(_){}
+        }
+      });
+      for(const candidate of detailSources){
+        const method = (candidate?.method ?? '').toString().trim().toLowerCase();
+        if(['pickup','shipping','delivery'].includes(method)) return method;
+      }
+
+      const textSources = [booking?.fulfillment_label, booking?.fulfillment_note];
+      for(const text of textSources){
+        if(!text) continue;
+        const lower = text.toString().toLowerCase();
+        if(lower.includes('versand')) return 'shipping';
+        if(lower.includes('liefer')) return 'delivery';
+      }
+
+      return 'pickup';
+    };
+
+    const fulfillmentInstructionLines = (info, details)=>{
+      const base = Array.isArray(info.infoLines) ? info.infoLines.map(x=>String(x).trim()).filter(Boolean) : [];
+      const lines = base.slice();
+      const contactParts = [];
+      const name = (details.contact_name||'').toString().trim();
+      const phone = (details.contact_phone||'').toString().trim();
+      const email = (details.contact_email||'').toString().trim();
+      if(name) contactParts.push(name);
+      if(phone) contactParts.push(`Tel: ${phone}`);
+      if(email) contactParts.push(`E-Mail: ${email}`);
+      if(contactParts.length){ lines.push(`👤 Kontakt: ${contactParts.join(' | ')}`); }
+
+      const consent = boolish(details.consent_contact ?? details.consent_whatsapp);
+      if(consent === true){ lines.push('✅ Kontakt per Telefon & WhatsApp ist freigegeben.'); }
+      else if(consent === false){ lines.push('⚠️ Bitte nur per E-Mail kontaktieren (kein Telefon/WhatsApp).'); }
+
+      if(info.id === 'shipping'){
+        const parts = [];
+        const line1 = (details.address_line1||'').toString().trim();
+        const line2 = (details.address_line2||'').toString().trim();
+        const extra = (details.address_extra||'').toString().trim();
+        const postal = (details.postal_code||'').toString().trim();
+        const city = (details.city||'').toString().trim();
+        if(line1) parts.push(line1);
+        if(line2) parts.push(line2);
+        const cityPart = `${postal} ${city}`.trim();
+        if(cityPart) parts.push(cityPart);
+        if(extra) parts.push(extra);
+        if(parts.length){ lines.push(`🏠 Lieferadresse: ${parts.join(', ')}`); }
+      }
+
+      if(info.id === 'delivery'){
+        const meeting = (details.meeting_point||'').toString().trim();
+        const preferred = (details.preferred_time||'').toString().trim();
+        if(meeting) lines.push(`📍 Treffpunkt: ${meeting}`);
+        if(preferred) lines.push(`🕒 Wunschzeit (Mittag): ${preferred}`);
+      }
+
+      return lines;
+    };
 
     // Anzeige-ID (nur Ziffern), Prefix 00 + laufend ab 100
     const ID_CATEGORY = '00';
@@ -158,6 +302,10 @@
         .mmb-bookings-table th.cell-head-date,.mmb-bookings-table td.cell--date{min-width:120px;width:120px;text-align:center;}
         .mmb-bookings-table td.cell--date{padding:.4rem .4rem;text-align:center;white-space:normal;line-height:1.25;}
         .mmb-bookings-table .cell-date-stack{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.15rem;min-height:100%;}
+        .mmb-fulfillment-link{background:none;border:none;padding:0;margin:0;color:var(--mmb-primary);font:inherit;cursor:pointer;text-decoration:underline;}
+        .mmb-fulfillment-link:hover,.mmb-fulfillment-link:focus{color:var(--mmb-accent);outline:none;}
+        .mmb-fulfillment-info-list{margin:.35rem 0 .25rem 1.25rem;padding:0;}
+        .mmb-fulfillment-info-list li{margin:.2rem 0;}
         .mmb-bookings-table .cell-date-stack span{display:block;width:100%;}
         .mmb-bookings-table th.cell-head-fulfillment,.mmb-bookings-table td.cell--fulfillment{min-width:96px;white-space:nowrap;}
         .mmb-bookings-table th.cell-head-price,.mmb-bookings-table td.cell--total{text-align:right;width:80px;}
@@ -234,6 +382,8 @@
           const totalAmount = Number(r.total_amount ?? 0);
           const deposit = Number(r.deposit_eur ?? 0);
           const fulfillmentPrice = Number(r.fulfillment_price_delta ?? 0);
+          const rawDetails = r.fulfillment_details_json ?? r.fulfillment_details ?? '';
+          const parsedDetails = parseFulfillmentDetails(rawDetails);
           return {
             id:String(r.id),
             box_id:boxId,
@@ -251,6 +401,8 @@
             fulfillment_label:r.fulfillment_label ?? '',
             fulfillment_note:r.fulfillment_note ?? '',
             fulfillment_price_delta:Number.isFinite(fulfillmentPrice)?fulfillmentPrice:0,
+            fulfillment_details_json: typeof rawDetails === 'string' ? rawDetails : '',
+            fulfillment_details: parsedDetails,
             created_at:r.created_at
           };
         });
@@ -362,13 +514,14 @@
         const fulfillmentInfo = this.getFulfillmentInfo(b);
         const fulfillmentNoteAttr = fulfillmentInfo.note ? ` title="${this.escape(fulfillmentInfo.note)}"` : '';
 
+        const fulfillmentLabel = this.formatFulfillmentCell(b);
         return `
         <tr>
           <td><span class="badge-id">${displayId(b.id)}</span></td>
           <td><div class="cell--name">${this.escape(b.customer_name)}</div><div class="cell--email" style="font-size:.75rem;color:var(--mmb-text-light);">${this.escape(b.customer_email)}</div></td>
           <td class="cell--box">${this.escape(b.box_name)}</td>
           <td class="cell--date">${this.renderDateCell(b)}</td>
-          <td class="cell--fulfillment"${fulfillmentNoteAttr}>${this.escape(this.formatFulfillmentCell(b))}</td>
+          <td class="cell--fulfillment"${fulfillmentNoteAttr}><button type="button" class="mmb-fulfillment-link" data-action="showFulfillmentDetails" data-id="${b.id}">${this.escape(fulfillmentLabel)}</button></td>
           <td class="cell--total">${this.formatEuro(b.price_total)}</td>
           <td class="cell--status"><span class="mmb-status-badge mmb-status-${b.status}">${this.translateStatus(b.status)}</span></td>
           <td class="cell--actions">
@@ -468,6 +621,7 @@
           if (btn.disabled || btn.getAttribute('aria-disabled') === 'true') return;
           e.preventDefault();
           const id = btn.dataset.id;
+          if(btn.dataset.action==='showFulfillmentDetails'){ await this.showFulfillmentDetails(id); return; }
           if(btn.dataset.action==='viewDetails') { await this.viewDetails(id); return; }
           if(btn.dataset.action==='confirmBooking') await this.confirmBooking(id);
           if(btn.dataset.action==='declineBooking') await this.declineBooking(id);
@@ -636,6 +790,10 @@
           .join('');
         const fulfillmentInfo = this.getFulfillmentInfo(b);
         const fulfillmentHint = fulfillmentInfo.note ? this.escape(fulfillmentInfo.note) : 'Keine zusätzlichen Hinweise';
+        const fulfillmentInstructionLines = this.fulfillmentInstructionLines(b);
+        const fulfillmentInstructionHtml = fulfillmentInstructionLines.length
+          ? `<ul class="mmb-fulfillment-info-list">${fulfillmentInstructionLines.map(line=>'<li>'+this.escape(line)+'</li>').join('')}</ul>`
+          : '<div class="mmb-text-muted">Keine zusätzlichen Informationen hinterlegt.</div>';
         const baseSubject = `Deine Buchung wurde aktualisiert 👷🏽 – Buchungs-ID: ${displayId(id)}`;
         const parseAmount = (val)=>{
           if(val===null || val===undefined) return NaN;
@@ -682,6 +840,7 @@
             <div class="mmb-field"><label>Abwicklung</label><select name="fulfillment_method">${fulfillmentOptions}</select><small class="mmb-text-muted">Steuert Versand-/Lieferhinweise und Preisaufschläge.</small></div>
             <div class="mmb-field"><label>Hinweis zur Abwicklung</label><div data-fulfillment-hint class="mmb-text-muted">${fulfillmentHint}</div></div>
           </div>
+          <div class="mmb-field"><label>Informationen zur Abwicklung</label>${fulfillmentInstructionHtml}</div>
           <hr style="border:none;border-top:1px solid var(--mmb-border);margin:.75rem 0"/>
           <div class="mmb-field mmb-field-switch">
             <label><input type="checkbox" name="send_email" value="1" checked/> <span>Kund*in per E-Mail informieren</span></label>
@@ -1018,20 +1177,26 @@
 
       getFulfillmentChoice(id){ return FULFILLMENT_LOOKUP[id] || FULFILLMENT_CHOICES[0]; }
       getFulfillmentInfo(b){
-        const raw = (b.fulfillment_method || '').toString().toLowerCase();
-        const choice = this.getFulfillmentChoice(raw);
+        const rawDetails = b.fulfillment_details || b.fulfillment_details_json || '';
+        const details = parseFulfillmentDetails(rawDetails);
+        const method = inferFulfillmentMethod(b, details);
+        const choice = this.getFulfillmentChoice(method);
         const price = Number(b.fulfillment_price_delta ?? choice.priceDelta);
         return {
+          id: choice.id,
           method: choice.id,
           label: b.fulfillment_label || choice.label,
           full: choice.full,
           note: b.fulfillment_note || choice.note || '',
-          priceDelta: Number.isFinite(price) ? price : choice.priceDelta
+          priceDelta: Number.isFinite(price) ? price : choice.priceDelta,
+          displaySuffix: choice.displaySuffix || '',
+          infoLines: choice.infoLines || [],
+          details
         };
       }
       formatFulfillmentCell(b){
         const info = this.getFulfillmentInfo(b);
-        return info.label;
+        return fulfillmentDisplayLabel(info);
       }
       formatEuro(amount){
         const num = Number(amount||0);
@@ -1040,13 +1205,15 @@
       }
       fulfillmentEmailLine(b){
         const info = this.getFulfillmentInfo(b);
-        if(info.method==='pickup'){
-          return info.priceDelta>0 ? `${info.full} +${this.formatEuro(info.priceDelta)}` : `${info.full} (gratis)`;
-        }
-        if(info.method==='shipping'){
-          return `${info.full} +${this.formatEuro(info.priceDelta)}`;
-        }
-        return info.note ? `${info.full} (${info.note})` : info.full;
+        return fulfillmentDisplayLabel(info);
+      }
+      fulfillmentInstructionLines(b){
+        const info = this.getFulfillmentInfo(b);
+        return fulfillmentInstructionLines(info, info.details || {});
+      }
+      fulfillmentInstructionText(b){
+        const lines = this.fulfillmentInstructionLines(b);
+        return lines.length ? `• ${lines.join('\n• ')}` : '• Wir melden uns kurzfristig mit allen weiteren Details.';
       }
 
       async viewDetails(id){
@@ -1075,8 +1242,25 @@
         await this.openModal({ title:`Buchungsdetails – ${displayId(id)}`, html, confirmText:'Schließen', cancelText:'' });
       }
 
+      async showFulfillmentDetails(id){
+        const booking = this.state.originalBookings.find(x=>String(x.id)===String(id));
+        if(!booking) return;
+        const info = this.getFulfillmentInfo(booking);
+        const instructions = this.fulfillmentInstructionLines(booking);
+        const instructionHtml = instructions.length
+          ? `<ul>${instructions.map(line=>'<li>'+this.escape(line)+'</li>').join('')}</ul>`
+          : '<p class="mmb-text-muted">Keine zusätzlichen Informationen hinterlegt.</p>';
+        const noteHtml = info.note ? `<div class="mmb-text-muted" style="font-size:.85rem;margin-top:.25rem;">${this.escape(info.note)}</div>` : '';
+        const html = `
+          <div class="mmb-field"><strong>Abwicklung</strong><div>${this.escape(fulfillmentDisplayLabel(info))}</div>${noteHtml}</div>
+          <div class="mmb-field"><strong>Informationen</strong>${instructionHtml}</div>
+        `;
+        await this.openModal({ title:`Abwicklung – ${displayId(id)}`, html, confirmText:'Schließen', cancelText:'' });
+      }
+
       tplConfirm(b){
         const range = `${new Date(b.start_date).toLocaleDateString('de-DE')} – ${new Date(b.end_date).toLocaleDateString('de-DE')}`;
+        const instructions = this.fulfillmentInstructionText(b);
         return `Hallo ${b.customer_name},
 
 hier sind hervorragende Neuigkeiten für dich 🎉
@@ -1089,6 +1273,9 @@ Deine Buchung im Überblick:
 🕰️ Zeitraum: ${range}
 🚚 Abwicklung: ${this.fulfillmentEmailLine(b)}
 💶 Gesamtkosten: ${this.formatEuro(b.price_total)}
+
+Informationen für deine gewählte Abwicklung:
+${instructions}
 
 Bitte überprüfe einmal, ob wir deine Buchung korrekt hinterlegt haben.
 
@@ -1173,6 +1360,7 @@ Telefon: 01742015500`;
         const email = b.customer_email || '–';
         const box = b.box_name || BOX_MAP[String(b.box_id)] || '—';
         const fulfillment = this.fulfillmentEmailLine(b);
+        const instructions = this.fulfillmentInstructionText(b);
         return `Hallo ${name},
 
 wir haben Details in deiner Buchung (${displayId(b.id)}) aktualisiert.
@@ -1184,6 +1372,9 @@ Deine aktualisierte Buchung im Überblick:
 🕰️ Zeitraum: ${range}
 🚚 Abwicklung: ${fulfillment}
 💶 Preis: ${priceLabel}€
+
+Informationen für deine gewählte Abwicklung:
+${instructions}
 
 Bitte überprüfe einmal, ob wir deine Buchung korrekt hinterlegt haben.
 
