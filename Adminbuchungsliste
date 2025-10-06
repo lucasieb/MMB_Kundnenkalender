@@ -131,8 +131,8 @@
     const EURO_FORMATTER = new Intl.NumberFormat('de-DE', {maximumFractionDigits:0});
     const FULFILLMENT_CHOICES = [
       { id:'pickup',   label:'Abholung', full:'Abholung in Wesel', note:'', priceDelta:0 },
-      { id:'shipping', label:'Versand',  full:'Versand (deutschlandweit)', note:'inkl. Express-Hin- & Rückversand sowie Vorbereitungspauschale', priceDelta:80 },
-      { id:'delivery', label:'Lieferung', full:'Lieferung (NRW-weit)', note:'zzgl. individueller Lieferpauschale – wir melden uns mit einem Angebot', priceDelta:0 }
+      { id:'shipping', label:'Versand',  full:'Versand', note:'inkl. Express-Hin- & Rückversand sowie Vorbereitungspauschale', priceDelta:80 },
+      { id:'delivery', label:'Lieferung', full:'Lieferung', note:'zzgl. individueller Lieferpauschale – wir melden uns mit einem Angebot', priceDelta:0 }
     ];
     const FULFILLMENT_LOOKUP = Object.fromEntries(FULFILLMENT_CHOICES.map(opt=>[opt.id,opt]));
 
