@@ -59,23 +59,41 @@ const FULFILLMENT_DEFS = [
   'pickup' => [
     'label' => 'Abholung',
     'full' => 'Abholung in Wesel',
+    'display_suffix' => 'in Wesel',
     'price_delta' => 0.0,
     'adds_to_total' => true,
     'note' => '',
+    'info_lines' => [
+      '📍 Treffpunkt stimmen wir individuell in Wesel ab.',
+      '🕚 Abholung ab deinem Miettag um 11:00 Uhr möglich.',
+      '🔁 Rückgabe am Folgetag nach Mietende bis 10:00 Uhr.',
+    ],
   ],
   'shipping' => [
     'label' => 'Versand',
     'full' => 'Versand (deutschlandweit)',
+    'display_suffix' => 'ganz.de',
     'price_delta' => 80.0,
     'adds_to_total' => true,
     'note' => 'inkl. Express-Hin- & Rückversand sowie Vorbereitungspauschale',
+    'info_lines' => [
+      '🚚 Wir versenden deine Musikbox einen Tag vor Mietbeginn per Express.',
+      '📦 Rückversand am letzten Miettag mit dem beiliegenden QR-Code.',
+      '📝 Bitte halte Lieferadresse sowie Kontaktinfos bereit, falls noch nicht übermittelt.',
+    ],
   ],
   'delivery' => [
     'label' => 'Lieferung',
     'full' => 'Lieferung (NRW-weit)',
+    'display_suffix' => 'ganz.nrb',
     'price_delta' => 0.0,
     'adds_to_total' => false,
     'note' => 'zzgl. individueller Lieferpauschale – wir melden uns mit einem Angebot',
+    'info_lines' => [
+      '🚗 Wir liefern dir die Musikbox persönlich innerhalb von NRW.',
+      '🕒 Wir stimmen deine Wunschzeit (Mittag, halbstündlich) individuell ab.',
+      '📍 Bitte teile uns deinen Treffpunkt oder die Lieferadresse mit.',
+    ],
   ],
 ];
 
@@ -100,6 +118,8 @@ function fulfillmentInfoFromBooking(array $bk): array {
     'note' => (string)($bk['fulfillment_note'] ?? $def['note']),
     'price_delta' => isset($bk['fulfillment_price_delta']) ? (float)$bk['fulfillment_price_delta'] : (float)$def['price_delta'],
     'adds_to_total' => (bool)$def['adds_to_total'],
+    'display_suffix' => (string)($def['display_suffix'] ?? ''),
+    'info_lines' => (array)($def['info_lines'] ?? []),
   ];
 }
 
@@ -107,18 +127,125 @@ function fulfillmentInfoFromBooking(array $bk): array {
  * @param array{method:string,label:string,full:string,note:string,price_delta:float,adds_to_total:bool} $info
  */
 function fulfillmentEmailLine(array $info): string {
-  $method = $info['method'];
-  $full   = $info['full'];
-  $price  = (float)$info['price_delta'];
-  $note   = trim((string)$info['note']);
+  $suffix = trim((string)($info['display_suffix'] ?? ''));
+  $label  = (string)$info['label'];
+  return $suffix !== '' ? ($label . ' (' . $suffix . ')') : $label;
+}
 
-  if ($method === 'pickup') {
-    return $price > 0 ? ($full . ' +' . formatEuro($price)) : ($full . ' (gratis)');
+/**
+ * @param array{info_lines?:array<int,string>} $info
+ * @return list<string>
+ */
+function fulfillmentInstructionLines(array $info): array {
+  $lines = [];
+  if (!empty($info['info_lines']) && is_array($info['info_lines'])) {
+    foreach ($info['info_lines'] as $line) {
+      $line = trim((string)$line);
+      if ($line !== '') {
+        $lines[] = $line;
+      }
+    }
   }
+  return $lines;
+}
+
+/**
+ * @param mixed $value
+ * @return array<string,mixed>
+ */
+function parseFulfillmentDetails($value): array {
+  if (is_array($value)) {
+    return $value;
+  }
+  if (is_string($value) && $value !== '') {
+    $decoded = json_decode($value, true);
+    if (is_array($decoded)) {
+      return $decoded;
+    }
+  }
+  return [];
+}
+
+/**
+ * @param array<string,mixed> $bk
+ * @return array<string,mixed>
+ */
+function fulfillmentDetailsFromBooking(array $bk): array {
+  foreach (['fulfillment_details_json', 'fulfillment_details'] as $key) {
+    if (array_key_exists($key, $bk)) {
+      $details = parseFulfillmentDetails($bk[$key]);
+      if ($details) {
+        return $details;
+      }
+    }
+  }
+  return [];
+}
+
+/**
+ * @param array<string,mixed> $info
+ * @param array<string,mixed> $details
+ * @return list<string>
+ */
+function fulfillmentInstructionLinesWithDetails(array $info, array $details): array {
+  $lines = fulfillmentInstructionLines($info);
+  $method = (string)($info['method'] ?? '');
+
+  $contactParts = [];
+  $name  = trim((string)($details['contact_name'] ?? ''));
+  $phone = trim((string)($details['contact_phone'] ?? ''));
+  $email = trim((string)($details['contact_email'] ?? ''));
+  if ($name !== '')  { $contactParts[] = $name; }
+  if ($phone !== '') { $contactParts[] = 'Tel: ' . $phone; }
+  if ($email !== '') { $contactParts[] = 'E-Mail: ' . $email; }
+  if ($contactParts) {
+    $lines[] = '👤 Kontakt: ' . implode(' | ', $contactParts);
+  }
+
+  $consentRaw = $details['consent_contact'] ?? ($details['consent_whatsapp'] ?? null);
+  $consent = null;
+  if (is_bool($consentRaw)) {
+    $consent = $consentRaw;
+  } elseif (is_string($consentRaw)) {
+    $consent = in_array(strtolower(trim($consentRaw)), ['1','true','yes','ja','y','on'], true);
+  } elseif (is_numeric($consentRaw)) {
+    $consent = ((int)$consentRaw) === 1;
+  }
+  if ($consent === true) {
+    $lines[] = '✅ Kontakt per Telefon & WhatsApp ist freigegeben.';
+  } elseif ($consent === false) {
+    $lines[] = '⚠️ Bitte nur per E-Mail kontaktieren (kein Telefon/WhatsApp).';
+  }
+
   if ($method === 'shipping') {
-    return $full . ' +' . formatEuro($price);
+    $addrParts = [];
+    $line1 = trim((string)($details['address_line1'] ?? ''));
+    $line2 = trim((string)($details['address_line2'] ?? ''));
+    $postal = trim((string)($details['postal_code'] ?? ''));
+    $city   = trim((string)($details['city'] ?? ''));
+    $extra  = trim((string)($details['address_extra'] ?? ''));
+    if ($line1 !== '') { $addrParts[] = $line1; }
+    if ($line2 !== '') { $addrParts[] = $line2; }
+    $cityPart = trim($postal . ' ' . $city);
+    if ($cityPart !== '') { $addrParts[] = $cityPart; }
+    if ($extra !== '') { $addrParts[] = $extra; }
+    if ($addrParts) {
+      $lines[] = '🏠 Lieferadresse: ' . implode(', ', $addrParts);
+    }
   }
-  return $note !== '' ? ($full . ' (' . $note . ')') : $full;
+
+  if ($method === 'delivery') {
+    $meeting = trim((string)($details['meeting_point'] ?? ''));
+    $preferred = trim((string)($details['preferred_time'] ?? ''));
+    if ($meeting !== '') {
+      $lines[] = '📍 Treffpunkt: ' . $meeting;
+    }
+    if ($preferred !== '') {
+      $lines[] = '🕒 Wunschzeit (Mittag): ' . $preferred;
+    }
+  }
+
+  return $lines;
 }
 
 // E-Mail-Vorlagen (werden von Custom-Subject/-Message übersteuert)
@@ -132,6 +259,11 @@ function buildEmailTemplates(array $bk, array $alternativeBoxIds = []): array {
 
   $fulfillmentInfo = fulfillmentInfoFromBooking($bk);
   $fulfillmentLine = fulfillmentEmailLine($fulfillmentInfo);
+  $details = fulfillmentDetailsFromBooking($bk);
+  $instructionLines = fulfillmentInstructionLinesWithDetails($fulfillmentInfo, $details);
+  $instructionText = $instructionLines
+    ? ('• ' . implode("\n• ", array_map('strval', $instructionLines)))
+    : '• Wir melden uns kurzfristig mit allen weiteren Details.';
 
   $subjects = [
     'confirmed'   => "Buchung bestätigt – {$dispId}",
@@ -150,6 +282,9 @@ gute Nachrichten – wir haben deine Buchung bestätigt.
 • Zeitraum: {$s} bis {$e}
 • Abwicklung: {$fulfillmentLine}
 • Buchungs-ID: {$dispId}
+
+Informationen für deine gewählte Abwicklung:
+{$instructionText}
 
 Wir melden uns, falls noch Rückfragen bestehen. Ansonsten freuen wir uns auf dich!
 
@@ -175,6 +310,9 @@ wir haben deine Buchung ({$dispId}) aktualisiert.
 • Box: {$box}
 • Zeitraum: {$s} bis {$e}
 • Abwicklung: {$fulfillmentLine}
+
+Informationen für deine gewählte Abwicklung:
+{$instructionText}
 
 Falls etwas nicht passt, antworte einfach auf diese E-Mail.
 
@@ -316,7 +454,7 @@ try {
     $fields = [];
     $vals   = [];
 
-    $whitelist = ['customer_name','customer_email','customer_phone','box_id','start_date','end_date','total_amount','status','fulfillment_method','fulfillment_label','fulfillment_note','fulfillment_price_delta'];
+    $whitelist = ['customer_name','customer_email','customer_phone','box_id','start_date','end_date','total_amount','status','fulfillment_method','fulfillment_label','fulfillment_note','fulfillment_price_delta','fulfillment_details_json'];
     foreach ($updates as $col => $val) {
       if (!in_array($col, $whitelist, true)) continue;
       $fields[] = "$col=?";
@@ -325,6 +463,12 @@ try {
         $val = (int)$val;
       } elseif ($col === 'total_amount' || $col === 'fulfillment_price_delta') {
         $val = (float)$val;
+      } elseif ($col === 'fulfillment_details_json') {
+        if (is_array($val)) {
+          $val = json_encode($val, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        } else {
+          $val = (string)$val;
+        }
       }
       $vals[] = $val;
       $bk[$col] = $val;
@@ -417,6 +561,7 @@ try {
       'fulfillment_label'  => (string)($bk['fulfillment_label'] ?? ''),
       'fulfillment_note'   => (string)($bk['fulfillment_note'] ?? ''),
       'fulfillment_price_delta' => isset($bk['fulfillment_price_delta']) ? (float)$bk['fulfillment_price_delta'] : 0.0,
+      'fulfillment_details_json' => (string)($bk['fulfillment_details_json'] ?? ($bk['fulfillment_details'] ?? '')),
     ],
     'alternative_box_ids' => $altBoxIds,
     'mail' => $mailInfo,
