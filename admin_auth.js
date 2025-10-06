@@ -85,6 +85,9 @@
   let csrfToken = null;
   let ensurePromise = null;
   let authenticated = false;
+  let authDisabled = false;
+  let bootstrapSkipped = false;
+  let lastState = null;
 
   function ensureStyle(){
     if (document.getElementById(STYLE_ID)) {
@@ -186,8 +189,13 @@
       err.isFatal = res.status >= 400 && res.status < 500;
       throw err;
     }
+    lastState = data;
     csrfToken = data.token || null;
     authenticated = Boolean(data.authenticated);
+    authDisabled = Boolean(data.auth_disabled);
+    if (authDisabled && !authenticated) {
+      authenticated = true;
+    }
     return data;
   }
 
@@ -295,18 +303,26 @@
       return ensurePromise;
     }
     ensurePromise = (async () => {
-      const state = await fetchState();
-      if (state.authenticated) {
-        return;
-      }
-      return new Promise((resolve, reject) => {
-        pendingResolve = () => {
+      try {
+        const state = await fetchState();
+        bootstrapSkipped = false;
+        if (state.authenticated || authDisabled) {
           authenticated = true;
-          resolve();
-        };
-        pendingReject = reject;
-        showOverlay();
-      });
+          return;
+        }
+        return new Promise((resolve, reject) => {
+          pendingResolve = () => {
+            authenticated = true;
+            resolve();
+          };
+          pendingReject = reject;
+          showOverlay();
+        });
+      } catch (error) {
+        bootstrapSkipped = true;
+        authenticated = true;
+        console.warn('Admin auth bootstrap failed, fahre ohne Sitzung fort.', error);
+      }
     })();
     try {
       await ensurePromise;
@@ -317,6 +333,14 @@
 
   global.MMBAdminAuth = {
     ensureSession,
-    getApiBase: () => API_BASE
+    getApiBase: () => API_BASE,
+    getSessionState: () => ({
+      authenticated,
+      authDisabled,
+      bootstrapSkipped,
+      lastState,
+    }),
+    isAuthDisabled: () => authDisabled,
+    wasBootstrapSkipped: () => bootstrapSkipped,
   };
 })(window);
