@@ -128,6 +128,7 @@
   (function(global){'use strict';
 
     const BOX_MAP = { '1':'Marshall Bromley 750', '2':'Teufel Rockster Neo', '3':'Soundboks 4' };
+    const EURO_FORMATTER = new Intl.NumberFormat('de-DE', {maximumFractionDigits:0});
     const FULFILLMENT_CHOICES = [
       { id:'pickup',   label:'Abholung', full:'Abholung in Wesel', note:'', priceDelta:0 },
       { id:'shipping', label:'Versand',  full:'Versand (deutschlandweit)', note:'inkl. Express-Hin- & Rückversand sowie Vorbereitungspauschale', priceDelta:80 },
@@ -150,16 +151,18 @@
         .mmb-admin-filters select,.mmb-admin-filters input{ padding:.6rem;border:1px solid var(--mmb-border);border-radius:6px;background:var(--mmb-bg);color:var(--mmb-text);font-size:.9rem; }
         .mmb-admin-list-wrap{height:70vh;overflow:auto;margin:.75rem 0;border-radius:6px;}
         .mmb-bookings-table{width:100%;border-collapse:collapse;background:var(--mmb-bg);border-radius:6px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.1);}
-        .mmb-bookings-table th,.mmb-bookings-table td{padding:.75rem .85rem;border-bottom:1px solid var(--mmb-border);text-align:left;vertical-align:middle;}
+        .mmb-bookings-table th,.mmb-bookings-table td{padding:.7rem .75rem;border-bottom:1px solid var(--mmb-border);text-align:left;vertical-align:middle;box-sizing:border-box;}
         .mmb-bookings-table th{background:var(--mmb-muted);font-weight:600;position:sticky;top:0;z-index:2;}
+        .mmb-bookings-table tbody tr{height:82px;}
         .mmb-bookings-table th.cell-head-box,.mmb-bookings-table td.cell--box{min-width:210px;white-space:nowrap;}
-        .mmb-bookings-table th.cell-head-date,.mmb-bookings-table td.cell--date{min-width:138px;width:138px;}
-        .mmb-bookings-table td.cell--date{display:flex;flex-direction:column;gap:.2rem;white-space:normal;line-height:1.35;align-items:center;justify-content:center;text-align:center;min-height:58px;}
-        .mmb-bookings-table th.cell-head-fulfillment,.mmb-bookings-table td.cell--fulfillment{min-width:170px;}
-        .mmb-bookings-table th.cell-head-status,.mmb-bookings-table td.cell--status{width:120px;}
-        .mmb-bookings-table th.cell-head-price,.mmb-bookings-table td.cell--total{text-align:right;}
-        .mmb-bookings-table td.cell--total{font-variant-numeric:tabular-nums;}
-        .mmb-bookings-table th.cell-head-actions,.mmb-bookings-table td.cell--actions{min-width:340px;}
+        .mmb-bookings-table th.cell-head-date,.mmb-bookings-table td.cell--date{min-width:120px;width:120px;}
+        .mmb-bookings-table td.cell--date{display:flex;flex-direction:column;gap:.2rem;white-space:normal;line-height:1.35;align-items:center;justify-content:center;text-align:center;min-height:58px;padding:.6rem .55rem;}
+        .mmb-bookings-table td.cell--date span{display:block;width:100%;}
+        .mmb-bookings-table th.cell-head-fulfillment,.mmb-bookings-table td.cell--fulfillment{min-width:132px;white-space:nowrap;}
+        .mmb-bookings-table th.cell-head-price,.mmb-bookings-table td.cell--total{text-align:right;width:110px;}
+        .mmb-bookings-table th.cell-head-status,.mmb-bookings-table td.cell--status{width:112px;}
+        .mmb-bookings-table td.cell--total{font-variant-numeric:tabular-nums;white-space:nowrap;}
+        .mmb-bookings-table th.cell-head-actions,.mmb-bookings-table td.cell--actions{min-width:300px;}
         .mmb-btn{background:var(--mmb-accent);color:#fff;border:none;padding:.5rem .75rem;border-radius:6px;font-size:.875rem;font-weight:500;cursor:pointer;transition:background-color .2s;}
         .mmb-btn:hover{background:#0284c7;} .mmb-btn:disabled{opacity:.45;cursor:not-allowed;filter:saturate(0.6) contrast(0.9);}
         .mmb-btn-small{padding:.25rem .5rem;font-size:.75rem;min-width:28px;}
@@ -194,8 +197,8 @@
         .badge-id{font-variant-numeric:tabular-nums;letter-spacing:.5px;}
         .mmb-footer{display:flex;justify-content:center;align-items:center;height:36px;color:var(--mmb-text-light);font-size:.9rem;background:var(--mmb-muted);border-radius:6px;}
         .mmb-text-muted{color:var(--mmb-text-light,#6b7280);}
-        .cell--actions-row{display:flex;gap:.35rem;flex-wrap:nowrap;align-items:center;}
-        .cell--actions-row .mmb-btn-small{width:52px;min-width:52px;height:36px;padding:0;display:inline-flex;align-items:center;justify-content:center;}
+        .cell--actions-row{display:flex;gap:.3rem;flex-wrap:nowrap;align-items:center;}
+        .cell--actions-row .mmb-btn-small{width:48px;min-width:48px;height:34px;padding:0;display:inline-flex;align-items:center;justify-content:center;}
       `; document.head.appendChild(s);
     }
 
@@ -345,6 +348,11 @@
         </table>`;
       }
 
+      formatEuro(value){
+        const amount = Math.round(Number(value) || 0);
+        return `${EURO_FORMATTER.format(amount)} €`;
+      }
+
       renderRow(b){
         const isConfirmed = b.status==='confirmed';
         const isRejected  = b.status==='rejected';
@@ -359,7 +367,7 @@
           <td class="cell--box">${this.escape(b.box_name)}</td>
           <td class="cell--date">${this.renderDateCell(b)}</td>
           <td class="cell--fulfillment"${fulfillmentNoteAttr}>${this.escape(this.formatFulfillmentCell(b))}</td>
-          <td class="cell--total">${Number(b.price_total).toLocaleString('de-DE')}€</td>
+          <td class="cell--total">${this.formatEuro(b.price_total)}</td>
           <td class="cell--status"><span class="mmb-status-badge mmb-status-${b.status}">${this.translateStatus(b.status)}</span></td>
           <td class="cell--actions">
             <div class="cell--actions-row">
