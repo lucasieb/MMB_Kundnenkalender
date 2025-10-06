@@ -156,8 +156,9 @@
         .mmb-bookings-table tbody tr{height:56px;}
         .mmb-bookings-table th.cell-head-box,.mmb-bookings-table td.cell--box{min-width:172px;white-space:nowrap;}
         .mmb-bookings-table th.cell-head-date,.mmb-bookings-table td.cell--date{min-width:120px;width:120px;text-align:center;}
-        .mmb-bookings-table td.cell--date{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.1rem;white-space:normal;line-height:1.25;text-align:center;height:100%;padding:.4rem .4rem;}
-        .mmb-bookings-table td.cell--date span{display:block;width:100%;}
+        .mmb-bookings-table td.cell--date{padding:.4rem .4rem;text-align:center;white-space:normal;line-height:1.25;}
+        .mmb-bookings-table .cell-date-stack{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.15rem;min-height:100%;}
+        .mmb-bookings-table .cell-date-stack span{display:block;width:100%;}
         .mmb-bookings-table th.cell-head-fulfillment,.mmb-bookings-table td.cell--fulfillment{min-width:96px;white-space:nowrap;}
         .mmb-bookings-table th.cell-head-price,.mmb-bookings-table td.cell--total{text-align:right;width:80px;}
         .mmb-bookings-table th.cell-head-status,.mmb-bookings-table td.cell--status{width:92px;}
@@ -406,14 +407,15 @@
         const start=parse(b.start_date);
         const end=parse(b.end_date);
         const fmt=(d)=>d?d.toLocaleDateString('de-DE'):'–';
+        const wrap = (content)=>`<div class="cell-date-stack">${content}</div>`;
         if(start && end){
           const same=start.getFullYear()===end.getFullYear() && start.getMonth()===end.getMonth() && start.getDate()===end.getDate();
-          if(same){ return `<span>${fmt(start)}</span>`; }
-          return `<span>${fmt(start)}</span><span>${fmt(end)}</span>`;
+          if(same){ return wrap(`<span>${fmt(start)}</span>`); }
+          return wrap(`<span>${fmt(start)}</span><span>${fmt(end)}</span>`);
         }
-        if(start){ return `<span>${fmt(start)}</span>`; }
-        if(end){ return `<span>${fmt(end)}</span>`; }
-        return `<span>–</span>`;
+        if(start){ return wrap(`<span>${fmt(start)}</span>`); }
+        if(end){ return wrap(`<span>${fmt(end)}</span>`); }
+        return wrap(`<span>–</span>`);
       }
 
       renderFooter(){
