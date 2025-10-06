@@ -85,6 +85,25 @@
   let csrfToken = null;
   let ensurePromise = null;
   let authenticated = false;
+  let publicMode = false;
+  let previousAuthState = false;
+
+  function setPublicMode(){
+    if (publicMode) {
+      return;
+    }
+    previousAuthState = authenticated;
+    publicMode = true;
+    authenticated = true;
+  }
+
+  function leavePublicMode(){
+    if (!publicMode) {
+      return;
+    }
+    publicMode = false;
+    authenticated = previousAuthState;
+  }
 
   function ensureStyle(){
     if (document.getElementById(STYLE_ID)) {
@@ -170,8 +189,30 @@
     errorBox.textContent = message;
   }
 
-  async function fetchState(){
-    const res = await fetch(TOKEN_ENDPOINT, { credentials: 'include' });
+  function shouldFallbackToPublicMode(error){
+    if (!error) {
+      return false;
+    }
+    if (error.isNetworkError) {
+      return true;
+    }
+    if (typeof error.status === 'number' && (error.status === 0 || error.status === 401 || error.status === 403)) {
+      return true;
+    }
+    return false;
+  }
+
+  async function requestState(credentialsMode){
+    let res;
+    try {
+      res = await fetch(TOKEN_ENDPOINT, { credentials: credentialsMode });
+    } catch (error) {
+      if (error && typeof error === 'object') {
+        error.isNetworkError = true;
+      }
+      throw error;
+    }
+
     const text = await res.text();
     let data;
     try {
@@ -179,16 +220,45 @@
     } catch (error) {
       const err = new Error('Unexpected response from server');
       err.cause = error;
+      err.status = res.status;
+      err.raw = text;
       throw err;
     }
+
     if (!res.ok || !data || data.ok !== true) {
       const err = new Error(data && data.error ? data.error : `HTTP ${res.status}`);
       err.isFatal = res.status >= 400 && res.status < 500;
+      err.status = res.status;
+      err.payload = data;
       throw err;
     }
+
     csrfToken = data.token || null;
-    authenticated = Boolean(data.authenticated);
+    if (data.auth_disabled || (data.authenticated && !data.token)) {
+      setPublicMode();
+    }
+    if (data.authenticated) {
+      authenticated = true;
+    }
     return data;
+  }
+
+  async function fetchState(){
+    try {
+      return await requestState('include');
+    } catch (error) {
+      if (!shouldFallbackToPublicMode(error)) {
+        throw error;
+      }
+      try {
+        const fallbackState = await requestState('omit');
+        setPublicMode();
+        return fallbackState;
+      } catch (fallbackError) {
+        fallbackError.originalError = error;
+        throw fallbackError;
+      }
+    }
   }
 
   function formatErrors(errors){
@@ -288,7 +358,7 @@
   }
 
   async function ensureSession(){
-    if (authenticated) {
+    if (authenticated || publicMode) {
       return;
     }
     if (ensurePromise) {
@@ -296,7 +366,8 @@
     }
     ensurePromise = (async () => {
       const state = await fetchState();
-      if (state.authenticated) {
+      if (publicMode || state.authenticated) {
+        authenticated = true;
         return;
       }
       return new Promise((resolve, reject) => {
@@ -317,6 +388,9 @@
 
   global.MMBAdminAuth = {
     ensureSession,
-    getApiBase: () => API_BASE
+    getApiBase: () => API_BASE,
+    shouldSendCredentials: () => !publicMode,
+    enterPublicMode: () => { setPublicMode(); },
+    exitPublicMode: () => { leavePublicMode(); }
   };
 })(window);

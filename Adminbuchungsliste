@@ -89,37 +89,157 @@
   <!-- ======================= MMB API ======================= -->
   <script>
     const MMB_API_BASE = MMBAdminAuth.getApiBase();
+    let apiUsesCredentials = true;
 
-    async function mmbApiGet(path){
-      const res = await fetch(MMB_API_BASE + path, { credentials: 'include' });
-      const text = await res.text();
+    function syncApiCredentialPreference(){
+      if (typeof MMBAdminAuth.shouldSendCredentials !== 'function') {
+        return;
+      }
+      try {
+        const result = MMBAdminAuth.shouldSendCredentials();
+        if (typeof result === 'boolean') {
+          apiUsesCredentials = result;
+        }
+      } catch (_) {
+        /* Ignorieren – wir behalten den letzten bekannten Wert. */
+      }
+    }
+
+    syncApiCredentialPreference();
+
+    function switchToPublicMode(){
+      if (!apiUsesCredentials) {
+        return;
+      }
+      apiUsesCredentials = false;
+      if (typeof MMBAdminAuth.enterPublicMode === 'function') {
+        MMBAdminAuth.enterPublicMode();
+      }
+    }
+
+    function switchToCredentialMode(){
+      if (apiUsesCredentials) {
+        return;
+      }
+      apiUsesCredentials = true;
+      if (typeof MMBAdminAuth.exitPublicMode === 'function') {
+        MMBAdminAuth.exitPublicMode();
+      }
+    }
+
+    function shouldRetryWithoutCredentials(error){
+      if (!error) {
+        return false;
+      }
+      if (error.isNetworkError || error.isParseError) {
+        return true;
+      }
+      const status = typeof error.status === 'number' ? error.status : 0;
+      return status === 0 || status === 401 || status === 403;
+    }
+
+    function shouldRetryWithCredentials(error){
+      if (!error) {
+        return false;
+      }
+      if (error.isNetworkError) {
+        return true;
+      }
+      const status = typeof error.status === 'number' ? error.status : 0;
+      return status === 401 || status === 403;
+    }
+
+    async function executeApiRequest(path, init, useCredentials){
+      const requestInit = Object.assign({}, init, {
+        credentials: useCredentials ? 'include' : 'omit'
+      });
+
+      let response;
+      try {
+        response = await fetch(MMB_API_BASE + path, requestInit);
+      } catch (error) {
+        const err = error instanceof Error ? error : new Error(String(error));
+        err.isNetworkError = true;
+        if (typeof err.status !== 'number') {
+          err.status = 0;
+        }
+        throw err;
+      }
+
+      const text = await response.text();
       let data;
       try {
         data = text ? JSON.parse(text) : {};
-      } catch (_) {
+      } catch (error) {
         const err = new Error('Server lieferte keine gültige JSON-Antwort');
+        err.cause = error instanceof Error ? error : new Error(String(error));
         err.raw = text;
-        err.status = res.status;
+        err.status = response.status;
+        err.isParseError = true;
         throw err;
       }
 
       const payload = (data && typeof data === 'object') ? data : {};
       const okFlag = Object.prototype.hasOwnProperty.call(payload, 'ok') ? Boolean(payload.ok) : true;
-      if (!res.ok || !okFlag) {
-        const message = (payload.error || payload.message || `HTTP ${res.status}`);
-        const error = new Error(message);
-        error.details = payload;
-        error.status = res.status;
-        throw error;
+      if (!response.ok || !okFlag) {
+        const message = payload.error || payload.message || `HTTP ${response.status}`;
+        const err = new Error(message);
+        err.details = payload;
+        err.status = response.status;
+        throw err;
       }
+
       return payload;
     }
+
+    async function performApiRequest(path, init = {}){
+      const credentialOrder = apiUsesCredentials ? ['include', 'omit'] : ['omit', 'include'];
+      let lastError = null;
+
+      for (let index = 0; index < credentialOrder.length; index++) {
+        const mode = credentialOrder[index];
+        const useCredentials = mode === 'include';
+        try {
+          const payload = await executeApiRequest(path, init, useCredentials);
+          if (useCredentials) {
+            switchToCredentialMode();
+          } else {
+            switchToPublicMode();
+          }
+          return payload;
+        } catch (error) {
+          const err = error instanceof Error ? error : new Error(String(error));
+          lastError = err;
+          const hasNext = index < credentialOrder.length - 1;
+          if (!hasNext) {
+            throw lastError;
+          }
+          const shouldRetry = useCredentials
+            ? shouldRetryWithoutCredentials(err)
+            : shouldRetryWithCredentials(err);
+          if (!shouldRetry) {
+            throw lastError;
+          }
+          if (useCredentials) {
+            console.warn('API-Anfrage mit Credentials fehlgeschlagen – versuche erneut ohne Credentials.', err);
+          } else {
+            console.warn('API-Anfrage ohne Credentials fehlgeschlagen – versuche erneut mit Credentials.', err);
+          }
+        }
+      }
+
+      throw lastError || new Error('API-Anfrage fehlgeschlagen');
+    }
+
+    async function mmbApiGet(path){
+      return performApiRequest(path);
+    }
     async function mmbApiPost(path,body){
-      const res=await fetch(MMB_API_BASE+path,{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(body||{})});
-      const text=await res.text(); let data;
-      try{ data=JSON.parse(text);}catch{ data={ok:false,error:'Keine JSON-Antwort',raw:text};}
-      if(!res.ok||!data.ok) throw new Error(data.error||('HTTP '+res.status+'\n'+(data.raw||'')));
-      return data;
+      return performApiRequest(path, {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(body||{})
+      });
     }
 
     const MMBApi={
@@ -1455,23 +1575,12 @@ Telefon: 01742015500`;
       } catch (error) {
         authError = error instanceof Error ? error : new Error(String(error));
         console.warn('Admin-Login wurde übersprungen (externer Schutz aktiv?).', authError);
+      } finally {
+        syncApiCredentialPreference();
       }
 
       try {
         MietMichBoxAdminList.init({ container:'#mmb-admin-list', locale:'de-DE', timezone:'Europe/Berlin' });
-        if (authError) {
-          const host = document.querySelector('#mmb-admin-list');
-          if (host && host.parentElement) {
-            const previous = host.previousElementSibling;
-            const hasWarning = previous && previous.classList && previous.classList.contains('mmb-warning');
-            if (!hasWarning) {
-              const notice = document.createElement('p');
-              notice.className = 'mmb-warning';
-              notice.textContent = 'Hinweis: Der zusätzliche Admin-Login wurde übersprungen, da diese Seite bereits extern geschützt ist.';
-              host.parentElement.insertBefore(notice, host);
-            }
-          }
-        }
       } catch (error) {
         console.error('Admin-Buchungsliste konnte nicht initialisiert werden', error);
         const container = document.querySelector('#mmb-admin-list');
