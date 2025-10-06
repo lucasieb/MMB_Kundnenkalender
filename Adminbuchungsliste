@@ -164,6 +164,7 @@
         error.credentialsMode=credentialsMode;
         throw error;
       }
+
       return payload;
     }
 
