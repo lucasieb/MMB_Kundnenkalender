@@ -153,6 +153,155 @@ function fulfillment_instruction_lines(array $info): array {
 }
 
 /**
+ * @param array<string,mixed> $input
+ * @return array<string,mixed>|null
+ */
+function extract_fulfillment_details_from_request(array $input): ?array {
+  if (isset($input['fulfillment_details']) && is_array($input['fulfillment_details'])) {
+    return $input['fulfillment_details'];
+  }
+
+  foreach (['fulfillment_details_json', 'fulfillment_details'] as $key) {
+    if (!array_key_exists($key, $input)) {
+      continue;
+    }
+    $value = $input[$key];
+    if (is_array($value)) {
+      return $value;
+    }
+    if (is_string($value) && $value !== '') {
+      $decoded = json_decode($value, true);
+      if (is_array($decoded)) {
+        return $decoded;
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * @param array<string,mixed> $raw
+ */
+function normalize_contact_flag(array $raw, string $key, bool $default = false): bool {
+  if (array_key_exists($key, $raw)) {
+    return is_truthy($raw[$key]);
+  }
+  return $default;
+}
+
+/**
+ * @param array<string,mixed> $raw
+ */
+function extract_contact_channel(array $raw, string $channel): bool {
+  $channel = strtolower($channel);
+  if (isset($raw['contact_preferences']) && is_array($raw['contact_preferences']) && array_key_exists($channel, $raw['contact_preferences'])) {
+    return is_truthy($raw['contact_preferences'][$channel]);
+  }
+  if (isset($raw['contact_methods']) && is_array($raw['contact_methods'])) {
+    foreach ($raw['contact_methods'] as $method) {
+      if (is_string($method) && strtolower(trim($method)) === $channel) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * @param array<string,mixed> $input
+ * @param array{customer_name:string,customer_email:string,customer_phone:string} $defaults
+ * @return array<string,mixed>
+ */
+function build_initial_fulfillment_details(string $method, array $input, array $defaults): array {
+  if (!in_array($method, ['shipping', 'delivery'], true)) {
+    return ['method' => $method];
+  }
+
+  $raw = extract_fulfillment_details_from_request($input);
+  if ($raw === null) {
+    json_response(['ok' => false, 'error' => 'Zusatzangaben fehlen für die gewählte Abwicklung', 'code' => 'validation'], 422);
+  }
+
+  $contactName = trim((string)($raw['contact_name'] ?? $defaults['customer_name'] ?? ''));
+  $contactEmail = trim((string)($raw['contact_email'] ?? $defaults['customer_email'] ?? ''));
+  $contactPhone = trim((string)($raw['contact_phone'] ?? $defaults['customer_phone'] ?? ''));
+
+  if ($contactName === '') {
+    json_response(['ok'=>false,'error'=>'Kontaktname für Zusatzangaben fehlt','code'=>'validation'], 422);
+  }
+  if ($contactEmail === '' || !filter_var($contactEmail, FILTER_VALIDATE_EMAIL)) {
+    json_response(['ok'=>false,'error'=>'Kontakt-E-Mail ist ungültig','code'=>'validation'], 422);
+  }
+  if ($contactPhone === '') {
+    json_response(['ok'=>false,'error'=>'Kontaktnummer fehlt für Zusatzangaben','code'=>'validation'], 422);
+  }
+
+  $allowPhone = normalize_contact_flag($raw, 'allow_contact_phone', false)
+    || normalize_contact_flag($raw, 'contact_phone_allowed', false)
+    || extract_contact_channel($raw, 'phone');
+  $allowWhatsApp = normalize_contact_flag($raw, 'allow_contact_whatsapp', false)
+    || normalize_contact_flag($raw, 'contact_whatsapp_allowed', false)
+    || extract_contact_channel($raw, 'whatsapp');
+
+  if (!$allowPhone && !$allowWhatsApp) {
+    json_response(['ok'=>false,'error'=>'Bitte mindestens eine Kontaktoption (Telefon oder WhatsApp) erlauben','code'=>'validation'], 422);
+  }
+
+  $details = [
+    'method' => $method,
+    'submitted_via' => 'customer_portal',
+    'submitted_at' => (new DateTimeImmutable('now', new DateTimeZone('Europe/Berlin')))->format(DateTimeInterface::ATOM),
+    'contact_name' => $contactName,
+    'contact_email' => $contactEmail,
+    'contact_phone' => $contactPhone,
+    'allow_contact_phone' => $allowPhone,
+    'allow_contact_whatsapp' => $allowWhatsApp,
+    'contact_preferences' => [
+      'phone' => $allowPhone,
+      'whatsapp' => $allowWhatsApp,
+    ],
+    'contact_via' => array_values(array_filter([
+      $allowPhone ? 'phone' : null,
+      $allowWhatsApp ? 'whatsapp' : null,
+    ])),
+    'customer_name' => $defaults['customer_name'],
+    'customer_email' => $defaults['customer_email'],
+    'customer_phone' => $defaults['customer_phone'],
+  ];
+
+  if ($method === 'shipping') {
+    $addressLine1 = trim((string)($raw['address_line1'] ?? $raw['street'] ?? ''));
+    $postalCode = trim((string)($raw['postal_code'] ?? $raw['zip'] ?? ''));
+    $city = trim((string)($raw['city'] ?? ''));
+    if ($addressLine1 === '' || $postalCode === '' || $city === '') {
+      json_response(['ok'=>false,'error'=>'Bitte vollständige Lieferadresse angeben','code'=>'validation'], 422);
+    }
+    $details['address_line1'] = $addressLine1;
+    if (isset($raw['address_line2']) && trim((string)$raw['address_line2']) !== '') {
+      $details['address_line2'] = trim((string)$raw['address_line2']);
+    }
+    $details['postal_code'] = $postalCode;
+    $details['city'] = $city;
+    if (isset($raw['address_extra']) && trim((string)$raw['address_extra']) !== '') {
+      $details['address_extra'] = trim((string)$raw['address_extra']);
+    }
+  }
+
+  if ($method === 'delivery') {
+    $meetingPoint = trim((string)($raw['meeting_point'] ?? $raw['address'] ?? ''));
+    $preferredTime = trim((string)($raw['preferred_time'] ?? ''));
+    if ($meetingPoint === '' || $preferredTime === '') {
+      json_response(['ok'=>false,'error'=>'Bitte Treffpunkt und Wunschzeit angeben','code'=>'validation'], 422);
+    }
+    $details['meeting_point'] = $meetingPoint;
+    $details['preferred_time'] = $preferredTime;
+  }
+
+  return $details;
+}
+
+/**
  * Erstellt Betreff + Text für die automatische Eingangsbestätigung.
  *
  * @param array{customer_name:string,customer_email:string,box_id:int,start_date:string,end_date:string,total_amount:float,display_id:string,fulfillment_method?:string,fulfillment_label?:string,fulfillment_note?:string,fulfillment_price_delta?:float} $data
@@ -375,7 +524,12 @@ try {
   $fulfillmentLabel  = $fulfillment['label'];
   $fulfillmentNote   = $fulfillment['note'];
   $fulfillmentPrice  = (float)$fulfillment['price_delta'];
-  $initialFulfillmentDetails = json_encode(['method' => $fulfillmentMethod], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '{}';
+  $fulfillmentDetailsArray = build_initial_fulfillment_details($fulfillmentMethod, $in, [
+    'customer_name' => $name,
+    'customer_email' => $email,
+    'customer_phone' => $phone,
+  ]);
+  $initialFulfillmentDetails = json_encode($fulfillmentDetailsArray, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '{}';
 
   // Overlap-Flag: nur TRUE zählt; FALSE wird ignoriert (Server-Default bleibt)
   $force = null;
@@ -521,7 +675,8 @@ try {
       'fulfillment_label'=>$fulfillmentLabel,
       'fulfillment_price_delta'=>$fulfillmentPrice,
       'fulfillment_note'=>$fulfillmentNote,
-      'fulfillment_details_json' => $initialFulfillmentDetails
+      'fulfillment_details_json' => $initialFulfillmentDetails,
+      'fulfillment_details' => $fulfillmentDetailsArray
     ],
     'mail'=>$mailInfo,
     'internal_mail'=>$internalMailInfo

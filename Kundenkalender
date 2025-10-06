@@ -232,6 +232,9 @@
   .mmb-dialog .mmb-dialog-error{color:#b91c1c; margin-bottom:.6rem; font-size:.95rem;}
   .mmb-dialog .mmb-checkbox{display:flex; align-items:flex-start; gap:.55rem; font-weight:400;}
   .mmb-dialog .mmb-checkbox input{width:auto; margin-top:.2rem;}
+  .mmb-dialog-contact-options{border:1px solid #dcdccf; border-radius:10px; padding:.75rem .85rem; background:#f9f9f2; margin-top:.4rem;}
+  .mmb-dialog-contact-options p{margin:0 0 .5rem 0; font-weight:500;}
+  .mmb-dialog-contact-options .mmb-checkbox{margin-bottom:.35rem;}
 </style>
 </head>
 <body>
@@ -389,12 +392,6 @@ const BOOKING_URLS = uniqueUrls([
   'create_booking.php',
   'api/create_booking.php'
 ]);
-const SUBMIT_DETAILS_URLS = uniqueUrls([
-  MMB_CONFIG.submitDetailsUrl,
-  remoteUrl('submit_fulfillment_details.php'),
-  'submit_fulfillment_details.php',
-  'api/submit_fulfillment_details.php'
-]);
 
 /* — Ableitungslogik: erzwinge Verfügbarkeit ja/nein — */
 function deriveEnforcement(pr){
@@ -471,75 +468,6 @@ async function attemptSendBooking(url, payload){
   }
 
   throw new Error('HTTP '+r1.status+' / '+r1.text.slice(0,140));
-}
-
-async function submitFulfillmentDetails(urls, payload){
-  const candidates = Array.isArray(urls) ? urls : [urls];
-  let lastError = null;
-  for(const url of candidates){
-    try{
-      return await attemptSubmitFulfillmentDetails(url, payload);
-    }catch(err){
-      lastError = err;
-    }
-  }
-  throw lastError || new Error('Konnte Abwicklungsdetails nicht senden');
-}
-
-async function attemptSubmitFulfillmentDetails(url, payload){
-  const makeUrlEnc = (data)=>{
-    const params = new URLSearchParams();
-    Object.entries(data || {}).forEach(([key, value])=>{
-      params.append(key, value == null ? '' : String(value));
-    });
-    return params;
-  };
-
-  const request = async (options)=>{
-    const res = await fetchText(url, options);
-    if(res.ok){
-      const parsed = parseJsonLoose(res.text);
-      if(parsed && parsed.ok === true){
-        return parsed;
-      }
-      if(parsed && parsed.error){
-        throw new Error(parsed.error);
-      }
-      throw new Error('HTTP '+res.status+' / '+res.text.slice(0,200));
-    }
-    const parsed = parseJsonLoose(res.text);
-    const message = parsed && parsed.error
-      ? parsed.error
-      : 'HTTP '+res.status+' / '+res.text.slice(0,200);
-    const error = new Error(message);
-    error.status = res.status;
-    throw error;
-  };
-
-  let lastError = null;
-  try{
-    return await request({
-      method:'POST',
-      headers:{'Content-Type':'application/x-www-form-urlencoded','Accept':'application/json'},
-      body: makeUrlEnc(payload),
-      credentials:'omit'
-    });
-  }catch(err){
-    lastError = err instanceof Error ? err : new Error(String(err));
-  }
-
-  try{
-    return await request({
-      method:'POST',
-      headers:{'Content-Type':'application/json','Accept':'application/json'},
-      body: JSON.stringify(payload),
-      credentials:'omit'
-    });
-  }catch(err){
-    lastError = err instanceof Error ? err : new Error(String(err));
-  }
-
-  throw lastError || new Error('Konnte Abwicklungsdetails nicht senden');
 }
 
 /* ===== Kalender ===== */
@@ -967,7 +895,8 @@ class Calendar{
         customer_name:(data.customer_name||'').trim(),
         customer_email:(data.customer_email||'').trim(),
         customer_phone:(data.customer_phone||'').trim(),
-        consent_contact:true
+        contact_pref_phone:true,
+        contact_pref_whatsapp:false
       };
 
       const payload={
@@ -992,18 +921,24 @@ class Calendar{
 
       const btn=e.target.querySelector('button'); const orig=btn.textContent; btn.disabled=true; btn.textContent='Senden…';
       try{
+        const needsDetails = fulfillmentMethod === 'shipping' || fulfillmentMethod === 'delivery';
+        if(needsDetails){
+          const details = await this.promptFulfillmentDetails(fulfillmentMethod, contactDefaults);
+          if(!details){ return; }
+          const serialized = JSON.stringify(details);
+          contactDefaults.contact_pref_phone = !!details.allow_contact_phone;
+          contactDefaults.contact_pref_whatsapp = !!details.allow_contact_whatsapp;
+          contactDefaults.customer_name = details.contact_name || contactDefaults.customer_name;
+          contactDefaults.customer_email = details.contact_email || contactDefaults.customer_email;
+          contactDefaults.customer_phone = details.contact_phone || contactDefaults.customer_phone;
+          payload.fulfillment_details_json = serialized;
+          payload.fulfillment_details = serialized;
+        }
+
         const res=await sendBooking(BOOKING_URLS, payload);
         const bookingInfo = res?.booking || null;
         const dispId = bookingInfo?.display_id ? String(bookingInfo.display_id) : '–';
-        const needsDetails = fulfillmentMethod === 'shipping' || fulfillmentMethod === 'delivery';
-        let submittedDetails = false;
-        if(needsDetails){
-          submittedDetails = await this.promptFulfillmentDetails(fulfillmentMethod, bookingInfo, contactDefaults);
-        }
-        const suffix = needsDetails
-          ? (submittedDetails ? '\n\nDanke für die zusätzlichen Infos!' : '\n\nBitte sende uns die benötigten Liefer- oder Treffpunktdaten zeitnah per E-Mail oder Telefon.')
-          : '';
-        this.modal('Buchungsanfrage gesendet',`Danke! Deine Anfrage ist eingegangen.\n\nBuchungs-ID: ${dispId}${suffix}`);
+        this.modal('Buchungsanfrage gesendet',`Danke! Deine Anfrage ist eingegangen.\n\nBuchungs-ID: ${dispId}`);
         e.target.reset(); this.state.sel={start:null,end:null}; this.avgCache=null; this.state.summary=null; this.state.fulfillment=FULFILLMENT_OPTIONS[0]; this.hideFulfillmentInfo();
         this.renderCalendar(); this.renderSide(); this.updateVisuals();
       }catch(err){
@@ -1047,13 +982,13 @@ class Calendar{
     document.getElementById('mmb-modal').style.display='flex';
   }
 
-  async promptFulfillmentDetails(method, booking, defaults){
+  async promptFulfillmentDetails(method, defaults){
     const opt = this.getFulfillmentOption(method || '');
-    const displayId = booking?.display_id ? String(booking.display_id) : '–';
     const baseName = (defaults?.customer_name || '').trim();
     const baseEmail = (defaults?.customer_email || '').trim();
     const basePhone = (defaults?.customer_phone || '').trim();
-    const consentDefault = defaults?.consent_contact ?? true;
+    const prefPhone = defaults?.contact_pref_phone !== false;
+    const prefWhatsApp = defaults?.contact_pref_whatsapp === true;
     const escapeAttr = (value)=>String(value ?? '').replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
     const isShipping = opt.id === 'shipping';
     const isDelivery = opt.id === 'delivery';
@@ -1061,7 +996,6 @@ class Calendar{
     return new Promise((resolve)=>{
       const backdrop = document.createElement('div');
       backdrop.className = 'mmb-dialog-backdrop';
-      const consentChecked = consentDefault ? 'checked' : '';
       const shippingFields = isShipping ? `
         <div class="mmb-dialog-row">
           <label>Straße & Hausnummer *<input name="address_line1" required placeholder="z. B. Musterstraße 12" autocomplete="address-line1"></label>
@@ -1084,15 +1018,15 @@ class Calendar{
 
       const title = `Zusätzliche Angaben – ${opt.displayTitle || opt.label}`;
       const intro = isShipping
-        ? 'Deine Buchungsanfrage ist eingegangen. Damit wir den Versand vorbereiten können, benötigen wir jetzt deine Lieferadresse.'
-        : 'Deine Buchungsanfrage ist eingegangen. Damit wir die Lieferung planen können, benötigen wir jetzt deinen Treffpunkt und deine Wunschzeit.';
-      const urgency = 'Bitte sende uns die Angaben sofort, damit wir deine Buchung ohne Verzögerung bearbeiten können.';
+        ? 'Fast geschafft! Damit wir den Versand vorbereiten können, benötigen wir jetzt deine Lieferadresse.'
+        : 'Fast geschafft! Damit wir die Lieferung planen können, benötigen wir jetzt deinen Treffpunkt und deine Wunschzeit.';
+      const note = 'Bitte fülle die Angaben aus. Erst danach können wir deine Buchung absenden.';
 
       backdrop.innerHTML = `
         <div class="mmb-dialog" role="dialog" aria-modal="true">
           <h3>${title}</h3>
-          <p>${intro}<br><strong>Buchungs-ID:</strong> ${escapeAttr(displayId)}</p>
-          <p>${urgency}</p>
+          <p>${intro}</p>
+          <p>${note}</p>
           <div class="mmb-dialog-error" data-role="error" aria-live="assertive"></div>
           <form>
             <div class="mmb-dialog-row">
@@ -1104,10 +1038,15 @@ class Calendar{
             </div>
             ${shippingFields}
             ${deliveryFields}
-            <label class="mmb-checkbox"><input type="checkbox" name="consent_contact" value="1" ${consentChecked}> <span>Ich bin einverstanden, dass ihr mich telefonisch &amp; per WhatsApp zu dieser Buchung kontaktieren dürft.</span></label>
+            <div class="mmb-dialog-contact-options">
+              <p>Wie dürfen wir dich kontaktieren? *</p>
+              <label class="mmb-checkbox"><input type="checkbox" name="contact_pref_phone" value="1" ${prefPhone ? 'checked' : ''}> <span>Telefonisch</span></label>
+              <label class="mmb-checkbox"><input type="checkbox" name="contact_pref_whatsapp" value="1" ${prefWhatsApp ? 'checked' : ''}> <span>Per WhatsApp</span></label>
+              <small>Mindestens eine Option muss ausgewählt sein.</small>
+            </div>
             <div class="mmb-dialog-actions">
-              <button type="button" data-act="cancel">Später senden</button>
-              <button type="submit">Informationen senden</button>
+              <button type="button" data-act="cancel">Abbrechen</button>
+              <button type="submit">Angaben übermitteln</button>
             </div>
           </form>
         </div>
@@ -1118,14 +1057,16 @@ class Calendar{
       const submitBtn = form.querySelector('button[type="submit"]');
       const cancelBtn = form.querySelector('[data-act="cancel"]');
 
-      const close = (submitted)=>{
+      const close = (details)=>{
         backdrop.remove();
-        resolve(submitted);
+        resolve(details);
       };
 
-      cancelBtn.addEventListener('click', ()=>{
-        close(false);
-      });
+      if(cancelBtn){
+        cancelBtn.addEventListener('click', ()=>{
+          close(null);
+        });
+      }
 
       form.addEventListener('submit', async (event)=>{
         event.preventDefault();
@@ -1135,29 +1076,59 @@ class Calendar{
         submitBtn.textContent='Senden…';
         try{
           const formData = new FormData(form);
-          const payload = {
-            booking_id: Number(booking?.id) || 0,
-            booking_display_id: displayId,
-            method: opt.id,
-            customer_email: defaults?.customer_email || '',
-            contact_name: String(formData.get('contact_name')||'').trim(),
-            contact_email: String(formData.get('contact_email')||'').trim(),
-            contact_phone: String(formData.get('contact_phone')||'').trim(),
-            consent_contact: formData.get('consent_contact') ? 1 : 0
-          };
-          if(isShipping){
-            payload.address_line1 = String(formData.get('address_line1')||'').trim();
-            payload.postal_code = String(formData.get('postal_code')||'').trim();
-            payload.city = String(formData.get('city')||'').trim();
-            payload.address_extra = String(formData.get('address_extra')||'').trim();
+          const contactName = String(formData.get('contact_name')||'').trim();
+          const contactEmail = String(formData.get('contact_email')||'').trim();
+          const contactPhone = String(formData.get('contact_phone')||'').trim();
+          const allowPhone = formData.get('contact_pref_phone') === '1';
+          const allowWhatsApp = formData.get('contact_pref_whatsapp') === '1';
+
+          if(!contactName || !contactEmail || !contactPhone){
+            throw new Error('Bitte alle Kontaktfelder ausfüllen.');
           }
-          if(isDelivery){
-            payload.meeting_point = String(formData.get('meeting_point')||'').trim();
-            payload.preferred_time = String(formData.get('preferred_time')||'').trim();
+          if(!allowPhone && !allowWhatsApp){
+            throw new Error('Bitte wähle mindestens eine Kontaktoption.');
           }
 
-          await submitFulfillmentDetails(SUBMIT_DETAILS_URLS, payload);
-          close(true);
+          const details = {
+            method: opt.id,
+            contact_name: contactName,
+            contact_email: contactEmail,
+            contact_phone: contactPhone,
+            allow_contact_phone: allowPhone,
+            allow_contact_whatsapp: allowWhatsApp,
+            contact_preferences: {
+              phone: allowPhone,
+              whatsapp: allowWhatsApp
+            },
+            submitted_via: 'customer_portal'
+          };
+
+          if(isShipping){
+            const addressLine1 = String(formData.get('address_line1')||'').trim();
+            const postalCode = String(formData.get('postal_code')||'').trim();
+            const city = String(formData.get('city')||'').trim();
+            const addressExtra = String(formData.get('address_extra')||'').trim();
+            if(!addressLine1 || !postalCode || !city){
+              throw new Error('Bitte vollständige Lieferadresse angeben.');
+            }
+            details.address_line1 = addressLine1;
+            details.postal_code = postalCode;
+            details.city = city;
+            if(addressExtra){ details.address_extra = addressExtra; }
+          }
+
+          if(isDelivery){
+            const meetingPoint = String(formData.get('meeting_point')||'').trim();
+            const preferredTime = String(formData.get('preferred_time')||'').trim();
+            if(!meetingPoint || !preferredTime){
+              throw new Error('Bitte Treffpunkt und Wunschzeit angeben.');
+            }
+            details.meeting_point = meetingPoint;
+            details.preferred_time = preferredTime;
+          }
+
+          close(details);
+          return;
         }catch(err){
           console.error(err);
           errorEl.textContent = err && err.message ? err.message : String(err);
