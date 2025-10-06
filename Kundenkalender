@@ -226,8 +226,10 @@
 <script>
 /* ========= KONFIG ========= */
 const MMB_CONFIG = {
-  pricingUrl: 'https://firebrick-squirrel-568721.hostingersite.com/pricing.php',
-  createUrl:  'https://firebrick-squirrel-568721.hostingersite.com/create_booking.php'
+  pricingUrl:      'https://firebrick-squirrel-568721.hostingersite.com/pricing.php',
+  createUrl:       'https://firebrick-squirrel-568721.hostingersite.com/create_booking.php',
+  settingsUrl:     'https://firebrick-squirrel-568721.hostingersite.com/availability_settings.php',
+  unavailableUrl:  'https://firebrick-squirrel-568721.hostingersite.com/calendar_unavailable.php'
 };
 /* ========================= */
 
@@ -330,9 +332,96 @@ function parseJsonLoose(txt){
 }
 async function fetchText(url, opts){ const r=await fetch(url, opts||{}); const t=await r.text(); return {ok:r.ok,status:r.status,text:t}; }
 
+function buildUrlWithParams(base, params){
+  try {
+    const url = new URL(base, window.location.href);
+    if (params) {
+      Object.entries(params).forEach(([key, value])=>{
+        if (value !== undefined && value !== null) {
+          url.searchParams.set(key, String(value));
+        }
+      });
+    }
+    return url.toString();
+  } catch (e) {
+    console.warn('Konnte URL nicht aufbauen', base, e);
+    return null;
+  }
+}
+
+async function getAvailabilitySettings(){
+  let lastError=null;
+  for(const candidate of SETTINGS_URLS){
+    const url=buildUrlWithParams(candidate, null);
+    if(!url) continue;
+    try{
+      const {status,text}=await fetchText(url,{credentials:'omit'});
+      const data=parseJsonLoose(text);
+      if(data && data.ok){ return data.settings || {}; }
+      lastError=new Error((data && data.error)? data.error : ('HTTP '+status));
+    }catch(err){ lastError=err; }
+  }
+  if(lastError){ console.warn('Verfügbarkeitseinstellungen nicht verfügbar', lastError); }
+  return null;
+}
+
+async function getUnavailableWindow(boxId, from, to){
+  let lastError=null;
+  for(const candidate of UNAVAILABLE_URLS){
+    const url=buildUrlWithParams(candidate,{box_id:boxId,from,to});
+    if(!url) continue;
+    try{
+      const {status,text}=await fetchText(url,{credentials:'omit'});
+      const data=parseJsonLoose(text);
+      if(data && data.ok){ return data; }
+      lastError=new Error((data && data.error)? data.error : ('HTTP '+status));
+    }catch(err){ lastError=err; }
+  }
+  if(lastError){ throw lastError; }
+  throw new Error('Konnte Verfügbarkeiten nicht laden');
+}
+
+function parseDateYMD(str){
+  if(typeof str!=='string') return null;
+  const parts=str.split('-').map(Number);
+  if(parts.length!==3) return null;
+  const [y,m,d]=parts;
+  if(!Number.isFinite(y)||!Number.isFinite(m)||!Number.isFinite(d)) return null;
+  return new Date(y, m-1, d);
+}
+
+function buildUnavailableMap(bookings, blocks){
+  const map=new Map();
+  const addRange=(start,end,type,meta)=>{
+    const s=parseDateYMD(start);
+    const e=parseDateYMD(end);
+    if(!s||!e) return;
+    const cursor=new Date(s);
+    while(Utils.cmpDate(cursor,e)<=0){
+      const key=Utils.formatDate(cursor);
+      map.set(key,{type,meta});
+      cursor.setDate(cursor.getDate()+1);
+    }
+  };
+
+  (bookings||[]).forEach(b=>{
+    const status=typeof b.status==='string'? b.status.toLowerCase() : 'confirmed';
+    if(status && status!=='confirmed') return;
+    addRange(b.start_date,b.end_date,'booking',{status});
+  });
+
+  (blocks||[]).forEach(block=>{
+    addRange(block.start_date,block.end_date,'block',{reason:block.reason||''});
+  });
+
+  return map;
+}
+
 /* ===== API Endpoints ===== */
 const PRICING_URLS = [MMB_CONFIG.pricingUrl,'pricing.php','api/pricing.php'].filter(Boolean);
 const BOOKING_URLS = [MMB_CONFIG.createUrl];
+const SETTINGS_URLS = [MMB_CONFIG.settingsUrl,'availability_settings.php','api/availability_settings.php'].filter(Boolean);
+const UNAVAILABLE_URLS = [MMB_CONFIG.unavailableUrl,'calendar_unavailable.php','api/calendar_unavailable.php'].filter(Boolean);
 
 /* — Ableitungslogik: erzwinge Verfügbarkeit ja/nein — */
 function deriveEnforcement(pr){
@@ -391,8 +480,12 @@ async function sendBooking(url, payload){
 class Calendar{
   constructor(container){
     this.root = typeof container==='string'? document.querySelector(container):container;
-    this.state={month:new Date(), boxes:[], box:null, sel:{start:null,end:null}, pricing:null, enforceAvailability:true, summary:null, fulfillment:FULFILLMENT_OPTIONS[0]};
+    this.state={month:new Date(), boxes:[], box:null, sel:{start:null,end:null}, pricing:null, enforceAvailability:true, availabilityVisible:true, summary:null, fulfillment:FULFILLMENT_OPTIONS[0]};
     this.dayElMap=new Map(); this.avgCache=null; this.infoOverlay=null;
+    this.unavailableDays=new Map();
+    this.availabilityError=null;
+    this.unavailableRequestToken=0;
+    this.settingsCache=null;
     this.handleInfoKeyDown=this.handleInfoKeyDown.bind(this);
     this.init();
   }
@@ -410,11 +503,35 @@ class Calendar{
           <div class="mmb-side-wrap"><div class="side" style="flex:1"></div></div>
         </div>
       </div>`;
-    const pr=await getPricing(); this.state.pricing=pr.pricing; this.state.enforceAvailability = deriveEnforcement(pr);
+    const pr=await getPricing();
+    this.state.pricing=pr.pricing;
+    this.state.enforceAvailability = deriveEnforcement(pr);
+    let availabilityVisible = true;
+    if(pr && pr.pricing && pr.pricing.settings && typeof pr.pricing.settings.availability_visible === 'boolean'){
+      availabilityVisible = pr.pricing.settings.availability_visible;
+    }
+    try{
+      const remoteSettings = await getAvailabilitySettings();
+      if(remoteSettings){
+        this.settingsCache=remoteSettings;
+        if(typeof remoteSettings.availability_visible === 'boolean'){
+          availabilityVisible = remoteSettings.availability_visible;
+        }
+        if(typeof remoteSettings.enforce_availability === 'boolean'){
+          this.state.enforceAvailability = remoteSettings.enforce_availability;
+        }
+      }
+    }catch(err){ console.warn('Konnte Verfügbarkeitseinstellungen nicht laden', err); }
+    if(!availabilityVisible){
+      this.state.enforceAvailability = false;
+    }
+    this.state.availabilityVisible = availabilityVisible;
+
     const boxes=Object.entries(pr.pricing.boxes).map(([id,b])=>({id,name:b.name})).sort((a,b)=>Number(a.id)-Number(b.id));
     this.state.boxes=boxes; this.state.box=boxes[0];
 
     this.renderHeader(); this.renderCalendar(); this.renderSide(); this.wire();
+    await this.refreshUnavailable();
   }
 
   getFulfillmentOption(id){
@@ -597,9 +714,9 @@ class Calendar{
         <div class="mmb-calendar-body">
           ${days.map(day=>{
             const key=Utils.formatDate(day.date);
-            const other=day.otherMonth?' mmb-day--other-month':'';
-            const blocked=(day.date<new Date().setHours(0,0,0,0))?' mmb-day--blocked':'';
-            return `<div class="mmb-day${other}${blocked}" data-date="${key}" data-price="" data-badge="">
+            const classes=['mmb-day'];
+            if(day.otherMonth) classes.push('mmb-day--other-month');
+            return `<div class="${classes.join(' ')}" data-date="${key}" data-price="" data-badge="">
                       <span class="num">${day.date.getDate()}</span>
                       <button class="mmb-pill-add" type="button" data-act="extend" data-date="${key}" aria-label="Zeitraum verlängern">+</button>
                     </div>`;
@@ -612,6 +729,7 @@ class Calendar{
       </div>`;
     this.dayElMap.clear();
     host.querySelectorAll('.mmb-day[data-date]').forEach(el=>this.dayElMap.set(el.dataset.date,el));
+    this.applyAvailabilityToCalendar();
     this.updateVisuals();
   }
 
@@ -661,6 +779,113 @@ class Calendar{
     this.root.querySelector('.side').innerHTML=html;
   }
 
+  visibleDateRange(){
+    const days=Utils.generateCalendarDays(this.state.month);
+    if(!days.length){
+      const start=Utils.startOfDay(this.state.month);
+      const key=Utils.formatDate(start);
+      return {from:key,to:key};
+    }
+    const first=Utils.startOfDay(days[0].date);
+    const last=Utils.startOfDay(days[days.length-1].date);
+    return {from:Utils.formatDate(first), to:Utils.formatDate(last)};
+  }
+
+  applyAvailabilityToCalendar(){
+    const today=Utils.startOfDay(new Date());
+    this.dayElMap.forEach((el,key)=>{
+      el.classList.remove('mmb-day--blocked','mmb-day--busy','mmb-day--blocked-auto');
+      const [Y,M,D]=key.split('-').map(Number);
+      const date=Utils.startOfDay(new Date(Y,M-1,D));
+      if(Utils.cmpDate(date,today)<0){
+        el.classList.add('mmb-day--blocked','mmb-day--blocked-auto');
+        return;
+      }
+      const info=this.unavailableDays.get(key);
+      if(!info) return;
+      if(info.type==='booking' && !this.state.availabilityVisible){
+        return;
+      }
+      el.classList.add('mmb-day--blocked','mmb-day--blocked-auto');
+      if(info.type==='booking'){ el.classList.add('mmb-day--busy'); }
+    });
+  }
+
+  async refreshUnavailable(){
+    const box=this.state.box;
+    const token=Date.now();
+    this.unavailableRequestToken=token;
+    if(!box){
+      this.unavailableDays=new Map();
+      return;
+    }
+    const range=this.visibleDateRange();
+    try{
+      const data=await getUnavailableWindow(box.id, range.from, range.to);
+      if(this.unavailableRequestToken!==token) return;
+      if(data && data.settings){
+        if(typeof data.settings.availability_visible==='boolean'){
+          this.state.availabilityVisible=data.settings.availability_visible;
+        }
+        if(typeof data.settings.enforce_availability==='boolean'){
+          this.state.enforceAvailability=data.settings.enforce_availability;
+        }
+      }
+      const rawBookings=(data && data.unavailable && Array.isArray(data.unavailable.bookings))?data.unavailable.bookings:[];
+      const rawBlocks=(data && data.unavailable && Array.isArray(data.unavailable.blocks))?data.unavailable.blocks:[];
+      const useBookings=this.state.availabilityVisible ? rawBookings : [];
+      this.unavailableDays=buildUnavailableMap(useBookings,rawBlocks);
+      this.availabilityError=null;
+    }catch(err){
+      if(this.unavailableRequestToken!==token) return;
+      this.availabilityError=err;
+      console.warn('Verfügbarkeiten konnten nicht geladen werden', err);
+      this.unavailableDays=new Map();
+    }
+    if(this.unavailableRequestToken!==token) return;
+    if(this.dayElMap.size){
+      this.applyAvailabilityToCalendar();
+      // Falls aktuelle Auswahl nun blockiert ist -> zurücksetzen
+      const start=this.state.sel.start;
+      const end=this.state.sel.end;
+      if(start && this.isDateBlocked(start)){
+        this.state.sel={start:null,end:null};
+        this.avgCache=null;
+        this.state.summary=null;
+        this.renderSide();
+      } else if(end && this.isDateBlocked(end)){
+        this.state.sel={start:start,end:null};
+        this.avgCache=null;
+        this.state.summary=null;
+        this.renderSide();
+      }
+      this.updateVisuals();
+    }
+  }
+
+  isDateBlocked(date){
+    const today=Utils.startOfDay(new Date());
+    const cmp=Utils.cmpDate(date,today);
+    if(cmp<0) return true;
+    const key=Utils.formatDate(date);
+    const info=this.unavailableDays.get(key);
+    if(!info) return false;
+    if(info.type==='booking' && !this.state.availabilityVisible) return false;
+    return true;
+  }
+
+  isRangeAvailable(start,end){
+    const cmp=Utils.cmpDate;
+    const cursor=new Date(start);
+    while(cmp(cursor,end)<=0){
+      if(this.isDateBlocked(Utils.startOfDay(cursor))){
+        return false;
+      }
+      cursor.setDate(cursor.getDate()+1);
+    }
+    return true;
+  }
+
   /* === Visuals === */
   updateVisuals(){
     this.dayElMap.forEach(el=>{
@@ -675,7 +900,16 @@ class Calendar{
     // Grundpreise
     this.dayElMap.forEach((el,key)=>{
       const [Y,M,D]=key.split('-').map(Number); const d=Utils.startOfDay(new Date(Y,M-1,D));
-      if(el.classList.contains('mmb-day--blocked') || d<today){ el.setAttribute('data-price','—'); return; }
+      if(el.classList.contains('mmb-day--blocked')){
+        if(el.classList.contains('mmb-day--busy')){
+          el.setAttribute('data-price','Belegt');
+          el.setAttribute('data-badge','Belegt');
+        } else {
+          el.setAttribute('data-price','—');
+        }
+        return;
+      }
+      if(Utils.cmpDate(d,today)<0){ el.setAttribute('data-price','—'); return; }
       el.setAttribute('data-price', Euro.fmt(this.baseDayPrice(this.state.box.id,d)));
     });
 
@@ -735,14 +969,14 @@ class Calendar{
         const act=nav.dataset.act;
         if(act==='prev'){ this.changeMonth(-1); return; }
         if(act==='next'){ this.changeMonth(1); return; }
-        if(act==='box'){ const b=this.state.boxes.find(x=>x.id===nav.dataset.id); this.state.box=b; this.state.sel={start:null,end:null}; this.avgCache=null; this.renderHeader(); this.renderCalendar(); this.renderSide(); return; }
+        if(act==='box'){ const b=this.state.boxes.find(x=>x.id===nav.dataset.id); this.state.box=b; this.state.sel={start:null,end:null}; this.avgCache=null; this.renderHeader(); this.renderCalendar(); this.renderSide(); void this.refreshUnavailable(); return; }
       }
       const add = e.target.closest('[data-act="extend"]');
       if(add){
         const key = add.dataset.date;
         if(this.state.sel.start && this.state.sel.end){
           const [Y,M,D]=key.split('-').map(Number); const target=Utils.startOfDay(new Date(Y,M-1,D));
-          if(Utils.cmpDate(target,this.state.sel.end)>0){
+          if(Utils.cmpDate(target,this.state.sel.end)>0 && this.isRangeAvailable(this.state.sel.start,target)){
             this.state.sel.end=target; this.renderSide(); this.updateVisuals();
           }
         }
@@ -821,20 +1055,25 @@ class Calendar{
 
   pick(key){
     const [Y,M,D]=key.split('-').map(Number); const date=Utils.startOfDay(new Date(Y,M-1,D));
-    const today=Utils.startOfDay(new Date()); if(date<today) return;
+    const today=Utils.startOfDay(new Date());
+    if(Utils.cmpDate(date,today)<0) return;
+    if(this.isDateBlocked(date)) return;
     let {start,end}=this.state.sel;
     if(start && end){ this.state.sel={start:date,end:null}; this.avgCache=null; this.state.summary=null; this.renderSide(); this.updateVisuals(); return; }
     if(!start){ this.state.sel={start:date,end:null}; this.avgCache=null; this.state.summary=null; this.renderSide(); this.updateVisuals(); return; }
     const cmp=Utils.cmpDate(date,start);
     if(cmp===0){ this.state.sel={start:start,end:start}; this.renderSide(); this.updateVisuals(); return; }
-    if(cmp>0){ this.state.sel={start:start,end:date}; this.renderSide(); this.updateVisuals(); return; }
+    if(cmp>0){
+      if(!this.isRangeAvailable(start,date)) return;
+      this.state.sel={start:start,end:date}; this.renderSide(); this.updateVisuals(); return;
+    }
     this.state.sel={start:date,end:null}; this.avgCache=null; this.state.summary=null; this.renderSide(); this.updateVisuals();
   }
 
   changeMonth(delta){
     const m=new Date(this.state.month); m.setMonth(m.getMonth()+delta);
     const today=new Date(); if(m<new Date(today.getFullYear(),today.getMonth(),1)) return;
-    this.state.month=m; this.renderHeader(); this.renderCalendar(); this.renderSide();
+    this.state.month=m; this.renderHeader(); this.renderCalendar(); this.renderSide(); void this.refreshUnavailable();
   }
 
   days(s,e){ const S=new Date(s.getFullYear(),s.getMonth(),s.getDate()), E=new Date(e.getFullYear(),e.getMonth(),e.getDate()); return Math.floor((E-S)/86400000)+1; }

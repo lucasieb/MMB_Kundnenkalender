@@ -82,7 +82,21 @@
     const t=await res.text(); let d; try{d=JSON.parse(t);}catch{d={ok:false,raw:t};}
     if(!res.ok||!d.ok) throw new Error('API Fehler'); return d;
   }
-  const MMBApi={ async blockDays({box_id,start_date,end_date,reason='admin_block'}){ return mmbApiPost('block_days.php',{box_id,start_date,end_date,reason}); } };
+  async function mmbApiGet(path){
+    const res=await fetch(MMB_API_BASE+path,{credentials:'include'});
+    const t=await res.text(); let d; try{d=JSON.parse(t);}catch{d={ok:false,raw:t};}
+    if(!res.ok||!d.ok) throw new Error('API Fehler'); return d;
+  }
+  const MMBApi={
+    async blockDays({box_id,start_date,end_date,reason='admin_block'}){ return mmbApiPost('block_days.php',{box_id,start_date,end_date,reason}); },
+    async getAvailabilitySettings(){
+      try{ const d=await mmbApiGet('availability_settings.php'); return d.settings||{}; }
+      catch(e){ console.warn('Verfügbarkeitseinstellungen konnten nicht geladen werden',e); return null; }
+    },
+    async updateAvailabilitySettings(settings){
+      return mmbApiPost('availability_settings.php',settings);
+    }
+  };
 
   /* ============ Admin-Kalender mit Switch ============ */
   (function(global){'use strict';
@@ -95,10 +109,24 @@
       constructor(sel){
         this.root = typeof sel==='string'? document.querySelector(sel) : sel;
         if(!this.root) throw new Error('Container nicht gefunden');
-        this.state={ month:new Date(), boxes:[], box:null, availability:{}, loading:false, blockMode:false, mode:getMode() };
+        this.state={ month:new Date(), boxes:[], box:null, availability:{}, loading:false, blockMode:false, mode:getMode(), savingMode:false };
         this.init();
       }
-      async init(){ this.renderLoading('Lade...'); this.state.boxes=[{id:'1',name:'Marshall Bromley 750',quantity:1},{id:'2',name:'Teufel Rockster Neo',quantity:1},{id:'3',name:'Soundboks 4',quantity:1}]; this.state.box=this.state.boxes[0]; await this.loadAvailability(); this.render(); this.wire(); }
+      async init(){
+        this.renderLoading('Lade...');
+        try{
+          const remote=await MMBApi.getAvailabilitySettings();
+          if(remote && typeof remote.availability_visible==='boolean'){
+            this.state.mode = remote.availability_visible ? AVAIL.ENFORCE : AVAIL.IGNORE;
+            setMode(this.state.mode);
+          }
+        }catch(err){ console.warn('Konnte Verfügbarkeitseinstellungen nicht abrufen',err); }
+        this.state.boxes=[{id:'1',name:'Marshall Bromley 750',quantity:1},{id:'2',name:'Teufel Rockster Neo',quantity:1},{id:'3',name:'Soundboks 4',quantity:1}];
+        this.state.box=this.state.boxes[0];
+        await this.loadAvailability();
+        this.render();
+        this.wire();
+      }
       renderLoading(t){ this.root.innerHTML=`<div class="mmb-widget"><div class="mmb-loading">${t}</div></div>`; }
       async loadAvailability(){
         const start=new Date(this.state.month.getFullYear(),this.state.month.getMonth(),1);
@@ -129,7 +157,7 @@
                 <div class="mmb-switch-row">
                   <span>Verfügbarkeiten</span>
                   <label class="mmb-switch">
-                    <input type="checkbox" id="mmb-switch-availability" ${this.state.mode===AVAIL.ENFORCE?'checked':''}>
+                    <input type="checkbox" id="mmb-switch-availability" ${this.state.mode===AVAIL.ENFORCE?'checked':''} ${this.state.savingMode?'disabled':''}>
                   </label>
                 </div>
               </div>
@@ -167,7 +195,25 @@
         });
         this.root.addEventListener('change',e=>{
           if(e.target.id==='mmb-switch-availability'){
-            const mode=e.target.checked?AVAIL.ENFORCE:AVAIL.IGNORE; setMode(mode); this.state.mode=mode;
+            const mode=e.target.checked?AVAIL.ENFORCE:AVAIL.IGNORE;
+            const prev=this.state.mode;
+            this.state.mode=mode;
+            this.state.savingMode=true;
+            this.render();
+            MMBApi.updateAvailabilitySettings({
+              availability_visible: mode===AVAIL.ENFORCE,
+              enforce_availability: mode===AVAIL.ENFORCE
+            }).then(()=>{
+              setMode(mode);
+              this.state.savingMode=false;
+              this.render();
+            }).catch(err=>{
+              console.error('Speichern der Einstellung fehlgeschlagen',err);
+              this.state.mode=prev;
+              this.state.savingMode=false;
+              this.render();
+              alert('Die Einstellung konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.');
+            });
           }
         });
       }

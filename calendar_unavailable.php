@@ -2,6 +2,7 @@
 // calendar_unavailable.php – public read endpoint for customer calendar
 declare(strict_types=1);
 require __DIR__.'/db.php';
+require __DIR__.'/lib/settings_store.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -9,6 +10,12 @@ try {
   $box_id = isset($_GET['box_id']) ? (int)$_GET['box_id'] : 0;
   $from   = isset($_GET['from'])   ? trim((string)$_GET['from'])   : '';
   $to     = isset($_GET['to'])     ? trim((string)$_GET['to'])     : '';
+
+  $visibleSetting = mmb_settings_bool('availability_visible', true);
+  $settings = [
+    'availability_visible' => $visibleSetting,
+    'enforce_availability' => mmb_settings_bool('enforce_availability', $visibleSetting),
+  ];
 
   // Basic validation
   if (!$box_id || !$from || !$to) {
@@ -25,17 +32,20 @@ try {
 
   $pdo = pdo();
 
-  // Bookings that overlap the window
-  $q1 = $pdo->prepare("
-    SELECT start_date, end_date
-    FROM bookings
-    WHERE box_id = ?
-      AND status IN ('pending','confirmed')
-      AND NOT (? < start_date OR ? > end_date)
-    ORDER BY start_date ASC
-  ");
-  $q1->execute([$box_id, $to, $from]);
-  $bookings = $q1->fetchAll();
+  $bookings = [];
+  if ($settings['availability_visible']) {
+    // Bookings that overlap the window
+    $q1 = $pdo->prepare("
+      SELECT start_date, end_date, status
+      FROM bookings
+      WHERE box_id = ?
+        AND status IN ('pending','confirmed')
+        AND NOT (? < start_date OR ? > end_date)
+      ORDER BY start_date ASC
+    ");
+    $q1->execute([$box_id, $to, $from]);
+    $bookings = $q1->fetchAll();
+  }
 
   // Admin availability blocks that overlap the window
   $q2 = $pdo->prepare("
@@ -50,8 +60,9 @@ try {
 
   echo json_encode([
     'ok' => true,
+    'settings' => $settings,
     'unavailable' => [
-      'bookings' => $bookings, // [{start_date, end_date}, ...]
+      'bookings' => $bookings, // [{start_date, end_date, status}, ...]
       'blocks'   => $blocks    // [{start_date, end_date, reason}, ...]
     ]
   ]);
