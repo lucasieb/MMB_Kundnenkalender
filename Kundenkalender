@@ -18,8 +18,19 @@
     --mmb-muted:#4a4a4a;  /* Pane rechts */
     --mmb-border:#555;
     --mmb-radius:12px;
+    --mmb-side-width:440px;
+    --mmb-main-gap:18px;
+    --mmb-calendar-max-width:700px;
     --mmb-badge-width-range:calc((5ch + 1rem) * 0.595);
     --mmb-badge-width-add:var(--mmb-badge-width-range);
+  }
+
+  @media (max-width:900px){
+    :root{
+      --mmb-side-width:0px;
+      --mmb-main-gap:0px;
+      --mmb-calendar-max-width:100%;
+    }
   }
 
   *,*::before,*::after{box-sizing:border-box;}
@@ -30,31 +41,39 @@
   .mmb-widget{background:var(--mmb-dark);border-radius:var(--mmb-radius);overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.1);max-width:1200px;margin:0 auto;}
 
   /* Header */
-  .mmb-header{display:grid;grid-template-columns:1fr auto auto;gap:12px;padding:.8rem 1rem;background:#2f2f2f;border-bottom:1px solid var(--mmb-border);}
-  .mmb-box-buttons{display:flex;gap:.4rem;flex-wrap:wrap;}
-  .mmb-box-btn{background:transparent;border:1px solid var(--mmb-border);padding:.5rem .8rem;border-radius:6px;cursor:pointer;
-               font-size:.85rem;font-weight:600;color:var(--mmb-light);display:inline-flex;align-items:center;justify-content:center;text-align:center;white-space:nowrap;}
+  .mmb-box-section{display:flex;flex-direction:column;gap:.4rem;}
+  .mmb-section-title{font-size:.9rem;font-weight:600;letter-spacing:.01em;color:var(--mmb-light);}
+  .mmb-box-buttons{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.5rem;}
+  .mmb-box-btn{background:transparent;border:1px solid var(--mmb-border);padding:.55rem .8rem;border-radius:6px;cursor:pointer;
+               font-size:.85rem;font-weight:600;color:var(--mmb-light);display:inline-flex;align-items:center;justify-content:center;text-align:center;white-space:nowrap;transition:background .2s,border-color .2s,color .2s;}
   .mmb-box-btn:hover{background:#3a3a3a;}
   .mmb-box-btn.mmb-box-btn--active{background:var(--mmb-accent);color:#fff;border-color:var(--mmb-accent);}
 
-  .mmb-nav{display:flex;align-items:center;gap:8px;}
-  .mmb-nav-btn{background:transparent;border:1px solid var(--mmb-border);padding:.4rem .6rem;border-radius:6px;cursor:pointer;
+  .mmb-nav{display:flex;align-items:center;gap:.35rem;}
+  .mmb-nav-btn{background:transparent;border:1px solid var(--mmb-border);padding:.45rem .65rem;border-radius:6px;cursor:pointer;
                color:var(--mmb-light);font-weight:600;}
   .mmb-nav-btn:hover{background:#3a3a3a;}
-  .mmb-month-title{font-weight:600;font-size:1rem;min-width:160px;text-align:center;color:var(--mmb-light);}
+  .mmb-month-title{font-weight:600;font-size:1rem;min-width:0;padding:0 .2rem;text-align:center;color:var(--mmb-light);}
+  .mmb-calendar-meta{display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin:.35rem 0 .25rem;}
+  .mmb-calendar-meta .mmb-nav{margin-left:auto;}
+  .mmb-calendar-meta .mmb-section-title{font-size:.95rem;}
 
   /* Layout – feste Min-Höhen, kein Springen */
-  .mmb-content{display:grid;grid-template-columns:1fr 440px;gap:18px;padding:1rem;}
+  .mmb-content{display:grid;grid-template-columns:1fr 440px;gap:18px;padding:1rem;align-items:stretch;}
   @media (max-width:900px){.mmb-content{grid-template-columns:1fr;}}
-  .mmb-calendar-wrap{min-height:560px;display:flex;width:100%;justify-content:center;}
-  .mmb-side-wrap{min-height:560px;display:flex;width:100%;justify-content:center;}
+  .mmb-calendar-wrap{display:flex;width:100%;justify-content:center;align-items:flex-start;}
+  .mmb-calendar-wrap .cal{display:flex;flex-direction:column;gap:.4rem;width:100%;max-width:var(--mmb-calendar-max-width);margin:0 auto;}
+  .mmb-calendar-area{display:flex;flex-direction:column;gap:.25rem;}
+  .mmb-side-wrap{display:flex;width:100%;justify-content:center;align-items:stretch;}
+  .mmb-side-wrap .side{display:flex;width:100%;justify-content:center;align-items:stretch;}
 
   @media (max-width:600px){
     .mmb-widget{margin:0 auto;border-radius:18px;width:min(100%,calc(100vw - 1.5rem));}
-    .mmb-header{grid-template-columns:1fr;grid-auto-rows:auto;gap:.65rem;padding:.85rem .7rem;justify-items:center;text-align:center;}
-    .mmb-box-buttons{justify-content:center;width:100%;gap:.5rem;}
-    .mmb-box-btn{flex:1 1 calc(50% - .6rem);min-width:140px;text-align:center;white-space:normal;padding:.55rem .6rem;}
+    .mmb-box-buttons{grid-template-columns:repeat(2,minmax(0,1fr));gap:.5rem;}
+    .mmb-box-btn{min-width:0;text-align:center;white-space:normal;padding:.6rem .6rem;}
+    .mmb-calendar-meta{grid-template-columns:1fr;row-gap:.35rem;}
     .mmb-nav{width:100%;justify-content:space-between;}
+    .mmb-calendar-meta .mmb-nav{justify-self:stretch;}
     .mmb-month-title{min-width:0;font-size:1.05rem;}
     .mmb-content{padding:.8rem .7rem;gap:12px;}
     .mmb-calendar-wrap,.mmb-side-wrap{min-height:0;width:100%;justify-content:center;}
@@ -65,12 +84,15 @@
     .mmb-day::before,.mmb-pill-add{top:4px;}
     .mmb-day::after{font-size:.82rem;}
     .mmb-booking-form{padding:16px;border-radius:14px;gap:.7rem;}
+    .mmb-fulfillment-group{grid-template-columns:1fr;}
+    .mmb-fulfillment-option{min-height:118px;padding:.85rem .85rem;}
+    .mmb-fulfillment-info{top:10px;right:10px;}
     .mmb-terms{font-size:.85rem;}
     .mmb-btn{font-size:.95rem;padding:.6rem .95rem;}
   }
 
   /* Kalender */
-  .mmb-calendar{border:1px solid var(--mmb-border);border-radius:var(--mmb-radius);overflow:hidden;background:#2a2a2a;flex:1;}
+  .mmb-calendar{border:1px solid var(--mmb-border);border-radius:var(--mmb-radius);overflow:hidden;background:#2a2a2a;flex:1;max-width:var(--mmb-calendar-max-width);margin:0 auto;}
   .mmb-calendar-header{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));background:#383838;color:var(--mmb-light);}
   .mmb-day-header{padding:.6rem .4rem;text-align:center;font-weight:600;font-size:.8rem;border-right:1px solid var(--mmb-border);}
   .mmb-day-header:last-child{border-right:none;}
@@ -133,14 +155,34 @@
   .mmb-day[data-extend="1"] .mmb-pill-add{display:inline-block;}
 
   /* Formular rechts – wieder mit Linie + Gesamt fett */
-  .mmb-booking-form{background:var(--mmb-muted);padding:18px;border-radius:10px;color:var(--mmb-light);display:flex;flex-direction:column;gap:.8rem;flex:1;width:100%;}
-  .mmb-price-summary{background:#2f2f2f;padding:.75rem;border-radius:6px;border:1px solid var(--mmb-border);}
-  .mmb-price-line{display:flex;justify-content:space-between;align-items:center;margin:.35rem 0;font-size:.9rem;}
-  .mmb-hr{height:1px;background:rgba(255,255,255,.12);margin:.35rem 0;}
-  .mmb-total{display:flex;justify-content:space-between;align-items:center;margin-top:.35rem;}
-  .mmb-total .label{font-weight:600;}
+  .mmb-booking-form{background:var(--mmb-muted);padding:18px;border-radius:10px;color:var(--mmb-light);display:flex;flex-direction:column;gap:.55rem;flex:1;width:100%;height:100%;}
+  .mmb-price-summary{background:#2f2f2f;padding:.65rem .7rem;border-radius:6px;border:1px solid var(--mmb-border);display:flex;flex-direction:column;gap:.2rem;min-height:268px;}
+  .mmb-price-summary--empty{justify-content:center;text-align:center;color:#cfcfcf;font-size:.9rem;min-height:inherit;display:flex;align-items:center;}
+  .mmb-price-line{display:flex;justify-content:space-between;align-items:center;margin:.2rem 0;font-size:.9rem;}
+  .mmb-hr{height:1px;background:rgba(255,255,255,.12);margin:.2rem 0;}
+  .mmb-total{display:flex;justify-content:space-between;align-items:flex-start;gap:.5rem;margin-top:.25rem;}
+  .mmb-total .label{font-weight:600;display:block;}
   .mmb-total .value{font-weight:600;font-size:1.05rem;}
-  .mmb-price-small{font-size:.8rem;color:#cfcfcf;}
+  .mmb-total-label{display:flex;flex-direction:column;gap:.05rem;}
+  .mmb-total-sub{font-weight:400;font-size:.64rem;color:rgba(255,255,255,.7);}
+  .mmb-price-small{font-size:.75rem;color:#cfcfcf;}
+  .mmb-price-note{font-size:.66rem;color:rgba(255,255,255,.68);margin-top:.12rem;}
+
+  .mmb-fulfillment-block{margin-top:.35rem;}
+  .mmb-fulfillment-group{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.5rem;margin-top:.25rem;}
+  .mmb-fulfillment-option{position:relative;padding:.65rem .7rem;border-radius:10px;border:1px solid var(--mmb-border);background:#2a2a2a;display:flex;flex-direction:column;gap:.18rem;min-height:88px;cursor:pointer;transition:background .2s,border-color .2s,box-shadow .2s,color .2s;}
+  .mmb-fulfillment-option:hover{border-color:var(--mmb-accent);box-shadow:0 0 0 1px var(--mmb-accent-200);}
+  .mmb-fulfillment-option.is-active{background:var(--mmb-accent);border-color:var(--mmb-accent);color:#fff;box-shadow:0 0 0 1px rgba(14,165,233,.35);}
+  .mmb-fulfillment-option input{position:absolute;opacity:0;pointer-events:none;}
+  .mmb-fulfillment-label{font-weight:600;font-size:1.02rem;line-height:1.2;}
+  .mmb-fulfillment-region{font-size:.82rem;opacity:.9;line-height:1.25;margin-top:.05rem;}
+  .mmb-fulfillment-price{font-size:.88rem;font-weight:600;text-align:center;margin-top:.32rem;font-variant-numeric:tabular-nums;}
+  .mmb-fulfillment-price-note{font-size:.66rem;text-align:center;opacity:.88;line-height:1.2;margin-top:.18rem;}
+  .mmb-fulfillment-option.is-active .mmb-fulfillment-region{opacity:.95;}
+  .mmb-fulfillment-info{position:absolute;top:12px;right:12px;width:24px;height:24px;border-radius:999px;border:1px solid currentColor;background:rgba(0,0,0,.14);color:inherit;display:inline-flex;align-items:center;justify-content:center;font-weight:600;font-size:.75rem;cursor:pointer;}
+  .mmb-fulfillment-option.is-active .mmb-fulfillment-info{background:rgba(255,255,255,.18);}
+
+  .mmb-form-actions{display:flex;flex-direction:column;gap:.65rem;margin-top:.35rem;}
 
   .mmb-input{width:100%;padding:.6rem .7rem;border:1px solid var(--mmb-border);border-radius:6px;background:#2a2a2a;color:var(--mmb-light);font-size:.95rem;box-sizing:border-box;}
   .mmb-btn{background:var(--mmb-accent);color:#fff;border:none;padding:.7rem 1.2rem;border-radius:8px;font-size:1rem;font-weight:600;cursor:pointer;width:100%;}
@@ -149,6 +191,13 @@
   .mmb-terms input{margin-top:.25rem;}
   .mmb-terms a{color:#9fdcff;text-decoration:none;}
   .mmb-terms a:hover{text-decoration:underline;}
+
+  .mmb-info-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:10000;padding:1rem;}
+  .mmb-info-card{background:#efefe6;color:#3b3b3b;border-radius:14px;padding:1.2rem 1.4rem;max-width:420px;width:min(90vw,420px);box-shadow:0 18px 48px rgba(0,0,0,.3);position:relative;line-height:1.5;}
+  .mmb-info-card h4{margin:.2rem 0 .8rem 0;font-size:1.05rem;font-weight:600;}
+  .mmb-info-card p{margin:.4rem 0;font-size:.92rem;}
+  .mmb-info-close{position:absolute;top:10px;right:10px;width:30px;height:30px;border-radius:999px;border:none;background:rgba(0,0,0,.08);color:#3b3b3b;font-size:1rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+  .mmb-info-close:hover{background:rgba(0,0,0,.14);}
 
   /* Modal */
   #mmb-modal{display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); align-items:center; justify-content:center; z-index:9999;}
@@ -180,6 +229,71 @@ const MMB_CONFIG = {
 };
 /* ========================= */
 
+const FULFILLMENT_OPTIONS = [
+  {
+    id:'pickup',
+    label:'Abholung in Wesel',
+    shortLabel:'Abholung',
+    subLabel:'Kostenfreie Selbstabholung vor Ort',
+    displayTitle:'Abholung',
+    displayRegion:'in Wesel, NRW',
+    displayPrice:'+ 0 €',
+    priceDelta:0,
+    addsToTotal:true,
+    summaryLabel:'Abholung in Wesel',
+    summaryValue:'+ 0 €',
+    note:'',
+    infoTitle:'Abholung in Wesel',
+    infoHtml:`<p>📍 Wir stimmen den Treffpunkt in Wesel individuell mit dir ab.</p>
+      <p>🕚 Abholung ab deinem Miettag um 11:00 Uhr möglich.</p>
+      <p>🔁 Rückgabe am selben Ort (sofern nichts anderes vereinbart) bis 10:00 Uhr am Folgetag nach Mietende.</p>
+      <p>😊 Melde dich gerne, falls du andere Zeiten brauchst – wir finden eine Lösung.</p>`
+  },
+  {
+    id:'shipping',
+    label:'Versand (deutschlandweit)',
+    shortLabel:'Versand',
+    subLabel:'Express-Hin- & Rückversand inkl. QR-Code',
+    displayTitle:'Versand (ganz Deutschland)',
+    displayRegion:'ganz Deutschland 🇩🇪',
+    displayPrice:'+ 80 €',
+    priceDelta:80,
+    addsToTotal:true,
+    summaryLabel:'Versand (ganz Deutschland)',
+    summaryValue:'+ 80 €',
+    note:'',
+    totalSubline:'inkl. Hin- & Rückversand',
+    infoTitle:'Versand deutschlandweit',
+    infoHtml:`<p>🚚 Wir versenden deine Musikbox einen Tag vor Mietbeginn per Express, damit sie pünktlich ankommt.</p>
+      <p>📦 Am letzten Miettag gibst du das Paket mit dem mitgelieferten QR-Code wieder auf – so ist es direkt am Folgetag bei uns.</p>
+      <p>💶 Die Pauschale von 80 € deckt Hin- und Rückversand sowie den zusätzlichen Aufwand und Ausfalltage ab.</p>
+      <p>✅ Du erhältst alle Versandinfos rechtzeitig per E-Mail.</p>`
+  },
+  {
+    id:'delivery',
+    label:'Lieferung (NRW-weit)',
+    shortLabel:'Lieferung',
+    subLabel:'Individuelles Angebot durch unser Team',
+    displayTitle:'Lieferung (ganz NRW)',
+    displayRegion:'ganz Nordrhein-Westfalen',
+    displayPriceNote:'* Individuelles Preisangebot durch unser Team',
+    priceDelta:0,
+    addsToTotal:false,
+    summaryLabel:'Lieferung (ganz NRW)',
+    summaryValue:'individuell',
+    note:'',
+    totalLabel:'Vorläufig Gesamt',
+    totalSubline:'zzgl. Lieferkosten',
+    infoTitle:'Lieferung NRW-weit',
+    infoHtml:`<p>🚗 Wir liefern dir die Musikbox persönlich innerhalb von NRW – auf Wunsch inkl. Aufbau & Abholung.</p>
+      <p>💶 Die Kosten bestehen aus einer Grundpauschale plus einer Kilometerpauschale – daher berechnen wir den Preis individuell.</p>
+      <p>✉️ Du erhältst nach deiner Anfrage ein persönliches Angebot mit allen Details.</p>
+      <p>🤝 Gemeinsam finden wir die bequemste Lösung für dich.</p>`
+  }
+];
+
+const FULFILLMENT_LOOKUP = Object.fromEntries(FULFILLMENT_OPTIONS.map(opt => [opt.id, opt]));
+
 const Utils={
   MONTH_NAMES:['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'],
   DAY_NAMES:['Mo','Di','Mi','Do','Fr','Sa','So'],
@@ -191,10 +305,12 @@ const Utils={
     const start=(first.getDay()===0?6:first.getDay()-1), days=[], prevLast=new Date(y,m,0);
     for(let i=start-1;i>=0;i--){days.push({date:new Date(y,m-1,prevLast.getDate()-i),otherMonth:true});}
     for(let d=1; d<=last.getDate(); d++){days.push({date:new Date(y,m,d),otherMonth:false});}
-    const total=Math.ceil(days.length/7)*7; for(let d=1; d<=total-days.length; d++){days.push({date:new Date(y,m+1,d),otherMonth:true});}
+    const total = days.length <= 35 ? 35 : 42;
+    for(let d=1; d<=total-days.length; d++){days.push({date:new Date(y,m+1,d),otherMonth:true});}
     return days;}
 };
-const Euro={round:x=>Math.round(Number(x)||0), fmt:x=>`${Math.round(Number(x)||0)}€`};
+const EURO_FMT = new Intl.NumberFormat('de-DE');
+const Euro={round:x=>Math.round(Number(x)||0), fmt:x=>`${EURO_FMT.format(Math.round(Number(x)||0))} €`};
 const Percent={disp:p=>Math.round(Number(p)||0)};
 
 /* ===== HTTP Helpers ===== */
@@ -272,25 +388,29 @@ async function sendBooking(url, payload){
 class Calendar{
   constructor(container){
     this.root = typeof container==='string'? document.querySelector(container):container;
-    this.state={month:new Date(), boxes:[], box:null, sel:{start:null,end:null}, pricing:null, enforceAvailability:true, summary:null};
-    this.dayElMap=new Map(); this.avgCache=null;
+    this.state={month:new Date(), boxes:[], box:null, sel:{start:null,end:null}, previewEnd:null, pricing:null, enforceAvailability:true, summary:null, fulfillment:FULFILLMENT_OPTIONS[0]};
+    this.dayElMap=new Map(); this.avgCache=null; this.infoOverlay=null;
+    this.handleInfoKeyDown=this.handleInfoKeyDown.bind(this);
     this.init();
   }
   async init(){
     this.root.innerHTML=`
       <div class="mmb-widget">
-        <div class="mmb-header">
-          <div class="mmb-box-buttons"></div>
-          <div></div>
-          <div class="mmb-nav">
-            <button class="mmb-nav-btn" data-act="prev" aria-label="Vorheriger Monat">←</button>
-            <div class="mmb-month-title"></div>
-            <button class="mmb-nav-btn" data-act="next" aria-label="Nächster Monat">→</button>
-          </div>
-        </div>
         <div class="mmb-content">
-          <div class="mmb-calendar-wrap"><div class="cal" style="flex:1"></div></div>
-          <div class="mmb-side-wrap"><div class="side" style="flex:1"></div></div>
+          <div class="mmb-calendar-wrap">
+            <div class="cal">
+              <div class="mmb-box-section">
+                <div class="mmb-section-title">Musikbox auswählen</div>
+                <div class="mmb-box-buttons" role="radiogroup" aria-label="Musikbox auswählen"></div>
+              </div>
+              <div class="mmb-calendar-area"></div>
+              <div class="mmb-fulfillment-block">
+                <div class="mmb-section-title">Abwicklung auswählen</div>
+                <div class="mmb-fulfillment-placeholder"></div>
+              </div>
+            </div>
+          </div>
+          <div class="mmb-side-wrap"><div class="side"></div></div>
         </div>
       </div>`;
     const pr=await getPricing(); this.state.pricing=pr.pricing; this.state.enforceAvailability = deriveEnforcement(pr);
@@ -298,6 +418,141 @@ class Calendar{
     this.state.boxes=boxes; this.state.box=boxes[0];
 
     this.renderHeader(); this.renderCalendar(); this.renderSide(); this.wire();
+  }
+
+  getFulfillmentOption(id){
+    return FULFILLMENT_LOOKUP[id] || FULFILLMENT_OPTIONS[0];
+  }
+
+  renderFulfillmentOptions(selected){
+    const active = selected && selected.id ? selected : FULFILLMENT_OPTIONS[0];
+    const group = FULFILLMENT_OPTIONS.map((opt, idx)=>{
+      const isActive = opt.id === active.id;
+      const title = opt.displayTitle || opt.label;
+      const region = opt.displayRegion ? `<span class="mmb-fulfillment-region">${opt.displayRegion}</span>` : '';
+      const price = opt.displayPrice ? `<span class="mmb-fulfillment-price">${opt.displayPrice}</span>` : '';
+      const note = opt.displayPriceNote ? `<span class="mmb-fulfillment-price-note">${opt.displayPriceNote}</span>` : '';
+      return `<label class="mmb-fulfillment-option ${isActive?'is-active':''}" data-fulfillment="${opt.id}">
+                <input type="radio" name="fulfillment_method" value="${opt.id}" ${isActive?'checked':''} ${idx===0?'required':''}>
+                <span class="mmb-fulfillment-label">${title}</span>
+                ${region}
+                ${price}
+                ${note}
+                <button type="button" class="mmb-fulfillment-info" data-act="fulfillment-info" data-id="${opt.id}" aria-label="Infos zu ${opt.label}">?</button>
+              </label>`;
+    }).join('');
+    return `<div class="mmb-fulfillment-group" role="radiogroup" aria-label="Abwicklung auswählen">
+      ${group}
+    </div>`;
+  }
+
+  fulfillmentMeta(option){
+    const opt = option || FULFILLMENT_OPTIONS[0];
+    const addsToTotal = opt.addsToTotal !== false;
+    const priceDelta = Number(opt.priceDelta||0);
+    const summaryLabel = opt.summaryLabel || opt.label;
+    const summaryValue = opt.summaryValue ?? (addsToTotal ? (priceDelta>0?`+${Euro.fmt(priceDelta)}`:'gratis') : 'gratis');
+    const note = opt.note || '';
+    const totalLabel = opt.totalLabel || (addsToTotal ? 'Gesamt' : 'Vorläufig Gesamt');
+    const totalSubline = opt.totalSubline || '';
+    const shortLabel = opt.shortLabel || summaryLabel;
+    return {addsToTotal, priceDelta, summaryLabel, summaryValue, note, totalLabel, totalSubline, shortLabel};
+  }
+
+  buildRangeSummary(sum, option){
+    const meta = this.fulfillmentMeta(option);
+    const shipping = meta.addsToTotal ? meta.priceDelta : 0;
+    const totalWithShipping = sum.total + shipping;
+    const totalRow = `<div class="mmb-total"><div class="mmb-total-label"><span class="label">${meta.totalLabel}</span>${meta.totalSubline?`<span class="mmb-total-sub">${meta.totalSubline}</span>`:''}</div><span class="value">${Euro.fmt(totalWithShipping)}</span></div>`;
+    const lines = [
+      `<div class="mmb-price-line"><span>Original (ohne Rabatt)</span><span>${Euro.fmt(sum.original)}</span></div>`,
+      `<div class="mmb-price-line"><span>Rabatt (${sum.discountPercentDisplay}%)</span><span>–${Euro.fmt(sum.discountAmount)}</span></div>`,
+      `<div class="mmb-price-line"><span>${meta.summaryLabel}</span><span>${meta.summaryValue}</span></div>`,
+      `<div class="mmb-hr"></div>`,
+      totalRow,
+      `<div class="mmb-price-line"><span class="mmb-price-small">Ø pro Tag</span><span class="mmb-price-small">${Euro.fmt(sum.avgPerDay)}</span></div>`,
+      `<div class="mmb-price-line"><span class="mmb-price-small">Kaution</span><span class="mmb-price-small">gratis</span></div>`
+    ];
+    if(meta.note){ lines.push(`<div class="mmb-price-note">${meta.note}</div>`); }
+    return {
+      html:`<div class="mmb-price-summary">${lines.join('')}</div>`,
+      payload:{
+        total: totalWithShipping,
+        deposit: 0,
+        original: sum.original,
+        days: sum.days,
+        base_total: sum.total,
+        shipping_delta: shipping,
+        fulfillment_id: option.id,
+        fulfillment_label: meta.shortLabel,
+        fulfillment_note: meta.note,
+        fulfillment_price_delta: meta.priceDelta,
+        fulfillment_adds_to_total: meta.addsToTotal
+      }
+    };
+  }
+
+  buildSingleSummary(base, option){
+    const meta = this.fulfillmentMeta(option);
+    const shipping = meta.addsToTotal ? meta.priceDelta : 0;
+    const totalWithShipping = base + shipping;
+    const totalRow = `<div class="mmb-total"><div class="mmb-total-label"><span class="label">${meta.totalLabel}</span>${meta.totalSubline?`<span class="mmb-total-sub">${meta.totalSubline}</span>`:''}</div><span class="value">${Euro.fmt(totalWithShipping)}</span></div>`;
+    const lines = [
+      `<div class="mmb-price-line"><span>Aktueller Rabatt</span><span>0%</span></div>`,
+      `<div class="mmb-price-line"><span>${meta.summaryLabel}</span><span>${meta.summaryValue}</span></div>`,
+      `<div class="mmb-hr"></div>`,
+      totalRow,
+      `<div class="mmb-price-line"><span class="mmb-price-small">Ø pro Tag</span><span class="mmb-price-small">${Euro.fmt(base)}</span></div>`,
+      `<div class="mmb-price-line"><span class="mmb-price-small">Kaution</span><span class="mmb-price-small">gratis</span></div>`
+    ];
+    if(meta.note){ lines.push(`<div class="mmb-price-note">${meta.note}</div>`); }
+    return {
+      html:`<div class="mmb-price-summary">${lines.join('')}</div>`,
+      payload:{
+        total: totalWithShipping,
+        deposit: 0,
+        original: base,
+        days: 1,
+        base_total: base,
+        shipping_delta: shipping,
+        fulfillment_id: option.id,
+        fulfillment_label: meta.shortLabel,
+        fulfillment_note: meta.note,
+        fulfillment_price_delta: meta.priceDelta,
+        fulfillment_adds_to_total: meta.addsToTotal
+      }
+    };
+  }
+
+  showFulfillmentInfo(option){
+    if(!option) return;
+    this.hideFulfillmentInfo();
+    const overlay=document.createElement('div'); overlay.className='mmb-info-overlay';
+    overlay.innerHTML=`<div class="mmb-info-card" role="dialog" aria-modal="true">
+        <button type="button" class="mmb-info-close" data-close aria-label="Info schließen">×</button>
+        <h4>${option.infoTitle || option.label}</h4>
+        ${option.infoHtml || ''}
+      </div>`;
+    const close=()=>this.hideFulfillmentInfo();
+    overlay.addEventListener('click',ev=>{ if(ev.target===overlay) close(); });
+    const closeBtn=overlay.querySelector('[data-close]');
+    if(closeBtn){ closeBtn.addEventListener('click',close); }
+    document.body.appendChild(overlay);
+    this.infoOverlay=overlay;
+    document.addEventListener('keydown',this.handleInfoKeyDown);
+    setTimeout(()=>{ try{ closeBtn?.focus(); }catch(e){} }, 50);
+  }
+
+  hideFulfillmentInfo(){
+    if(this.infoOverlay){
+      document.removeEventListener('keydown',this.handleInfoKeyDown);
+      this.infoOverlay.remove();
+      this.infoOverlay=null;
+    }
+  }
+
+  handleInfoKeyDown(ev){
+    if(ev.key==='Escape'){ this.hideFulfillmentInfo(); }
   }
 
   getBoxPricing(id){ return this.state?.pricing?.boxes?.[id]||null; }
@@ -317,16 +572,30 @@ class Calendar{
   }
 
   renderHeader(){
-    const h=this.root.querySelector('.mmb-header');
-    h.querySelector('.mmb-month-title').textContent=Utils.formatMonthYear(this.state.month);
-    const btns=this.state.boxes.map(b=>`<button class="mmb-box-btn ${this.state.box?.id===b.id?'mmb-box-btn--active':''}" data-act="box" data-id="${b.id}">${b.name}</button>`).join('');
-    h.querySelector('.mmb-box-buttons').innerHTML=btns;
+    const group=this.root.querySelector('.mmb-box-section .mmb-box-buttons');
+    if(!group) return;
+    const btns=this.state.boxes.map(b=>`<button class="mmb-box-btn ${this.state.box?.id===b.id?'mmb-box-btn--active':''}" data-act="box" data-id="${b.id}" aria-pressed="${this.state.box?.id===b.id}">${b.name}</button>`).join('');
+    group.innerHTML=btns;
   }
 
   renderCalendar(){
-    const host=this.root.querySelector('.cal');
+    const calendarArea=this.root.querySelector('.mmb-calendar-area');
+    const fulfillmentHost=this.root.querySelector('.mmb-fulfillment-placeholder');
+    if(!calendarArea || !fulfillmentHost) return;
+    this.state.previewEnd=null;
     const days=Utils.generateCalendarDays(this.state.month);
-    host.innerHTML=`
+    const selectedFulfillment=this.getFulfillmentOption(this.state.fulfillment?.id);
+    this.state.fulfillment=selectedFulfillment;
+    const fulfillmentMarkup=this.renderFulfillmentOptions(selectedFulfillment);
+    calendarArea.innerHTML=`
+      <div class="mmb-calendar-meta">
+        <div class="mmb-section-title">Zeitraum auswählen</div>
+        <div class="mmb-nav">
+          <button class="mmb-nav-btn" data-act="prev" aria-label="Vorheriger Monat">←</button>
+          <div class="mmb-month-title">${Utils.formatMonthYear(this.state.month)}</div>
+          <button class="mmb-nav-btn" data-act="next" aria-label="Nächster Monat">→</button>
+        </div>
+      </div>
       <div class="mmb-calendar">
         <div class="mmb-calendar-header">${Utils.DAY_NAMES.map(d=>`<div class="mmb-day-header">${d}</div>`).join('')}</div>
         <div class="mmb-calendar-body">
@@ -341,50 +610,50 @@ class Calendar{
           }).join('')}
         </div>
       </div>`;
+    fulfillmentHost.innerHTML = fulfillmentMarkup;
     this.dayElMap.clear();
-    host.querySelectorAll('.mmb-day[data-date]').forEach(el=>this.dayElMap.set(el.dataset.date,el));
+    calendarArea.querySelectorAll('.mmb-day[data-date]').forEach(el=>this.dayElMap.set(el.dataset.date,el));
     this.updateVisuals();
   }
 
   renderSide(){
     const s=this.state.sel.start, e=this.state.sel.end; const hasRange=!!(s&&e);
+    const selectedFulfillment=this.getFulfillmentOption(this.state.fulfillment?.id);
+    this.state.fulfillment=selectedFulfillment;
     let html=`<div class="mmb-booking-form"><h3 style="margin:0;font-weight:600;">Buchungsanfrage</h3>`;
+
+    let summaryHtml='';
+    let summaryPayload=null;
+
     if(hasRange){
-      const sum=this.pricedTotal(this.state.box.id,s,e); 
+      const sum=this.pricedTotal(this.state.box.id,s,e);
       this.avgCache=sum.avgPerDay;
-      // >>> NEU: Summary speichern (für Request)
-      this.state.summary = { total: sum.total, deposit: 0, original: sum.original, days: sum.days };
-      html+=`<div class="mmb-price-summary">
-        <div class="mmb-price-line"><span>Original (ohne Rabatt)</span><span>${Euro.fmt(sum.original)}</span></div>
-        <div class="mmb-price-line"><span>Rabatt (${sum.discountPercentDisplay}%)</span><span>–${Euro.fmt(sum.discountAmount)}</span></div>
-        <div class="mmb-hr"></div>
-        <div class="mmb-total"><span class="label">Gesamt</span><span class="value">${Euro.fmt(sum.total)}</span></div>
-        <div class="mmb-price-line"><span class="mmb-price-small">Ø pro Tag</span><span class="mmb-price-small">${Euro.fmt(sum.avgPerDay)}</span></div>
-        <div class="mmb-price-line"><span class="mmb-price-small">Kaution</span><span class="mmb-price-small">gratis</span></div>
-      </div>`;
+      const summary=this.buildRangeSummary(sum, selectedFulfillment);
+      summaryHtml=summary.html;
+      summaryPayload=summary.payload;
     }else if(s){
       const base=this.baseDayPrice(this.state.box.id,s);
-      this.state.summary = { total: base, deposit: 0, original: base, days: 1 }; // <<< NEU
-      html+=`<div class="mmb-price-summary">
-        <div class="mmb-price-line"><span>Aktueller Rabatt</span><span>0%</span></div>
-        <div class="mmb-hr"></div>
-        <div class="mmb-total"><span class="label">Gesamt</span><span class="value">${Euro.fmt(base)}</span></div>
-        <div class="mmb-price-line"><span class="mmb-price-small">Ø pro Tag</span><span class="mmb-price-small">${Euro.fmt(base)}</span></div>
-        <div class="mmb-price-line"><span class="mmb-price-small">Kaution</span><span class="mmb-price-small">gratis</span></div>
-      </div>`;
+      const summary=this.buildSingleSummary(base, selectedFulfillment);
+      summaryHtml=summary.html;
+      summaryPayload=summary.payload;
       this.avgCache=null;
     }else{
-      html+=`<div class="mmb-price-summary" style="text-align:center;color:#cfcfcf;">Bitte Zeitraum wählen</div>`;
+      summaryHtml=`<div class="mmb-price-summary mmb-price-summary--empty">Bitte Zeitraum wählen</div>`;
       this.avgCache=null;
-      this.state.summary = null; // <<< NEU
     }
+
+    this.state.summary = summaryPayload;
+    if(summaryHtml) html+=summaryHtml;
+
     html+=`<form data-act="submit">
       <label>Name *<br><input class="mmb-input" name="customer_name" required></label><br>
       <label>E-Mail *<br><input type="email" class="mmb-input" name="customer_email" required></label><br>
       <label>Telefon<br><input class="mmb-input" name="customer_phone"></label><br>
       <label>Anmerkungen<br><textarea class="mmb-input" name="note" style="min-height:70px;"></textarea></label><br>
-      <label class="mmb-terms"><input type="checkbox" name="accept_terms" required> Ich akzeptiere <a href="https://www.mietmichbox.de/allgemeine-geschaftsbedingungen" target="_blank" rel="noopener">AGB</a> & <a href="https://www.mietmichbox.de/datenschutzerklarung" target="_blank" rel="noopener">Datenschutz</a>*</label>
-      <button class="mmb-btn" ${s?'':'disabled'}>Buchungsanfrage senden</button>
+      <div class="mmb-form-actions">
+        <label class="mmb-terms"><input type="checkbox" name="accept_terms" required> Ich akzeptiere <a href="https://www.mietmichbox.de/allgemeine-geschaftsbedingungen" target="_blank" rel="noopener">AGB</a> & <a href="https://www.mietmichbox.de/datenschutzerklarung" target="_blank" rel="noopener">Datenschutz</a>*</label>
+        <button class="mmb-btn" ${s?'':'disabled'}>Buchungsanfrage senden</button>
+      </div>
     </form>
     <div style="margin-top:6px;color:#cfcfcf;font-size:.9rem;">${
       hasRange?`${s.toLocaleDateString('de-DE')} – ${e.toLocaleDateString('de-DE')} (${this.pricedTotal(this.state.box.id,s,e).days} Tage)`
@@ -411,16 +680,22 @@ class Calendar{
       el.setAttribute('data-price', Euro.fmt(this.baseDayPrice(this.state.box.id,d)));
     });
 
-    if(!s) return;
+    if(!s){
+      if(this.state.previewEnd){ this.state.previewEnd=null; }
+      return;
+    }
 
     // nur Start
     if(s && !e){
-      this.setBadge(s,'Start'); this.markRange(s,s);
+      const preview = (this.state.previewEnd && cmp(this.state.previewEnd,s)>=0) ? this.state.previewEnd : s;
+      this.setBadge(s,'Start');
+      if(cmp(preview,s)>0){ this.setBadge(preview,'Ende'); }
+      this.markRange(s,preview);
       this.dayElMap.forEach((el,key)=>{
         const [Y,M,D]=key.split('-').map(Number); const d=Utils.startOfDay(new Date(Y,M-1,D));
         if(cmp(d,s)>0 && !el.classList.contains('mmb-day--blocked')){
           const add=this.marginalOneDay(this.state.box.id,s,d);
-          el.setAttribute('data-price', add>0?`+${Euro.round(add)}€`:'—');
+          el.setAttribute('data-price', add>0?`+ ${Euro.round(add)} €`:'—');
         }
       });
       return;
@@ -430,12 +705,12 @@ class Calendar{
     if(s && e){
       this.setBadge(s,'Start'); this.setBadge(e,'Ende'); this.markRange(s,e);
       const avg = this.avgCache ?? this.pricedTotal(this.state.box.id,s,e).avgPerDay;
-      this.forEachInRange(s,e, el=>{ el.setAttribute('data-price',`Ø ${Euro.round(avg)}€`); });
+      this.forEachInRange(s,e, el=>{ el.setAttribute('data-price',`Ø ${Euro.round(avg)} €`); });
       this.dayElMap.forEach((el,key)=>{
         const [Y,M,D]=key.split('-').map(Number); const d=Utils.startOfDay(new Date(Y,M-1,D));
         if(cmp(d,e)>0 && !el.classList.contains('mmb-day--blocked')){
           const add=this.marginalOneDay(this.state.box.id,s,d);
-          el.setAttribute('data-price', add>0?`+${Euro.round(add)}€`:'—');
+          el.setAttribute('data-price', add>0?`+ ${Euro.round(add)} €`:'—');
           el.setAttribute('data-extend','1');
         }
       });
@@ -455,12 +730,19 @@ class Calendar{
   /* === Events === */
   wire(){
     this.root.addEventListener('click',e=>{
+      const infoBtn = e.target.closest('[data-act="fulfillment-info"]');
+      if(infoBtn){
+        e.preventDefault();
+        const opt=this.getFulfillmentOption(infoBtn.dataset.id);
+        this.showFulfillmentInfo(opt);
+        return;
+      }
       const nav = e.target.closest('[data-act="prev"],[data-act="next"],[data-act="box"]');
       if(nav){
         const act=nav.dataset.act;
         if(act==='prev'){ this.changeMonth(-1); return; }
         if(act==='next'){ this.changeMonth(1); return; }
-        if(act==='box'){ const b=this.state.boxes.find(x=>x.id===nav.dataset.id); this.state.box=b; this.state.sel={start:null,end:null}; this.avgCache=null; this.renderHeader(); this.renderCalendar(); this.renderSide(); return; }
+        if(act==='box'){ const b=this.state.boxes.find(x=>x.id===nav.dataset.id); this.state.box=b; this.state.sel={start:null,end:null}; this.state.previewEnd=null; this.avgCache=null; this.state.summary=null; this.renderHeader(); this.renderCalendar(); this.renderSide(); return; }
       }
       const add = e.target.closest('[data-act="extend"]');
       if(add){
@@ -477,6 +759,30 @@ class Calendar{
       if(day){ this.pick(day.dataset.date); }
     });
 
+    this.root.addEventListener('mouseover',e=>{
+      const day = e.target.closest('.mmb-day[data-date]');
+      if(day){ this.preview(day.dataset.date); }
+    });
+
+    this.root.addEventListener('mouseout',e=>{
+      const day = e.target.closest('.mmb-day[data-date]');
+      if(!day) return;
+      const related = e.relatedTarget && e.relatedTarget.closest ? e.relatedTarget.closest('.mmb-day[data-date]') : null;
+      if(!related && this.state.previewEnd){
+        this.state.previewEnd=null;
+        this.updateVisuals();
+      }
+    });
+
+    this.root.addEventListener('change',e=>{
+      const radio = e.target.closest('input[name="fulfillment_method"]');
+      if(radio){
+        this.state.fulfillment = this.getFulfillmentOption(radio.value);
+        this.renderCalendar();
+        this.renderSide();
+      }
+    });
+
     // Submit
     this.root.addEventListener('submit', async (e)=>{
       if(!e.target.matches('form[data-act="submit"]')) return;
@@ -489,9 +795,17 @@ class Calendar{
       const start=this.state.sel.start, end=this.state.sel.end || this.state.sel.start;
 
       // >>> NEU: Summen aus dem State (Fallback: on-the-fly berechnen)
-      const sum = this.state.summary || this.pricedTotal(this.state.box.id, start, end);
-      const total_amount = Number(sum?.total ?? 0);
-      const deposit_eur  = Number(sum?.deposit ?? 0);
+      const summaryInfo = this.state.summary;
+      const fallbackSum = this.pricedTotal(this.state.box.id, start, end);
+      const fulfillmentFromState = this.getFulfillmentOption(summaryInfo?.fulfillment_id || this.state.fulfillment?.id);
+      const baseTotal = Number(summaryInfo?.base_total ?? fallbackSum?.total ?? 0);
+      const shippingDelta = Number(summaryInfo?.shipping_delta ?? (fulfillmentFromState.addsToTotal !== false ? (fulfillmentFromState.priceDelta||0) : 0));
+      const total_amount = Number(summaryInfo?.total ?? (baseTotal + shippingDelta));
+      const deposit_eur  = Number(summaryInfo?.deposit ?? 0);
+      const fulfillmentMethod = summaryInfo?.fulfillment_id || fulfillmentFromState.id;
+      const fulfillmentLabel = summaryInfo?.fulfillment_label || fulfillmentFromState.shortLabel || fulfillmentFromState.label;
+      const fulfillmentPriceDelta = Number(summaryInfo?.fulfillment_price_delta ?? fulfillmentFromState.priceDelta ?? 0);
+      const fulfillmentNote = summaryInfo?.fulfillment_note || fulfillmentFromState.note || '';
 
       const payload={
         box_id:Number(this.state.box.id),
@@ -506,16 +820,20 @@ class Calendar{
 
         // >>> NEU: Preis an Backend übergeben (als reine Zahlen)
         total_amount: total_amount,
-        deposit_eur:  deposit_eur
+        deposit_eur:  deposit_eur,
+        fulfillment_method: fulfillmentMethod,
+        fulfillment_label: fulfillmentLabel,
+        fulfillment_price_delta: fulfillmentPriceDelta
       };
+      if(fulfillmentNote){ payload.fulfillment_note = fulfillmentNote; }
 
       const btn=e.target.querySelector('button'); const orig=btn.textContent; btn.disabled=true; btn.textContent='Senden…';
       try{
         const res=await sendBooking(MMB_CONFIG.createUrl, payload);
         const dispId = res?.booking?.display_id ? String(res.booking.display_id) : '–';
         this.modal('Buchungsanfrage gesendet','Danke! Deine Anfrage ist eingegangen.\n\nBuchungs-ID: '+dispId);
-        e.target.reset(); this.state.sel={start:null,end:null}; this.avgCache=null; this.state.summary=null;
-        this.renderSide(); this.updateVisuals();
+        e.target.reset(); this.state.sel={start:null,end:null}; this.state.previewEnd=null; this.avgCache=null; this.state.summary=null; this.state.fulfillment=FULFILLMENT_OPTIONS[0]; this.hideFulfillmentInfo();
+        this.renderCalendar(); this.renderSide(); this.updateVisuals();
       }catch(err){
         console.error(err);
         this.modal('Fehler beim Senden', (err && err.message)? err.message : String(err));
@@ -523,16 +841,37 @@ class Calendar{
     });
   }
 
+  preview(key){
+    const start=this.state.sel?.start;
+    if(!start || this.state.sel?.end) return;
+    const el=this.dayElMap.get(key);
+    if(!el || el.classList.contains('mmb-day--blocked')) return;
+    const [Y,M,D]=key.split('-').map(Number);
+    const date=Utils.startOfDay(new Date(Y,M-1,D));
+    const cmpToStart=Utils.cmpDate(date,start);
+    if(cmpToStart<0){
+      if(this.state.previewEnd){
+        this.state.previewEnd=null;
+        this.updateVisuals();
+      }
+      return;
+    }
+    if(!this.state.previewEnd || Utils.cmpDate(this.state.previewEnd,date)!==0){
+      this.state.previewEnd=date;
+      this.updateVisuals();
+    }
+  }
+
   pick(key){
     const [Y,M,D]=key.split('-').map(Number); const date=Utils.startOfDay(new Date(Y,M-1,D));
     const today=Utils.startOfDay(new Date()); if(date<today) return;
     let {start,end}=this.state.sel;
-    if(start && end){ this.state.sel={start:date,end:null}; this.avgCache=null; this.state.summary=null; this.renderSide(); this.updateVisuals(); return; }
-    if(!start){ this.state.sel={start:date,end:null}; this.avgCache=null; this.state.summary=null; this.renderSide(); this.updateVisuals(); return; }
+    if(start && end){ this.state.sel={start:date,end:null}; this.state.previewEnd=null; this.avgCache=null; this.state.summary=null; this.renderSide(); this.updateVisuals(); return; }
+    if(!start){ this.state.sel={start:date,end:null}; this.state.previewEnd=null; this.avgCache=null; this.state.summary=null; this.renderSide(); this.updateVisuals(); return; }
     const cmp=Utils.cmpDate(date,start);
-    if(cmp===0){ this.state.sel={start:start,end:start}; this.renderSide(); this.updateVisuals(); return; }
-    if(cmp>0){ this.state.sel={start:start,end:date}; this.renderSide(); this.updateVisuals(); return; }
-    this.state.sel={start:date,end:null}; this.avgCache=null; this.state.summary=null; this.renderSide(); this.updateVisuals();
+    if(cmp===0){ this.state.sel={start:start,end:start}; this.state.previewEnd=null; this.renderSide(); this.updateVisuals(); return; }
+    if(cmp>0){ this.state.sel={start:start,end:date}; this.state.previewEnd=null; this.renderSide(); this.updateVisuals(); return; }
+    this.state.sel={start:date,end:null}; this.state.previewEnd=null; this.avgCache=null; this.state.summary=null; this.renderSide(); this.updateVisuals();
   }
 
   changeMonth(delta){

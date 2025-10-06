@@ -62,17 +62,82 @@ function format_price(float $amount): string {
   return number_format($amount, 0, ',', '.') . '€';
 }
 
+const FULFILLMENT_DEFS = [
+  'pickup' => [
+    'label' => 'Abholung',
+    'full' => 'Abholung in Wesel',
+    'price_delta' => 0.0,
+    'adds_to_total' => true,
+    'note' => '',
+  ],
+  'shipping' => [
+    'label' => 'Versand',
+    'full' => 'Versand (deutschlandweit)',
+    'price_delta' => 80.0,
+    'adds_to_total' => true,
+    'note' => 'inkl. Express-Hin- & Rückversand sowie Vorbereitungspauschale',
+  ],
+  'delivery' => [
+    'label' => 'Lieferung',
+    'full' => 'Lieferung (NRW-weit)',
+    'price_delta' => 0.0,
+    'adds_to_total' => false,
+    'note' => 'zzgl. individueller Lieferpauschale – wir melden uns mit einem Angebot',
+  ],
+];
+
+/**
+ * @param array<string,mixed> $input
+ * @return array{method:string,label:string,full:string,note:string,price_delta:float,adds_to_total:bool}
+ */
+function normalize_fulfillment_from_request(array $input): array {
+  $method = strtolower(trim((string)($input['fulfillment_method'] ?? '')));
+  if (!isset(FULFILLMENT_DEFS[$method])) {
+    $method = 'pickup';
+  }
+  $def = FULFILLMENT_DEFS[$method];
+  return [
+    'method' => $method,
+    'label' => (string)$def['label'],
+    'full' => (string)$def['full'],
+    'note' => (string)$def['note'],
+    'price_delta' => (float)$def['price_delta'],
+    'adds_to_total' => (bool)$def['adds_to_total'],
+  ];
+}
+
+/**
+ * @param array{method:string,label:string,full:string,note:string,price_delta:float,adds_to_total:bool} $info
+ */
+function fulfillment_email_line(array $info): string {
+  $method = $info['method'];
+  $full   = $info['full'];
+  $price  = (float)$info['price_delta'];
+  $note   = trim((string)$info['note']);
+
+  if ($method === 'pickup') {
+    return $price > 0 ? ($full . ' +' . format_price($price)) : ($full . ' (gratis)');
+  }
+  if ($method === 'shipping') {
+    return $full . ' +' . format_price($price);
+  }
+  return $note !== '' ? ($full . ' (' . $note . ')') : $full;
+}
+
 /**
  * Erstellt Betreff + Text für die automatische Eingangsbestätigung.
  *
- * @param array{customer_name:string,customer_email:string,box_id:int,start_date:string,end_date:string,total_amount:float,display_id:string} $data
- * @return array{subject:string,text:string,html:string}
+ * @param array{customer_name:string,customer_email:string,box_id:int,start_date:string,end_date:string,total_amount:float,display_id:string,fulfillment_method?:string,fulfillment_label?:string,fulfillment_note?:string,fulfillment_price_delta?:float} $data
+ * @return array<string,mixed>
  */
 function booking_mail_context(array $data): array {
   $name      = trim($data['customer_name']) ?: 'Guten Tag';
   $email     = trim($data['customer_email']);
   $boxName   = box_name_by_id((int)$data['box_id']);
   $totalDisp = format_price((float)$data['total_amount']);
+
+  $fulfillmentInfo = normalize_fulfillment_from_request($data);
+  $fulfillmentLine = fulfillment_email_line($fulfillmentInfo);
 
   $startDate = new DateTimeImmutable($data['start_date']);
   $endDate   = new DateTimeImmutable($data['end_date']);
@@ -86,6 +151,8 @@ function booking_mail_context(array $data): array {
     'boxName'     => $boxName,
     'totalDisp'   => $totalDisp,
     'range'       => $range,
+    'fulfillment' => $fulfillmentLine,
+    'fulfillment_info' => $fulfillmentInfo,
   ];
 }
 
@@ -96,6 +163,7 @@ function build_submission_mail(array $data): array {
   $boxName   = $ctx['boxName'];
   $range     = $ctx['range'];
   $totalDisp = $ctx['totalDisp'];
+  $fulfillment = $ctx['fulfillment'];
 
   $subject = "Deine Buchung wurde übermittelt 🚀 – Buchungs-ID: {$data['display_id']}";
 
@@ -109,6 +177,7 @@ Deine Buchung im Überblick:
 📧 E-Mail: {$email}
 🎵 Musikbox: {$boxName}
 🕰️ Zeitraum: {$range}
+🚚 Abwicklung: {$fulfillment}
 💶 Gesamtkosten: {$totalDisp}
 
 Bitte überprüfe einmal, ob deine Buchung korrekt bei uns eingegangen ist.
@@ -137,6 +206,7 @@ function build_internal_submission_mail(array $data): array {
   $boxName   = $ctx['boxName'];
   $range     = $ctx['range'];
   $totalDisp = $ctx['totalDisp'];
+  $fulfillment = $ctx['fulfillment'];
   $displayId = $data['display_id'];
 
   $linkUrl   = 'https://mietmichbox.de/buchungsverwaltung';
@@ -152,6 +222,7 @@ Buchung im Überblick:
 📧 E-Mail: {$email}
 🎵 Musikbox: {$boxName}
 🕰️ Zeitraum: {$range}
+🚚 Abwicklung: {$fulfillment}
 💶 Gesamtkosten: {$totalDisp}
 
 Buchung in der Buchungsverwaltung einsehen: {$linkUrl}
@@ -165,6 +236,7 @@ TXT;
 📧 E-Mail: {$email}<br>
 🎵 Musikbox: {$boxName}<br>
 🕰️ Zeitraum: {$range}<br>
+🚚 Abwicklung: {$fulfillment}<br>
 💶 Gesamtkosten: {$totalDisp}</p>
 <p>Buchung in der <a href="{$linkUrl}">Buchungsverwaltung</a> einsehen.</p>
 HTML;
@@ -244,6 +316,12 @@ try {
   $phone  = trim((string)($in['customer_phone'] ?? ''));
   $note   = trim((string)($in['note']           ?? ''));
 
+  $fulfillment = normalize_fulfillment_from_request($in);
+  $fulfillmentMethod = $fulfillment['method'];
+  $fulfillmentLabel  = $fulfillment['label'];
+  $fulfillmentNote   = $fulfillment['note'];
+  $fulfillmentPrice  = (float)$fulfillment['price_delta'];
+
   // Overlap-Flag: nur TRUE zählt; FALSE wird ignoriert (Server-Default bleibt)
   $force = null;
   foreach (['force','force_overlap','allow_overlap','ignore_availability','ignore_overlaps'] as $k) {
@@ -304,6 +382,10 @@ try {
   if (has_col($pdo,'note'))           { $fields[]='note';           $place[]=':note';           $params[':note']=$note; }
   if (has_col($pdo,'total_amount'))   { $fields[]='total_amount';   $place[]=':total_amount';   $params[':total_amount']=$total; }
   if (has_col($pdo,'deposit_eur'))    { $fields[]='deposit_eur';    $place[]=':deposit_eur';    $params[':deposit_eur']=$deposit; }
+  if (has_col($pdo,'fulfillment_method')) { $fields[]='fulfillment_method'; $place[]=':fulfillment_method'; $params[':fulfillment_method']=$fulfillmentMethod; }
+  if (has_col($pdo,'fulfillment_label'))  { $fields[]='fulfillment_label';  $place[]=':fulfillment_label';  $params[':fulfillment_label']=$fulfillmentLabel; }
+  if (has_col($pdo,'fulfillment_note'))   { $fields[]='fulfillment_note';   $place[]=':fulfillment_note';   $params[':fulfillment_note']=$fulfillmentNote; }
+  if (has_col($pdo,'fulfillment_price_delta')) { $fields[]='fulfillment_price_delta'; $place[]=':fulfillment_price_delta'; $params[':fulfillment_price_delta']=$fulfillmentPrice; }
 
   // created_at → NOW() (nur wenn Spalte existiert)
   if (has_col($pdo,'created_at')) { $fields[]='created_at'; $place[]='NOW()'; }
@@ -338,6 +420,10 @@ try {
       'end_date'       => $end,
       'total_amount'   => $total,
       'display_id'     => $dispId,
+      'fulfillment_method' => $fulfillmentMethod,
+      'fulfillment_label'  => $fulfillmentLabel,
+      'fulfillment_note'   => $fulfillmentNote,
+      'fulfillment_price_delta' => $fulfillmentPrice,
     ];
 
     try {
@@ -365,7 +451,11 @@ try {
       'status'=>'pending',
       'overlap'=>$conflicts ? 'allowed' : 'none',
       'total_amount'=>$total,
-      'deposit_eur'=>$deposit
+      'deposit_eur'=>$deposit,
+      'fulfillment_method'=>$fulfillmentMethod,
+      'fulfillment_label'=>$fulfillmentLabel,
+      'fulfillment_price_delta'=>$fulfillmentPrice,
+      'fulfillment_note'=>$fulfillmentNote
     ],
     'mail'=>$mailInfo,
     'internal_mail'=>$internalMailInfo
