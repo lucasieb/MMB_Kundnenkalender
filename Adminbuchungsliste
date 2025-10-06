@@ -1449,29 +1449,15 @@ Telefon: 01742015500`;
   <!-- ======================= INIT ======================= -->
   <script>
     document.addEventListener('DOMContentLoaded', async function(){
-      let authError = null;
       try {
         await MMBAdminAuth.ensureSession();
       } catch (error) {
-        authError = error instanceof Error ? error : new Error(String(error));
-        console.warn('Admin-Login wurde übersprungen (externer Schutz aktiv?).', authError);
+        const reason = error instanceof Error ? error : new Error(String(error));
+        console.error('Admin-Authentifizierung konnte nicht geprüft werden.', reason);
       }
 
       try {
         MietMichBoxAdminList.init({ container:'#mmb-admin-list', locale:'de-DE', timezone:'Europe/Berlin' });
-        if (authError) {
-          const host = document.querySelector('#mmb-admin-list');
-          if (host && host.parentElement) {
-            const previous = host.previousElementSibling;
-            const hasWarning = previous && previous.classList && previous.classList.contains('mmb-warning');
-            if (!hasWarning) {
-              const notice = document.createElement('p');
-              notice.className = 'mmb-warning';
-              notice.textContent = 'Hinweis: Der zusätzliche Admin-Login wurde übersprungen, da diese Seite bereits extern geschützt ist.';
-              host.parentElement.insertBefore(notice, host);
-            }
-          }
-        }
       } catch (error) {
         console.error('Admin-Buchungsliste konnte nicht initialisiert werden', error);
         const container = document.querySelector('#mmb-admin-list');
