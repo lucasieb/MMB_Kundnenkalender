@@ -25,7 +25,7 @@
   </div>
 
   <!-- ======================= MMB CORE ======================= -->
-  <script src="https://firebrick-squirrel-568721.hostingersite.com/admin_auth.js" data-api-base="https://firebrick-squirrel-568721.hostingersite.com/"></script>
+  <script src="admin_auth.js" data-api-base="./"></script>
   <script>
   (function(global){'use strict';
 
@@ -1182,6 +1182,8 @@
         const method = inferFulfillmentMethod(b, details);
         const choice = this.getFulfillmentChoice(method);
         const price = Number(b.fulfillment_price_delta ?? choice.priceDelta);
+        const rawDetails = b.fulfillment_details || b.fulfillment_details_json || '';
+        const details = parseFulfillmentDetails(rawDetails);
         return {
           id: choice.id,
           method: choice.id,
