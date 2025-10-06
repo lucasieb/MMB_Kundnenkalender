@@ -51,6 +51,7 @@ function has_column(PDO $pdo, string $name): bool {
 
 $input = read_input();
 $bookingId = isset($input['booking_id']) ? (int)$input['booking_id'] : 0;
+$bookingDisplayIdRaw = isset($input['booking_display_id']) ? trim((string)$input['booking_display_id']) : '';
 $customerEmail = strtolower(trim((string)($input['customer_email'] ?? '')));
 
 /**
@@ -91,6 +92,15 @@ function normalize_method($value): string {
 
 $requestedMethod = normalize_method($input['method'] ?? null);
 
+if ($bookingId <= 0 && $bookingDisplayIdRaw !== '' && has_column($pdo, 'display_id')) {
+  $stmt = $pdo->prepare('SELECT id FROM bookings WHERE display_id = ? LIMIT 1');
+  $stmt->execute([$bookingDisplayIdRaw]);
+  $fallbackId = (int) $stmt->fetchColumn();
+  if ($fallbackId > 0) {
+    $bookingId = $fallbackId;
+  }
+}
+
 if ($bookingId <= 0) {
   json_response(['ok'=>false,'error'=>'Ungültige Buchungs-ID'], 400);
 }
@@ -99,6 +109,9 @@ if ($customerEmail === '' || !filter_var($customerEmail, FILTER_VALIDATE_EMAIL))
 }
 
 $selectCols = ['id', 'customer_email'];
+if (has_column($pdo, 'display_id')) {
+  $selectCols[] = 'display_id';
+}
 foreach (['fulfillment_method','fulfillment_label','fulfillment_note','fulfillment_details_json','fulfillment_details'] as $col) {
   if (has_column($pdo, $col)) {
     $selectCols[] = $col;
@@ -201,7 +214,15 @@ $details = [
   'contact_email' => $contactEmail,
   'contact_phone' => $contactPhone,
   'consent_contact' => $consent,
+  'customer_email' => $customerEmail,
+  'booking_id' => $bookingId,
+  'submitted_via' => 'customer_portal',
 ];
+if (($booking['display_id'] ?? '') !== '') {
+  $details['booking_display_id'] = (string) $booking['display_id'];
+} elseif ($bookingDisplayIdRaw !== '') {
+  $details['booking_display_id'] = $bookingDisplayIdRaw;
+}
 
 if (isset($methodLabels[$method])) {
   $details['method_label'] = $methodLabels[$method];
@@ -209,12 +230,16 @@ if (isset($methodLabels[$method])) {
 
 if ($method === 'shipping') {
   $addressLine1 = trim((string)($input['address_line1'] ?? ''));
+  $addressLine2 = trim((string)($input['address_line2'] ?? ''));
   $postalCode   = trim((string)($input['postal_code'] ?? ''));
   $city         = trim((string)($input['city'] ?? ''));
   if ($addressLine1 === '' || $postalCode === '' || $city === '') {
     json_response(['ok'=>false,'error'=>'Bitte vollständige Lieferadresse angeben'], 422);
   }
   $details['address_line1'] = $addressLine1;
+  if ($addressLine2 !== '') {
+    $details['address_line2'] = $addressLine2;
+  }
   $details['postal_code']   = $postalCode;
   $details['city']          = $city;
   $details['address_extra'] = trim((string)($input['address_extra'] ?? ''));
