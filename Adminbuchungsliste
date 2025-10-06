@@ -91,11 +91,28 @@
     const MMB_API_BASE = MMBAdminAuth.getApiBase();
 
     async function mmbApiGet(path){
-      const res=await fetch(MMB_API_BASE+path,{credentials:'include'});
-      const text=await res.text(); let data;
-      try{ data=JSON.parse(text);}catch{ data={ok:false,error:'Keine JSON-Antwort',raw:text};}
-      if(!res.ok||!data.ok) throw new Error(data.error||('HTTP '+res.status+'\n'+(data.raw||'')));
-      return data;
+      const res = await fetch(MMB_API_BASE + path, { credentials: 'include' });
+      const text = await res.text();
+      let data;
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch (_) {
+        const err = new Error('Server lieferte keine gültige JSON-Antwort');
+        err.raw = text;
+        err.status = res.status;
+        throw err;
+      }
+
+      const payload = (data && typeof data === 'object') ? data : {};
+      const okFlag = Object.prototype.hasOwnProperty.call(payload, 'ok') ? Boolean(payload.ok) : true;
+      if (!res.ok || !okFlag) {
+        const message = (payload.error || payload.message || `HTTP ${res.status}`);
+        const error = new Error(message);
+        error.details = payload;
+        error.status = res.status;
+        throw error;
+      }
+      return payload;
     }
     async function mmbApiPost(path,body){
       const res=await fetch(MMB_API_BASE+path,{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(body||{})});
@@ -406,7 +423,12 @@
 
       async loadBookings(){ try{
         const res=await MMBApi.listBookings();
-        const items=(res.items||[]).map(r=>{
+        const sourceItems = Array.isArray(res.items)
+          ? res.items
+          : (Array.isArray(res.bookings)
+            ? res.bookings
+            : (Array.isArray(res.data) ? res.data : (Array.isArray(res) ? res : [])));
+        const items=sourceItems.map(r=>{
           const boxId = String(r.box_id);
           const totalAmount = Number(r.total_amount ?? 0);
           const deposit = Number(r.deposit_eur ?? 0);
