@@ -487,20 +487,59 @@ async function submitFulfillmentDetails(urls, payload){
 }
 
 async function attemptSubmitFulfillmentDetails(url, payload){
-  const response = await fetchText(url, {
-    method:'POST',
-    headers:{'Content-Type':'application/json','Accept':'application/json'},
-    body: JSON.stringify(payload),
-    credentials:'omit'
-  });
-  if(!response.ok){
-    throw new Error('HTTP '+response.status+' / '+response.text.slice(0,180));
+  const makeUrlEnc = (data)=>{
+    const params = new URLSearchParams();
+    Object.entries(data || {}).forEach(([key, value])=>{
+      params.append(key, value == null ? '' : String(value));
+    });
+    return params;
+  };
+
+  const request = async (options)=>{
+    const res = await fetchText(url, options);
+    if(res.ok){
+      const parsed = parseJsonLoose(res.text);
+      if(parsed && parsed.ok === true){
+        return parsed;
+      }
+      if(parsed && parsed.error){
+        throw new Error(parsed.error);
+      }
+      throw new Error('HTTP '+res.status+' / '+res.text.slice(0,200));
+    }
+    const parsed = parseJsonLoose(res.text);
+    const message = parsed && parsed.error
+      ? parsed.error
+      : 'HTTP '+res.status+' / '+res.text.slice(0,200);
+    const error = new Error(message);
+    error.status = res.status;
+    throw error;
+  };
+
+  let lastError = null;
+  try{
+    return await request({
+      method:'POST',
+      headers:{'Content-Type':'application/x-www-form-urlencoded','Accept':'application/json'},
+      body: makeUrlEnc(payload),
+      credentials:'omit'
+    });
+  }catch(err){
+    lastError = err instanceof Error ? err : new Error(String(err));
   }
-  const data = parseJsonLoose(response.text);
-  if(!data || data.ok !== true){
-    throw new Error((data && data.error) ? data.error : 'Unbekannter Fehler beim Übermitteln der Abwicklungsdaten');
+
+  try{
+    return await request({
+      method:'POST',
+      headers:{'Content-Type':'application/json','Accept':'application/json'},
+      body: JSON.stringify(payload),
+      credentials:'omit'
+    });
+  }catch(err){
+    lastError = err instanceof Error ? err : new Error(String(err));
   }
-  return data;
+
+  throw lastError || new Error('Konnte Abwicklungsdetails nicht senden');
 }
 
 /* ===== Kalender ===== */
