@@ -86,13 +86,23 @@
   let ensurePromise = null;
   let authenticated = false;
   let publicMode = false;
+  let previousAuthState = false;
 
   function setPublicMode(){
     if (publicMode) {
       return;
     }
+    previousAuthState = authenticated;
     publicMode = true;
     authenticated = true;
+  }
+
+  function leavePublicMode(){
+    if (!publicMode) {
+      return;
+    }
+    publicMode = false;
+    authenticated = previousAuthState;
   }
 
   function ensureStyle(){
@@ -380,6 +390,7 @@
     ensureSession,
     getApiBase: () => API_BASE,
     shouldSendCredentials: () => !publicMode,
-    enterPublicMode: () => { setPublicMode(); }
+    enterPublicMode: () => { setPublicMode(); },
+    exitPublicMode: () => { leavePublicMode(); }
   };
 })(window);

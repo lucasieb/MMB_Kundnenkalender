@@ -77,15 +77,23 @@
 
   /* ============ API ============ */
   const MMB_API_BASE = MMBAdminAuth.getApiBase();
-  let apiUsesCredentials = (typeof MMBAdminAuth.shouldSendCredentials === 'function')
-    ? MMBAdminAuth.shouldSendCredentials()
-    : true;
+  let apiUsesCredentials = true;
 
-  function refreshApiCredentialPreference(){
-    if (typeof MMBAdminAuth.shouldSendCredentials === 'function') {
-      apiUsesCredentials = MMBAdminAuth.shouldSendCredentials();
+  function syncApiCredentialPreference(){
+    if (typeof MMBAdminAuth.shouldSendCredentials !== 'function') {
+      return;
+    }
+    try {
+      const result = MMBAdminAuth.shouldSendCredentials();
+      if (typeof result === 'boolean') {
+        apiUsesCredentials = result;
+      }
+    } catch (_) {
+      /* Ignorieren – wir behalten die zuletzt bekannte Einstellung. */
     }
   }
+
+  syncApiCredentialPreference();
 
   function switchToPublicMode(){
     if (!apiUsesCredentials) {
@@ -97,22 +105,53 @@
     }
   }
 
-  async function performApiRequest(path, init = {}, attemptFallback = true){
+  function switchToCredentialMode(){
+    if (apiUsesCredentials) {
+      return;
+    }
+    apiUsesCredentials = true;
+    if (typeof MMBAdminAuth.exitPublicMode === 'function') {
+      MMBAdminAuth.exitPublicMode();
+    }
+  }
+
+  function shouldRetryWithoutCredentials(error){
+    if (!error) {
+      return false;
+    }
+    if (error.isNetworkError || error.isParseError) {
+      return true;
+    }
+    const status = typeof error.status === 'number' ? error.status : 0;
+    return status === 0 || status === 401 || status === 403;
+  }
+
+  function shouldRetryWithCredentials(error){
+    if (!error) {
+      return false;
+    }
+    if (error.isNetworkError) {
+      return true;
+    }
+    const status = typeof error.status === 'number' ? error.status : 0;
+    return status === 401 || status === 403;
+  }
+
+  async function executeApiRequest(path, init, useCredentials){
     const requestInit = Object.assign({}, init, {
-      credentials: apiUsesCredentials ? 'include' : 'omit'
+      credentials: useCredentials ? 'include' : 'omit'
     });
 
     let response;
     try {
       response = await fetch(MMB_API_BASE + path, requestInit);
     } catch (error) {
-      if (attemptFallback && apiUsesCredentials) {
-        console.warn('Kalender-API mit Credentials fehlgeschlagen – neuer Versuch ohne.', error);
-        switchToPublicMode();
-        refreshApiCredentialPreference();
-        return performApiRequest(path, init, false);
+      const err = error instanceof Error ? error : new Error(String(error));
+      err.isNetworkError = true;
+      if (typeof err.status !== 'number') {
+        err.status = 0;
       }
-      throw error;
+      throw err;
     }
 
     const text = await response.text();
@@ -120,35 +159,64 @@
     try {
       data = text ? JSON.parse(text) : {};
     } catch (error) {
-      if (attemptFallback && apiUsesCredentials) {
-        console.warn('Kalender-API lieferte kein JSON mit Credentials – neuer Versuch ohne.', error);
-        switchToPublicMode();
-        refreshApiCredentialPreference();
-        return performApiRequest(path, init, false);
-      }
       const err = new Error('Server lieferte keine gültige JSON-Antwort');
+      err.cause = error instanceof Error ? error : new Error(String(error));
       err.raw = text;
       err.status = response.status;
+      err.isParseError = true;
       throw err;
     }
 
     const payload = (data && typeof data === 'object') ? data : {};
     const okFlag = Object.prototype.hasOwnProperty.call(payload, 'ok') ? Boolean(payload.ok) : true;
     if (!response.ok || !okFlag) {
-      if (attemptFallback && apiUsesCredentials && (response.status === 401 || response.status === 403)) {
-        console.warn('Kalender-API meldete Berechtigungsfehler – neuer Versuch ohne Credentials.');
-        switchToPublicMode();
-        refreshApiCredentialPreference();
-        return performApiRequest(path, init, false);
-      }
       const message = payload.error || payload.message || `HTTP ${response.status}`;
-      const error = new Error(message);
-      error.details = payload;
-      error.status = response.status;
-      throw error;
+      const err = new Error(message);
+      err.details = payload;
+      err.status = response.status;
+      throw err;
     }
 
     return payload;
+  }
+
+  async function performApiRequest(path, init = {}){
+    const credentialOrder = apiUsesCredentials ? ['include', 'omit'] : ['omit', 'include'];
+    let lastError = null;
+
+    for (let index = 0; index < credentialOrder.length; index++) {
+      const mode = credentialOrder[index];
+      const useCredentials = mode === 'include';
+      try {
+        const payload = await executeApiRequest(path, init, useCredentials);
+        if (useCredentials) {
+          switchToCredentialMode();
+        } else {
+          switchToPublicMode();
+        }
+        return payload;
+      } catch (error) {
+        const err = error instanceof Error ? error : new Error(String(error));
+        lastError = err;
+        const hasNext = index < credentialOrder.length - 1;
+        if (!hasNext) {
+          throw lastError;
+        }
+        const shouldRetry = useCredentials
+          ? shouldRetryWithoutCredentials(err)
+          : shouldRetryWithCredentials(err);
+        if (!shouldRetry) {
+          throw lastError;
+        }
+        if (useCredentials) {
+          console.warn('Kalender-API mit Credentials fehlgeschlagen – erneuter Versuch ohne Credentials.', err);
+        } else {
+          console.warn('Kalender-API ohne Credentials fehlgeschlagen – erneuter Versuch mit Credentials.', err);
+        }
+      }
+    }
+
+    throw lastError || new Error('Kalender-API konnte nicht erreicht werden');
   }
 
   async function mmbApiPost(path,body){
@@ -262,7 +330,7 @@
     async function start(){
       try {
         await MMBAdminAuth.ensureSession();
-        refreshApiCredentialPreference();
+        syncApiCredentialPreference();
         new AdminCalendar('#mmb-admin-cal');
       } catch (error) {
         console.error('Admin-Login konnte nicht initialisiert werden', error);
