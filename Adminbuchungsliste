@@ -1569,14 +1569,11 @@ Telefon: 01742015500`;
   <!-- ======================= INIT ======================= -->
   <script>
     document.addEventListener('DOMContentLoaded', async function(){
-      let authError = null;
       try {
         await MMBAdminAuth.ensureSession();
       } catch (error) {
-        authError = error instanceof Error ? error : new Error(String(error));
-        console.warn('Admin-Login wurde übersprungen (externer Schutz aktiv?).', authError);
-      } finally {
-        syncApiCredentialPreference();
+        const reason = error instanceof Error ? error : new Error(String(error));
+        console.error('Admin-Authentifizierung konnte nicht geprüft werden.', reason);
       }
 
       try {
