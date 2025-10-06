@@ -12,6 +12,7 @@
     .card h1{margin:0;padding:1rem;border-bottom:1px solid #e5e7eb;background:#f8f9fa;font-size:1.25rem;}
     .card .content{padding:1rem;}
     .mmb-error{margin-top:1.5rem;padding:1rem;border-radius:6px;background:#fee2e2;color:#b91c1c;font-weight:600;}
+    .mmb-warning{margin:0 0 1rem 0;padding:0.85rem 1rem;border-radius:6px;background:#fef3c7;color:#92400e;font-weight:600;}
   </style>
 </head>
 <body>
@@ -249,12 +250,14 @@
       if(name) contactParts.push(name);
       if(phone) contactParts.push(`Tel: ${phone}`);
       if(email) contactParts.push(`E-Mail: ${email}`);
-      if(contactParts.length){ lines.push(`👤 Kontakt: ${contactParts.join(' | ')}`); }
+      const hasContact = contactParts.length>0;
+      if(hasContact){ lines.push(`👤 Kontakt: ${contactParts.join(' | ')}`); }
 
       const consent = boolish(details.consent_contact ?? details.consent_whatsapp);
       if(consent === true){ lines.push('✅ Kontakt per Telefon & WhatsApp ist freigegeben.'); }
       else if(consent === false){ lines.push('⚠️ Bitte nur per E-Mail kontaktieren (kein Telefon/WhatsApp).'); }
 
+      let hasShippingAddress = false;
       if(info.id === 'shipping'){
         const parts = [];
         const line1 = (details.address_line1||'').toString().trim();
@@ -267,14 +270,40 @@
         const cityPart = `${postal} ${city}`.trim();
         if(cityPart) parts.push(cityPart);
         if(extra) parts.push(extra);
-        if(parts.length){ lines.push(`🏠 Lieferadresse: ${parts.join(', ')}`); }
+        if(parts.length){
+          hasShippingAddress = true;
+          lines.push(`🏠 Lieferadresse: ${parts.join(', ')}`);
+        }
       }
 
+      let hasDeliveryDetails = false;
       if(info.id === 'delivery'){
         const meeting = (details.meeting_point||'').toString().trim();
         const preferred = (details.preferred_time||'').toString().trim();
-        if(meeting) lines.push(`📍 Treffpunkt: ${meeting}`);
-        if(preferred) lines.push(`🕒 Wunschzeit (Mittag): ${preferred}`);
+        if(meeting){
+          hasDeliveryDetails = true;
+          lines.push(`📍 Treffpunkt: ${meeting}`);
+        }
+        if(preferred){
+          hasDeliveryDetails = true;
+          lines.push(`🕒 Wunschzeit (Mittag): ${preferred}`);
+        }
+      }
+
+      const needsExtra = info.id === 'shipping' || info.id === 'delivery';
+      if(needsExtra){
+        if(!hasContact){
+          lines.push('⚠️ Kein Kontakt für diese Abwicklung hinterlegt – bitte ergänzen.');
+        }
+        if(!hasShippingAddress && info.id === 'shipping'){
+          lines.push('⚠️ Es liegt noch keine vollständige Lieferadresse vor.');
+        }
+        if(!hasDeliveryDetails && info.id === 'delivery'){
+          lines.push('⚠️ Treffpunkt oder Wunschzeit fehlen bislang.');
+        }
+        if(!hasContact && !hasShippingAddress && !hasDeliveryDetails){
+          lines.push('❗ Noch keine zusätzlichen Angaben vom Kunden hinterlegt.');
+        }
       }
 
       return lines;
@@ -1182,8 +1211,6 @@
         const method = inferFulfillmentMethod(b, details);
         const choice = this.getFulfillmentChoice(method);
         const price = Number(b.fulfillment_price_delta ?? choice.priceDelta);
-        const rawDetails = b.fulfillment_details || b.fulfillment_details_json || '';
-        const details = parseFulfillmentDetails(rawDetails);
         return {
           id: choice.id,
           method: choice.id,
@@ -1400,14 +1427,34 @@ Telefon: 01742015500`;
   <!-- ======================= INIT ======================= -->
   <script>
     document.addEventListener('DOMContentLoaded', async function(){
+      let authError = null;
       try {
         await MMBAdminAuth.ensureSession();
-        MietMichBoxAdminList.init({ container:'#mmb-admin-list', locale:'de-DE', timezone:'Europe/Berlin' });
       } catch (error) {
-        console.error('Admin-Login konnte nicht initialisiert werden', error);
+        authError = error instanceof Error ? error : new Error(String(error));
+        console.warn('Admin-Login wurde übersprungen (externer Schutz aktiv?).', authError);
+      }
+
+      try {
+        MietMichBoxAdminList.init({ container:'#mmb-admin-list', locale:'de-DE', timezone:'Europe/Berlin' });
+        if (authError) {
+          const host = document.querySelector('#mmb-admin-list');
+          if (host && host.parentElement) {
+            const previous = host.previousElementSibling;
+            const hasWarning = previous && previous.classList && previous.classList.contains('mmb-warning');
+            if (!hasWarning) {
+              const notice = document.createElement('p');
+              notice.className = 'mmb-warning';
+              notice.textContent = 'Hinweis: Der zusätzliche Admin-Login wurde übersprungen, da diese Seite bereits extern geschützt ist.';
+              host.parentElement.insertBefore(notice, host);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Admin-Buchungsliste konnte nicht initialisiert werden', error);
         const container = document.querySelector('#mmb-admin-list');
         if (container) {
-          container.innerHTML = '<p class="mmb-error">Der Admin-Login konnte nicht initialisiert werden. Bitte prüfen Sie die HTTPS-Verbindung oder wenden Sie sich an den Support.</p>';
+          container.innerHTML = '<p class="mmb-error">Die Buchungsliste konnte nicht geladen werden. Bitte versuchen Sie es erneut oder wenden Sie sich an den Support.</p>';
         }
       }
     });
