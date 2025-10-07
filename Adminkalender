@@ -125,7 +125,52 @@
   })(window);
 
   /* ============ API ============ */
-  const MMB_API_BASE = MMBAdminAuth.getApiBase();
+  var MMBAdminAuth = (function(){
+    if (typeof window !== 'undefined' && window.MMBAdminAuth) {
+      return window.MMBAdminAuth;
+    }
+    const fallbackState = {
+      getApiBase: () => './',
+      getSessionState: () => ({ authDisabled: true, bootstrapSkipped: true }),
+      isAuthDisabled: () => true,
+      shouldSendCredentials: () => false,
+      enterPublicMode: () => {},
+      exitPublicMode: () => {},
+    };
+    if (typeof window !== 'undefined') {
+      try {
+        window.MMBAdminAuth = fallbackState;
+      } catch (_) {
+        try {
+          Object.defineProperty(window, 'MMBAdminAuth', { value: fallbackState });
+        } catch (__) {
+          /* ignore */
+        }
+      }
+    }
+    return fallbackState;
+  })();
+
+  function mmbResolveApiBase(){
+    let base = './';
+    try {
+      if (MMBAdminAuth && typeof MMBAdminAuth.getApiBase === 'function') {
+        base = MMBAdminAuth.getApiBase();
+      }
+    } catch (_) {
+      base = './';
+    }
+    if (base && typeof base === 'object' && typeof base.href === 'string') {
+      base = base.href;
+    }
+    base = (base || './').toString();
+    if (!base.endsWith('/')) {
+      base += base.indexOf('?') === -1 ? '/' : '';
+    }
+    return base;
+  }
+
+  const MMB_API_BASE = mmbResolveApiBase();
   let apiUsesCredentials = true;
 
   function syncApiCredentialPreference(){

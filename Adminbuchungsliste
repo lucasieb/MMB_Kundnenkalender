@@ -129,7 +129,52 @@
 
   <!-- ======================= MMB API ======================= -->
   <script>
-    const MMB_API_BASE = MMBAdminAuth.getApiBase();
+    var MMBAdminAuth = (function(){
+      if (typeof window !== 'undefined' && window.MMBAdminAuth) {
+        return window.MMBAdminAuth;
+      }
+      const fallbackState = {
+        getApiBase: () => './',
+        getSessionState: () => ({ authDisabled: true, bootstrapSkipped: true }),
+        isAuthDisabled: () => true,
+        shouldSendCredentials: () => false,
+        enterPublicMode: () => {},
+        exitPublicMode: () => {},
+      };
+      if (typeof window !== 'undefined') {
+        try {
+          window.MMBAdminAuth = fallbackState;
+        } catch (_) {
+          try {
+            Object.defineProperty(window, 'MMBAdminAuth', { value: fallbackState });
+          } catch (__) {
+            /* ignore */
+          }
+        }
+      }
+      return fallbackState;
+    })();
+
+    function mmbResolveApiBase(){
+      let base = './';
+      try {
+        if (MMBAdminAuth && typeof MMBAdminAuth.getApiBase === 'function') {
+          base = MMBAdminAuth.getApiBase();
+        }
+      } catch (_) {
+        base = './';
+      }
+      if (base && typeof base === 'object' && typeof base.href === 'string') {
+        base = base.href;
+      }
+      base = (base || './').toString();
+      if (!base.endsWith('/')) {
+        base += base.indexOf('?') === -1 ? '/' : '';
+      }
+      return base;
+    }
+
+    const MMB_API_BASE = mmbResolveApiBase();
     let preferPublicRequests = false;
 
     function refreshPreferredCredentials(){
@@ -317,6 +362,14 @@
       // FIX: richtiger Endpoint + richtige Keys
       async updateBookingStatus(payload){
         return mmbApiPost('update_booking_status.php', payload);
+      },
+      async deleteBooking(input){
+        const value = (input && typeof input === 'object') ? (input.booking_id ?? input.id) : input;
+        const numericId = Number(value);
+        if(!Number.isFinite(numericId) || numericId <= 0){
+          throw new Error('Ungültige Buchungs-ID');
+        }
+        return mmbApiPost('delete_booking.php', { booking_id: numericId });
       },
     };
     global.MMBApi = MMBApi;
@@ -656,7 +709,7 @@
         .mmb-bookings-table th.cell-head-price,.mmb-bookings-table td.cell--total{text-align:right;width:80px;}
         .mmb-bookings-table th.cell-head-status,.mmb-bookings-table td.cell--status{width:92px;}
         .mmb-bookings-table td.cell--total{font-variant-numeric:tabular-nums;white-space:nowrap;}
-        .mmb-bookings-table th.cell-head-actions,.mmb-bookings-table td.cell--actions{min-width:232px;}
+        .mmb-bookings-table th.cell-head-actions,.mmb-bookings-table td.cell--actions{min-width:272px;}
         .mmb-bookings-table td.cell--actions{white-space:nowrap;}
         .mmb-btn{background:var(--mmb-accent);color:#fff;border:none;padding:.45rem .65rem;border-radius:6px;font-size:.83rem;font-weight:500;cursor:pointer;transition:background-color .2s;}
         .mmb-btn:hover{background:#0284c7;} .mmb-btn:disabled{opacity:.45;cursor:not-allowed;filter:saturate(0.6) contrast(0.9);}
@@ -1038,6 +1091,10 @@
               <button class="mmb-btn mmb-btn-small"
                       data-action="editBooking" data-id="${b.id}"
                       title="Buchung bearbeiten">✍🏼</button>
+
+              <button class="mmb-btn mmb-btn-small mmb-btn-danger"
+                      data-action="deleteBooking" data-id="${b.id}"
+                      title="Buchung endgültig löschen" aria-label="Buchung löschen">🗑️</button>
             </div>
           </td>
         </tr>`;
@@ -1119,6 +1176,7 @@
           if(btn.dataset.action==='declineBooking') await this.declineBooking(id);
           if(btn.dataset.action==='offerAlternative') await this.offerAlternative(id);
           if(btn.dataset.action==='editBooking') await this.editBooking(id);
+          if(btn.dataset.action==='deleteBooking') await this.deleteBooking(id);
         });
       }
 
@@ -1620,6 +1678,63 @@
           }
         }else if(updatesApplied){
           MMBCore.Utils.showNotification('Buchung aktualisiert');
+        }
+      }
+
+      async deleteBooking(id){
+        const booking = this.state.originalBookings.find(x=>String(x.id)===String(id));
+        if(!booking) return;
+
+        const formatDate = (value)=>{
+          if(!value) return '–';
+          const d = new Date(value);
+          return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString('de-DE');
+        };
+        const rangeLabel = `${formatDate(booking.start_date)} – ${formatDate(booking.end_date)}`;
+        const emailSuffix = booking.customer_email ? ` (${this.escape(booking.customer_email)})` : '';
+        const html = `
+          <p style="margin-top:0;">Soll diese Buchung wirklich endgültig gelöscht werden? Dieser Schritt kann nicht rückgängig gemacht werden.</p>
+          <div class="mmb-field"><strong>Buchung:</strong> ${this.escape(displayId(booking))}</div>
+          <div class="mmb-field"><strong>Kund*in:</strong> ${this.escape(booking.customer_name)}${emailSuffix}</div>
+          <div class="mmb-field"><strong>Zeitraum:</strong> ${this.escape(rangeLabel)}</div>
+          <div class="mmb-warning" style="margin-top:.75rem;">⚠️ Die Buchung wird vollständig entfernt. Es wird keine automatische E-Mail an die Kundschaft gesendet.</div>
+        `;
+        const confirmed = await this.openModal({
+          title: 'Buchung löschen',
+          html,
+          confirmText: 'Buchung endgültig löschen',
+          cancelText: 'Abbrechen',
+        });
+        if(confirmed === null || confirmed === undefined) return;
+
+        try {
+          await MMBApi.deleteBooking({ booking_id: Number(id) });
+        } catch (err) {
+          console.error('deleteBooking failed:', err);
+          const errorInfo = MMBCore.Utils.describeError(err, {
+            headline: 'Buchung konnte nicht gelöscht werden',
+            context: (err && err.context && err.context.path) || 'delete_booking.php',
+          });
+          MMBCore.Utils.showNotification(errorInfo.message || 'Buchung konnte nicht gelöscht werden', 'error');
+          return;
+        }
+
+        const focusSnapshot = this.snapshotFocus();
+        this.state.originalBookings = this.state.originalBookings.filter(x=>String(x.id)!==String(id));
+        this.applyFilters(focusSnapshot);
+
+        let reloadFailed = false;
+        try {
+          await this.loadBookings();
+        } catch (err) {
+          reloadFailed = true;
+          console.error('Reload after delete failed:', err);
+        }
+
+        if(reloadFailed){
+          MMBCore.Utils.showNotification('Buchung gelöscht, Liste konnte nicht neu geladen werden', 'error');
+        }else{
+          MMBCore.Utils.showNotification('Buchung wurde gelöscht');
         }
       }
 
