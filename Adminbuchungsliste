@@ -174,7 +174,24 @@
       return base;
     }
 
-    const MMB_API_BASE = mmbResolveApiBase();
+    const rawApiBase = mmbResolveApiBase();
+    let resolvedBaseUrl;
+    try {
+      resolvedBaseUrl = new URL(rawApiBase || './', global.location?.href || global.document?.baseURI || 'https://example.com/');
+    } catch (_) {
+      resolvedBaseUrl = new URL('./', global.location?.href || global.document?.baseURI || 'https://example.com/');
+    }
+    if (!resolvedBaseUrl.pathname.endsWith('/')) {
+      resolvedBaseUrl = new URL('./', resolvedBaseUrl);
+    }
+    const MMB_API_BASE = resolvedBaseUrl.href;
+    function buildApiUrl(path){
+      try{
+        return new URL(path, MMB_API_BASE).href;
+      }catch(_){
+        return MMB_API_BASE + path;
+      }
+    }
     let preferPublicRequests = false;
 
     function refreshPreferredCredentials(){
@@ -210,7 +227,8 @@
 
     async function requestJson(path,{method='GET',body=null}={},credentialsMode='include'){
       const normalizedMethod=typeof method==='string'?method.toUpperCase():'GET';
-      const context={ path, method: normalizedMethod, credentialsMode };
+      const targetUrl=buildApiUrl(path);
+      const context={ path, url: targetUrl, method: normalizedMethod, credentialsMode };
       const fetchOptions={
         method: normalizedMethod,
         credentials:credentialsMode,
@@ -222,7 +240,7 @@
       }
       let res;
       try{
-        res=await fetch(MMB_API_BASE+path,fetchOptions);
+        res=await fetch(targetUrl,fetchOptions);
       }catch(networkError){
         const err = networkError instanceof Error ? networkError : new Error(String(networkError));
         if(typeof err.status!=='number') err.status=0;
