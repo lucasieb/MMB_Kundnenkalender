@@ -464,13 +464,39 @@
       return null;
     }
 
+    const RESOLVE_TIMEOUT_MS = 5000;
+    const RESOLVE_RETRY_MS = 60;
+
+    function waitForDelegate(method, args){
+      const start = Date.now();
+      return new Promise((resolve, reject)=>{
+        function attempt(){
+          const resolved = resolveDelegate();
+          if(resolved && typeof resolved[method]==='function'){
+            try{
+              Promise.resolve(resolved[method].apply(resolved, args)).then(resolve, reject);
+            }catch(callError){
+              reject(callError);
+            }
+            return;
+          }
+          if(Date.now() - start >= RESOLVE_TIMEOUT_MS){
+            reject(createNotAvailableError(method));
+            return;
+          }
+          setTimeout(attempt, RESOLVE_RETRY_MS);
+        }
+        attempt();
+      });
+    }
+
     function createProxy(method){
       return function proxyMethod(){
         const resolved=resolveDelegate();
         if(resolved && typeof resolved[method]==='function'){
           return resolved[method].apply(resolved, arguments);
         }
-        return Promise.reject(createNotAvailableError(method));
+        return waitForDelegate(method, arguments);
       };
     }
 
