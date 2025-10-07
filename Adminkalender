@@ -125,7 +125,69 @@
   })(window);
 
   /* ============ API ============ */
-  const MMB_API_BASE = MMBAdminAuth.getApiBase();
+  var MMBAdminAuth = (function(){
+    if (typeof window !== 'undefined' && window.MMBAdminAuth) {
+      return window.MMBAdminAuth;
+    }
+    const fallbackState = {
+      getApiBase: () => './',
+      getSessionState: () => ({ authDisabled: true, bootstrapSkipped: true }),
+      isAuthDisabled: () => true,
+      shouldSendCredentials: () => false,
+      enterPublicMode: () => {},
+      exitPublicMode: () => {},
+    };
+    if (typeof window !== 'undefined') {
+      try {
+        window.MMBAdminAuth = fallbackState;
+      } catch (_) {
+        try {
+          Object.defineProperty(window, 'MMBAdminAuth', { value: fallbackState });
+        } catch (__) {
+          /* ignore */
+        }
+      }
+    }
+    return fallbackState;
+  })();
+
+  function mmbResolveApiBase(){
+    let base = './';
+    try {
+      if (MMBAdminAuth && typeof MMBAdminAuth.getApiBase === 'function') {
+        base = MMBAdminAuth.getApiBase();
+      }
+    } catch (_) {
+      base = './';
+    }
+    if (base && typeof base === 'object' && typeof base.href === 'string') {
+      base = base.href;
+    }
+    base = (base || './').toString();
+    if (!base.endsWith('/')) {
+      base += base.indexOf('?') === -1 ? '/' : '';
+    }
+    return base;
+  }
+
+  const rawApiBase = mmbResolveApiBase();
+  let resolvedBaseUrl;
+  try {
+    resolvedBaseUrl = new URL(rawApiBase || './', global.location?.href || global.document?.baseURI || 'https://example.com/');
+  } catch (_) {
+    resolvedBaseUrl = new URL('./', global.location?.href || global.document?.baseURI || 'https://example.com/');
+  }
+  if (!resolvedBaseUrl.pathname.endsWith('/')) {
+    resolvedBaseUrl = new URL('./', resolvedBaseUrl);
+  }
+  const MMB_API_BASE = resolvedBaseUrl.href;
+  function buildApiUrl(path) {
+    try {
+      return new URL(path, MMB_API_BASE).href;
+    } catch (_) {
+      return MMB_API_BASE + path;
+    }
+  }
   let apiUsesCredentials = true;
 
   function syncApiCredentialPreference(){
@@ -188,7 +250,8 @@
 
   async function executeApiRequest(path, init, useCredentials){
     const normalizedMethod = typeof init?.method === 'string' ? init.method.toUpperCase() : 'GET';
-    const context = { path, method: normalizedMethod, credentialsMode: useCredentials ? 'include' : 'omit' };
+    const targetUrl = buildApiUrl(path);
+    const context = { path, url: targetUrl, method: normalizedMethod, credentialsMode: useCredentials ? 'include' : 'omit' };
     const requestInit = Object.assign({}, init, {
       credentials: useCredentials ? 'include' : 'omit',
       method: normalizedMethod,
@@ -196,7 +259,7 @@
 
     let response;
     try {
-      response = await fetch(MMB_API_BASE + path, requestInit);
+      response = await fetch(targetUrl, requestInit);
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       err.isNetworkError = true;
