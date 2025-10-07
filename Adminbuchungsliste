@@ -83,6 +83,12 @@
       deleteBooking:createProxy('deleteBooking'),
     };
 
+    try {
+      Object.defineProperty(stub,'__mmbIsPlaceholder',{value:true,enumerable:false,configurable:true});
+    } catch(_) {
+      stub.__mmbIsPlaceholder = true;
+    }
+
     if(!global.AdminApi || global.AdminApi===stub){
       try{ global.AdminApi = stub; }catch(_){ /* ignore */ }
     }
@@ -215,7 +221,10 @@
 
     const MMBAdminAuth = ensureAdminAuth();
 
-    if (global.AdminApi && typeof global.AdminApi.listBookings === 'function') {
+    const existingApi = global.AdminApi;
+    const existingIsPlaceholder = !!(existingApi && existingApi.__mmbIsPlaceholder === true);
+
+    if (existingApi && typeof existingApi.listBookings === 'function' && !existingIsPlaceholder) {
       if (!global.MMBApi) {
         try { global.MMBApi = global.AdminApi; } catch (_) { /* ignore */ }
       }
@@ -437,14 +446,6 @@
       },
       blockDays(payload = {}) {
         return requestWithFallback('block_days.php', { method: 'POST', body: payload });
-      },
-      async deleteBooking(input){
-        const value = (input && typeof input === 'object') ? (input.booking_id ?? input.id) : input;
-        const numericId = Number(value);
-        if(!Number.isFinite(numericId) || numericId <= 0){
-          throw new Error('Ungültige Buchungs-ID');
-        }
-        return mmbApiPost('delete_booking.php', { booking_id: numericId });
       },
     };
 

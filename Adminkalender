@@ -158,7 +158,10 @@
 
     const MMBAdminAuth = ensureAdminAuth();
 
-    if (global.AdminApi && typeof global.AdminApi.listBookings === 'function') {
+    const existingApi = global.AdminApi;
+    const existingIsPlaceholder = !!(existingApi && existingApi.__mmbIsPlaceholder === true);
+
+    if (existingApi && typeof existingApi.listBookings === 'function' && !existingIsPlaceholder) {
       if (!global.MMBApi) {
         try { global.MMBApi = global.AdminApi; } catch (_) { /* ignore */ }
       }
@@ -440,6 +443,12 @@
       availabilityWindow:createProxy('availabilityWindow'),
       blockDays:createProxy('blockDays'),
     };
+
+    try {
+      Object.defineProperty(stub,'__mmbIsPlaceholder',{value:true,enumerable:false,configurable:true});
+    } catch(_) {
+      stub.__mmbIsPlaceholder = true;
+    }
 
     if(!global.AdminApi || global.AdminApi===stub){
       try{ global.AdminApi = stub; }catch(_){ /* ignore */ }
