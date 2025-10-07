@@ -438,6 +438,14 @@
       blockDays(payload = {}) {
         return requestWithFallback('block_days.php', { method: 'POST', body: payload });
       },
+      async deleteBooking(input){
+        const value = (input && typeof input === 'object') ? (input.booking_id ?? input.id) : input;
+        const numericId = Number(value);
+        if(!Number.isFinite(numericId) || numericId <= 0){
+          throw new Error('Ungültige Buchungs-ID');
+        }
+        return mmbApiPost('delete_booking.php', { booking_id: numericId });
+      },
     };
 
     try {
