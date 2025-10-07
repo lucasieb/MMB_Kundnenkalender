@@ -129,6 +129,8 @@
 
   <!-- ======================= MMB API ======================= -->
   <script>
+  (function(global){'use strict';
+
     var MMBAdminAuth = (function(){
       if (typeof window !== 'undefined' && window.MMBAdminAuth) {
         return window.MMBAdminAuth;
@@ -431,6 +433,12 @@
       return fallback;
     }
     const AdminApi = resolveAdminApi();
+    try {
+      global.AdminApi = AdminApi;
+    } catch (_) {
+      /* ignore */
+    }
+  })(typeof globalThis !== 'undefined' ? globalThis : (typeof window !== 'undefined' ? window : this));
   </script>
 
   <!-- ======================= ADMIN – LISTE ======================= -->
