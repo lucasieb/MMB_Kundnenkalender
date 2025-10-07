@@ -432,6 +432,23 @@
 
   /* ============ Admin-Kalender mit Switch ============ */
   (function(global){'use strict';
+    const AdminApi = (()=>{
+      const candidate = (global && typeof global.AdminApi === 'object') ? global.AdminApi : null;
+      if(candidate && typeof candidate.listBookings === 'function'){
+        return candidate;
+      }
+      const fallback = (global && typeof global.MMBApi === 'object') ? global.MMBApi : null;
+      if(fallback && typeof fallback.listBookings === 'function'){
+        try{ global.AdminApi = fallback; }catch(_){ /* ignore */ }
+        return fallback;
+      }
+      return {
+        listBookings(){ return Promise.reject(new Error('Admin API ist nicht verfügbar.')); },
+        availabilityWindow(){ return Promise.reject(new Error('Admin API ist nicht verfügbar.')); },
+        blockDays(){ return Promise.reject(new Error('Admin API ist nicht verfügbar.')); },
+      };
+    })();
+
     const AVAILABILITY_MODE_KEY='MMB_AVAILABILITY_MODE'; // 'enforce' | 'ignore'
     const AVAIL={ENFORCE:'enforce',IGNORE:'ignore'};
     const getMode=()=>localStorage.getItem(AVAILABILITY_MODE_KEY)||AVAIL.ENFORCE;

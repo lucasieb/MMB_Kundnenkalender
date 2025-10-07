@@ -34,6 +34,24 @@
   <script>
   (function(global){'use strict';
 
+    const AdminApi = (()=>{
+      const candidate = (global && typeof global.AdminApi === 'object') ? global.AdminApi : null;
+      if(candidate && typeof candidate.listBookings === 'function'){
+        return candidate;
+      }
+      const fallback = (global && typeof global.MMBApi === 'object') ? global.MMBApi : null;
+      if(fallback && typeof fallback.listBookings === 'function'){
+        try{ global.AdminApi = fallback; }catch(_){ /* ignore */ }
+        return fallback;
+      }
+      return {
+        listBookings(){ return Promise.reject(new Error('Admin API ist nicht verfügbar.')); },
+        updateBooking(){ return Promise.reject(new Error('Admin API ist nicht verfügbar.')); },
+        updateBookingStatus(){ return Promise.reject(new Error('Admin API ist nicht verfügbar.')); },
+        deleteBooking(){ return Promise.reject(new Error('Admin API ist nicht verfügbar.')); },
+      };
+    })();
+
     function injectBaseCSS(){
       if (document.getElementById('mmb-core-css')) return;
       const style=document.createElement('style'); style.id='mmb-core-css';
