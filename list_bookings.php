@@ -286,6 +286,14 @@ function mmb_enrich_booking_row(array $row): array
     $missing = $structured['missing'] ?? [];
     $needsAttention = (bool) ($structured['needs_attention'] ?? false);
 
+    $row['customer_name'] = mmb_trim($row['customer_name'] ?? '');
+    $row['customer_email'] = mmb_trim($row['customer_email'] ?? '');
+    $row['customer_phone'] = mmb_trim($row['customer_phone'] ?? '');
+    $row['note'] = (string) ($row['note'] ?? '');
+    $row['total_amount'] = isset($row['total_amount']) ? (float) $row['total_amount'] : 0.0;
+    $row['price_total'] = $row['total_amount'];
+    $row['deposit_eur'] = isset($row['deposit_eur']) ? (float) $row['deposit_eur'] : 0.0;
+
     $row['fulfillment_method'] = $method;
     $row['fulfillment_label'] = $label;
     $row['fulfillment_note'] = $note;
@@ -296,6 +304,17 @@ function mmb_enrich_booking_row(array $row): array
     $row['fulfillment_needs_attention'] = $needsAttention;
     $row['fulfillment_details_structured'] = $structured;
     $row['fulfillment_details_raw'] = $structured['raw'];
+    if (!isset($row['fulfillment_details']) || !is_array($row['fulfillment_details'])) {
+        $row['fulfillment_details'] = $structured['raw'];
+    }
+    $encodedDetails = json_encode(
+        $structured['raw'],
+        JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE
+    );
+    if ($encodedDetails === false || $encodedDetails === '[]') {
+        $encodedDetails = '{}';
+    }
+    $row['fulfillment_details_json'] = $encodedDetails;
     $row['fulfillment'] = [
         'method' => $method,
         'label' => $label,
