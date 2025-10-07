@@ -34,30 +34,57 @@
   <script>
   (function(global){'use strict';
 
-    const AdminApi = (()=>{
-      const candidate = (global && typeof global.AdminApi === 'object') ? global.AdminApi : null;
-      if(candidate && typeof candidate.listBookings === 'function'){
-        return candidate;
-      }
-      const fallback = (global && typeof global.MMBApi === 'object') ? global.MMBApi : null;
-      if(fallback && typeof fallback.listBookings === 'function'){
-        try{ global.AdminApi = fallback; }catch(_){ /* ignore */ }
-        return fallback;
-      }
-      return {
-        listBookings(){ return Promise.reject(new Error('Admin API ist nicht verfügbar.')); },
-        updateBooking(){ return Promise.reject(new Error('Admin API ist nicht verfügbar.')); },
-        updateBookingStatus(){ return Promise.reject(new Error('Admin API ist nicht verfügbar.')); },
-        deleteBooking(){ return Promise.reject(new Error('Admin API ist nicht verfügbar.')); },
-      };
-    })();
+    function createNotAvailableError(method){
+      const error=new Error('Admin API ist nicht verfügbar.');
+      error.name='AdminApiUnavailableError';
+      error.context={ method };
+      return error;
+    }
 
-    if(!global.AdminApi){
-      try{
-        global.AdminApi = AdminApi;
-      }catch(_){
-        /* ignore */
+    function isUsable(candidate){
+      return candidate && typeof candidate==='object' && typeof candidate.listBookings==='function';
+    }
+
+    let delegate=null;
+    let stub=null;
+
+    function resolveDelegate(){
+      if(delegate && isUsable(delegate)){
+        return delegate;
       }
+      const candidates=[
+        (global && global.AdminApi && global.AdminApi!==stub) ? global.AdminApi : null,
+        (global && global.MMBApi) ? global.MMBApi : null,
+      ];
+      for(const candidate of candidates){
+        if(candidate && candidate!==stub && isUsable(candidate)){
+          delegate=candidate;
+          try{ global.AdminApi=candidate; }catch(_){ /* ignore */ }
+          return delegate;
+        }
+      }
+      return null;
+    }
+
+    function createProxy(method){
+      return function proxyMethod(){
+        const resolved=resolveDelegate();
+        if(resolved && typeof resolved[method]==='function'){
+          return resolved[method].apply(resolved, arguments);
+        }
+        return Promise.reject(createNotAvailableError(method));
+      };
+    }
+
+    stub={
+      listBookings:createProxy('listBookings'),
+      updateBooking:createProxy('updateBooking'),
+      updateBookingStatus:createProxy('updateBookingStatus'),
+      deleteBooking:createProxy('deleteBooking'),
+    };
+
+    if(!global.AdminApi || global.AdminApi===stub){
+      try{ global.AdminApi = stub; }catch(_){ /* ignore */ }
     }
 
     function injectBaseCSS(){
