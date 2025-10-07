@@ -40,11 +40,23 @@
     .mmb-calendar-header{display:grid;grid-template-columns:repeat(7,1fr);background:var(--mmb-muted);}
     .mmb-day-header{padding:.75rem .5rem;text-align:center;font-weight:600;font-size:.875rem;border-right:1px solid var(--mmb-border);} .mmb-day-header:last-child{border-right:none;}
     .mmb-calendar-body{display:grid;grid-template-columns:repeat(7,1fr);}
-    .mmb-day{border-right:1px solid var(--mmb-border);border-bottom:1px solid var(--mmb-border);padding:0;cursor:pointer;display:flex;align-items:center;justify-content:center;min-height:72px;}
+    .mmb-day{position:relative;border-right:1px solid var(--mmb-border);border-bottom:1px solid var(--mmb-border);padding:0;cursor:pointer;display:flex;align-items:center;justify-content:center;min-height:72px;}
     .mmb-day:nth-child(7n){border-right:none;}
     .mmb-day--other-month{color:var(--mmb-text-light);opacity:.5;}
     .mmb-day--available{background:var(--mmb-bg);} .mmb-day--busy{background:#fee2e2;color:#991b1b;} .mmb-day--blocked{background:#f3f4f6;color:var(--mmb-text-light);cursor:not-allowed;}
+    .mmb-day--status-pending{background:#fef3c7;color:#92400e;}
+    .mmb-day--status-confirmed{background:#fee2e2;color:#991b1b;}
+    .mmb-day--status-blocked{background:#f3f4f6;color:#6b7280;cursor:not-allowed;}
+    .mmb-day-badge{position:absolute;top:6px;right:6px;border-radius:999px;padding:.15rem .45rem;font-size:.65rem;font-weight:600;line-height:1;background:rgba(15,23,42,.2);color:inherit;pointer-events:none;}
+    .mmb-day-badge--pending{background:#f59e0b;color:#fff;}
+    .mmb-day-badge--confirmed{background:#dc2626;color:#fff;}
+    .mmb-day-badge--blocked{background:#4b5563;color:#fff;}
+    .mmb-admin-summary{margin-top:.75rem;font-size:.85rem;color:var(--mmb-text-light);}
     .mmb-error{margin-top:1rem;padding:1rem;border-radius:6px;background:#fee2e2;color:#b91c1c;font-weight:600;}
+    .mmb-error-meta{margin-top:.5rem;font-size:.8rem;color:#7f1d1d;text-transform:uppercase;letter-spacing:.05em;}
+    .mmb-error-details{margin-top:.75rem;font-size:.9rem;line-height:1.45;color:#7f1d1d;}
+    .mmb-error-details code{display:block;margin-top:.5rem;padding:.75rem;border-radius:6px;background:#fee2e2;color:#991b1b;white-space:pre-wrap;word-break:break-word;font-family:ui-monospace,SFMono-Regular,Consolas,'Liberation Mono',Menlo,monospace;}
+    .mmb-error-actions{margin-top:1rem;display:flex;gap:.5rem;flex-wrap:wrap;}
   </style>
 </head>
 <body>
@@ -70,7 +82,44 @@
         for(let i=start-1;i>=0;i--){days.push({date:new Date(y,m-1,prevLast.getDate()-i),otherMonth:true});}
         for(let d=1; d<=last.getDate(); d++){days.push({date:new Date(y,m,d),otherMonth:false});}
         const total=Math.ceil(days.length/7)*7; for(let d=1; d<=total-days.length; d++){days.push({date:new Date(y,m+1,d),otherMonth:true});}
-        return days;}
+        return days;},
+      escapeHtml(value){ if(value===null||value===undefined) return ''; return String(value).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])); },
+      describeError(error, options={}){
+        const headline=(typeof options.headline==='string'&&options.headline.trim())?options.headline.trim():'Unbekannter Fehler';
+        const fallback=(typeof options.fallbackMessage==='string'&&options.fallbackMessage.trim())?options.fallbackMessage.trim():'Bitte prüfen Sie die Browser-Konsole für weitere Details.';
+        const info={headline,message:fallback,status:null,context:typeof options.context==='string'?options.context:'',items:[],raw:null};
+        const pushDetail=(value)=>{
+          if(value===null||value===undefined) return;
+          if(typeof value==='string'){const trimmed=value.trim(); if(trimmed) info.items.push(trimmed); return;}
+          if(typeof value==='number'||typeof value==='boolean'){info.items.push(String(value)); return;}
+          if(Array.isArray(value)){value.forEach(pushDetail); return;}
+          try{const json=JSON.stringify(value,null,2); if(json) info.items.push(json);}catch(_){info.items.push(String(value));}
+        };
+        if(error instanceof Error){
+          if(typeof error.message==='string'&&error.message.trim()) info.message=error.message.trim();
+          if(typeof error.status==='number'&&!Number.isNaN(error.status)) info.status=error.status;
+          if(error.name&&error.name!=='Error') pushDetail(`Fehlertyp: ${error.name}`);
+          if('details' in error) pushDetail(error.details);
+          if('detail' in error) pushDetail(error.detail);
+          if('error' in error&&error.error!==error.message) pushDetail(error.error);
+          if(!info.context&&error.context){
+            if(typeof error.context==='string') info.context=error.context;
+            else if(error.context&&typeof error.context.path==='string') info.context=error.context.path;
+          }
+          if(typeof error.raw==='string'&&error.raw.trim()) info.raw=error.raw.slice(0,1200);
+        }else if(error&&typeof error==='object'){
+          if(typeof error.message==='string'&&error.message.trim()) info.message=error.message.trim();
+          if(typeof error.status==='number'&&!Number.isNaN(error.status)) info.status=error.status;
+          if(typeof error.context==='string') info.context=error.context;
+          pushDetail(error.details??error.detail??error.error??error);
+        }else if(typeof error==='string'&&error.trim()){
+          info.message=error.trim();
+        }
+        if(!info.context&&typeof options.context==='string') info.context=options.context;
+        if(typeof options.status==='number'&&!info.status) info.status=options.status;
+        if(options.extra) pushDetail(options.extra);
+        return info;
+      }
     };
     global.MMBCore={events:new EventEmitter(),Utils};
   })(window);
@@ -138,8 +187,11 @@
   }
 
   async function executeApiRequest(path, init, useCredentials){
+    const normalizedMethod = typeof init?.method === 'string' ? init.method.toUpperCase() : 'GET';
+    const context = { path, method: normalizedMethod, credentialsMode: useCredentials ? 'include' : 'omit' };
     const requestInit = Object.assign({}, init, {
-      credentials: useCredentials ? 'include' : 'omit'
+      credentials: useCredentials ? 'include' : 'omit',
+      method: normalizedMethod,
     });
 
     let response;
@@ -151,6 +203,7 @@
       if (typeof err.status !== 'number') {
         err.status = 0;
       }
+      err.context = Object.assign({}, err.context || {}, context);
       throw err;
     }
 
@@ -164,6 +217,7 @@
       err.raw = text;
       err.status = response.status;
       err.isParseError = true;
+      err.context = context;
       throw err;
     }
 
@@ -174,6 +228,7 @@
       const err = new Error(message);
       err.details = payload;
       err.status = response.status;
+      err.context = context;
       throw err;
     }
 
@@ -197,16 +252,20 @@
         return payload;
       } catch (error) {
         const err = error instanceof Error ? error : new Error(String(error));
+        err.retryMode = mode;
+        if (!err.context) {
+          err.context = { path, method: init?.method || 'GET', credentialsMode: useCredentials ? 'include' : 'omit' };
+        }
         lastError = err;
         const hasNext = index < credentialOrder.length - 1;
         if (!hasNext) {
-          throw lastError;
+          throw err;
         }
         const shouldRetry = useCredentials
           ? shouldRetryWithoutCredentials(err)
           : shouldRetryWithCredentials(err);
         if (!shouldRetry) {
-          throw lastError;
+          throw err;
         }
         if (useCredentials) {
           console.warn('Kalender-API mit Credentials fehlgeschlagen – erneuter Versuch ohne Credentials.', err);
@@ -216,7 +275,15 @@
       }
     }
 
-    throw lastError || new Error('Kalender-API konnte nicht erreicht werden');
+    if (lastError) {
+      if (!lastError.context) {
+        lastError.context = { path, method: init?.method || 'GET' };
+      }
+      throw lastError;
+    }
+    const fallbackError = new Error('Kalender-API konnte nicht erreicht werden');
+    fallbackError.context = { path, method: init?.method || 'GET' };
+    throw fallbackError;
   }
 
   async function mmbApiPost(path,body){
@@ -227,7 +294,31 @@
     });
   }
 
-  const MMBApi={ async blockDays({box_id,start_date,end_date,reason='admin_block'}){ return mmbApiPost('block_days.php',{box_id,start_date,end_date,reason}); } };
+  async function mmbApiGet(path){
+    return performApiRequest(path);
+  }
+
+  var MMBApi={
+    async blockDays({box_id,start_date,end_date,reason='admin_block'}){
+      return mmbApiPost('block_days.php',{box_id,start_date,end_date,reason});
+    },
+    async listBookings(params = {}){
+      const q = new URLSearchParams();
+      if(params.box_id) q.set('box_id', params.box_id);
+      if(params.from) q.set('from', params.from);
+      if(params.to) q.set('to', params.to);
+      if(params.status) q.set('status', params.status);
+      const suffix = q.toString();
+      return mmbApiGet('list_bookings.php' + (suffix ? `?${suffix}` : ''));
+    },
+    async availabilityWindow(params){
+      const q = new URLSearchParams();
+      q.set('box_id', params.box_id);
+      q.set('from', params.from);
+      q.set('to', params.to);
+      return mmbApiGet('calendar_unavailable.php?' + q.toString());
+    }
+  };
 
   /* ============ Admin-Kalender mit Switch ============ */
   (function(global){'use strict';
@@ -236,28 +327,309 @@
     const getMode=()=>localStorage.getItem(AVAILABILITY_MODE_KEY)||AVAIL.ENFORCE;
     const setMode=(m)=>{ localStorage.setItem(AVAILABILITY_MODE_KEY,m); window.dispatchEvent(new CustomEvent('mmb:availabilityModeChanged',{detail:{mode:m}})); };
 
+    const ID_CATEGORY='00';
+    const computeDisplayId=(rawId)=>{
+      const numeric=Number(rawId);
+      if(Number.isFinite(numeric) && numeric>0){
+        const base=Math.trunc(100+numeric);
+        return ID_CATEGORY+String(base).padStart(3,'0');
+      }
+      const digits=String(rawId??'').replace(/[^0-9]/g,'');
+      if(digits){
+        return ID_CATEGORY+digits.slice(-3).padStart(3,'0');
+      }
+      return ID_CATEGORY+'000';
+    };
+    const normalizeDisplayId=(rawId,provided)=>{
+      const direct=(typeof provided==='string')?provided.trim():'';
+      return direct||computeDisplayId(rawId);
+    };
+    const displayIdFor=(value)=>{
+      if(value && typeof value==='object'){
+        return normalizeDisplayId(value.id??value.booking_id??null,value.display_id??value.displayId??null);
+      }
+      return normalizeDisplayId(value,null);
+    };
+    const parseISODate=(value)=>{
+      if(!value) return null;
+      const match=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value));
+      if(!match) return null;
+      const year=Number(match[1]);
+      const month=Number(match[2])-1;
+      const day=Number(match[3]);
+      const date=new Date(year,month,day);
+      return Number.isNaN(date.getTime())?null:date;
+    };
+    const cloneDate=(date)=>new Date(date.getFullYear(),date.getMonth(),date.getDate());
+    const clampDate=(date,min,max)=>{
+      const d=cloneDate(date);
+      if(d.getTime()<min.getTime()) return cloneDate(min);
+      if(d.getTime()>max.getTime()) return cloneDate(max);
+      return d;
+    };
+
     class AdminCalendar{
       constructor(sel){
         this.root = typeof sel==='string'? document.querySelector(sel) : sel;
         if(!this.root) throw new Error('Container nicht gefunden');
-        this.state={ month:new Date(), boxes:[], box:null, availability:{}, loading:false, blockMode:false, mode:getMode() };
+        this.state={ month:new Date(), boxes:[], box:null, availability:{}, loading:false, blockMode:false, mode:getMode(), error:null, meta:{bookings:0,blocks:0} };
         this.init();
       }
-      async init(){ this.renderLoading('Lade...'); this.state.boxes=[{id:'1',name:'Marshall Bromley 750',quantity:1},{id:'2',name:'Teufel Rockster Neo',quantity:1},{id:'3',name:'Soundboks 4',quantity:1}]; this.state.box=this.state.boxes[0]; await this.loadAvailability(); this.render(); this.wire(); }
-      renderLoading(t){ this.root.innerHTML=`<div class="mmb-widget"><div class="mmb-loading">${t}</div></div>`; }
+      async init(){
+        this.state.loading = true;
+        this.renderLoading('Verfügbarkeiten werden geladen...');
+        this.state.boxes=[{id:'1',name:'Marshall Bromley 750',quantity:1},{id:'2',name:'Teufel Rockster Neo',quantity:1},{id:'3',name:'Soundboks 4',quantity:1}];
+        this.state.box=this.state.boxes[0]||null;
+        try {
+          await this.loadAvailability();
+        } catch (error) {
+          console.error('Admin-Kalender konnte nicht initialisiert werden:', error);
+          this.state.error = MMBCore.Utils.describeError(error,{headline:'Kalender konnte nicht initialisiert werden'});
+        } finally {
+          this.state.loading = false;
+      }
+      this.render();
+      this.wire();
+    }
+    renderLoading(t){ this.root.innerHTML=`<div class="mmb-widget"><div class="mmb-loading">${t}</div></div>`; }
+    getErrorClipboardText(){
+      const info=this.state.error;
+      if(!info) return 'Keine Fehlerdetails vorhanden.';
+      try{ return JSON.stringify(info,null,2); }catch(_){ return String(info); }
+    }
+    renderErrorView(){
+      const info=this.state.error||{};
+      const headline=this.escape(info.headline||'Verfügbarkeiten konnten nicht geladen werden');
+      const message=this.escape(info.message||'Bitte prüfen Sie die Browser-Konsole für weitere Details.');
+      const status=info.status!==null&&info.status!==undefined?`<div class="mmb-error-meta">HTTP-Status: ${this.escape(String(info.status))}</div>`:'';
+      const context=info.context?`<div class="mmb-error-meta">Quelle: ${this.escape(info.context)}</div>`:'';
+      const details=Array.isArray(info.items)&&info.items.length
+        ? `<div class="mmb-error-details"><ul>${info.items.map(item=>`<li>${this.escape(String(item))}</li>`).join('')}</ul></div>`
+        : '';
+      const raw=info.raw?`<div class="mmb-error-details"><strong>Serverantwort</strong><code>${this.escape(String(info.raw))}</code></div>`:'';
+      return `
+        <div class="mmb-widget">
+          <div class="mmb-error">
+            <strong>${headline}</strong><br/>${message}
+            ${status}
+            ${context}
+            ${details}
+            ${raw}
+            <div class="mmb-error-actions">
+              <button type="button" class="mmb-box-btn" data-act="retry-load">Erneut versuchen</button>
+              <button type="button" class="mmb-box-btn" data-act="copy-error">Fehlerdetails kopieren</button>
+            </div>
+          </div>
+        </div>`;
+    }
+    async copyErrorDetails(){
+      try{
+        await navigator.clipboard.writeText(this.getErrorClipboardText());
+        MMBCore.Utils.showNotification?.('Fehlerdetails kopiert','info');
+      }catch(err){
+        console.error('Clipboard copy failed',err);
+        MMBCore.Utils.showNotification?.('Kopieren nicht möglich – siehe Konsole.','error');
+      }
+    }
+    async reloadAvailability(){
+      if(!this.state.box) return;
+      this.state.loading=true;
+      this.state.error=null;
+      this.render();
+      try{
+        await this.loadAvailability();
+      }catch(err){
+        console.error('Erneuter Kalendereinzug fehlgeschlagen:',err);
+      }finally{
+        this.state.loading=false;
+        this.render();
+      }
+    }
       async loadAvailability(){
+        if(!this.state.box){
+          this.state.availability={};
+          this.state.meta={bookings:0,blocks:0};
+          return;
+        }
+        this.state.error=null;
         const start=new Date(this.state.month.getFullYear(),this.state.month.getMonth(),1);
         const end=new Date(this.state.month.getFullYear(),this.state.month.getMonth()+1,0);
-        const fmt=MMBCore.Utils.formatDate; const avail={};
-        for(let d=new Date(start); d<=end; d.setDate(d.getDate()+1)){ avail[fmt(d)]={available:this.state.box.quantity,status:'available'}; }
-        this.state.availability=avail;
+        const fmt=MMBCore.Utils.formatDate;
+        const availability={};
+        for(let d=new Date(start); d.getTime()<=end.getTime(); d.setDate(d.getDate()+1)){
+          const key=fmt(d);
+          availability[key]={
+            date: cloneDate(d),
+            available:this.state.box.quantity,
+            status:'available',
+            bookings:[],
+            blocks:[],
+          };
+        }
+
+        const from=fmt(start);
+        const to=fmt(end);
+
+        try {
+          const [bookingsPayload, windowPayload] = await Promise.all([
+            MMBApi.listBookings({ box_id: this.state.box.id, from, to }),
+            MMBApi.availabilityWindow({ box_id: this.state.box.id, from, to })
+          ]);
+
+          const bookingItems = Array.isArray(bookingsPayload?.items)
+            ? bookingsPayload.items
+            : Array.isArray(bookingsPayload?.bookings)
+              ? bookingsPayload.bookings
+              : Array.isArray(bookingsPayload?.data)
+                ? bookingsPayload.data
+                : Array.isArray(bookingsPayload)
+                  ? bookingsPayload
+                  : [];
+
+          let bookingsCount = 0;
+          for (const raw of bookingItems) {
+            const status = (raw?.status || '').toString().toLowerCase();
+            if (!['pending','confirmed'].includes(status)) {
+              continue;
+            }
+            const startDate = parseISODate(raw.start_date);
+            const endDate = parseISODate(raw.end_date || raw.start_date);
+            if (!startDate || !endDate) {
+              continue;
+            }
+            bookingsCount += 1;
+            const bookingInfo = {
+              id: raw.id ?? raw.booking_id ?? null,
+              display_id: displayIdFor(raw),
+              status,
+              customer_name: raw.customer_name || '',
+              start_date: raw.start_date,
+              end_date: raw.end_date || raw.start_date,
+            };
+
+            const clampedStart = clampDate(startDate, start, end);
+            const clampedEnd = clampDate(endDate, start, end);
+            for (let day = cloneDate(clampedStart); day.getTime() <= clampedEnd.getTime(); day.setDate(day.getDate()+1)) {
+              const key = fmt(day);
+              const entry = availability[key];
+              if (!entry) continue;
+              entry.bookings.push(bookingInfo);
+              entry.available = Math.max(0, entry.available - 1);
+              if (entry.status !== 'blocked') {
+                if (status === 'confirmed') {
+                  entry.status = 'confirmed';
+                } else if (entry.status !== 'confirmed') {
+                  entry.status = 'pending';
+                }
+              }
+            }
+          }
+
+          const blocks = Array.isArray(windowPayload?.unavailable?.blocks)
+            ? windowPayload.unavailable.blocks
+            : [];
+          let blockCount = 0;
+          for (const block of blocks) {
+            const startDate = parseISODate(block.start_date);
+            const endDate = parseISODate(block.end_date || block.start_date);
+            if (!startDate || !endDate) {
+              continue;
+            }
+            blockCount += 1;
+            const clampedStart = clampDate(startDate, start, end);
+            const clampedEnd = clampDate(endDate, start, end);
+            for (let day = cloneDate(clampedStart); day.getTime() <= clampedEnd.getTime(); day.setDate(day.getDate()+1)) {
+              const key = fmt(day);
+              const entry = availability[key];
+              if (!entry) continue;
+              entry.blocks.push({
+                start_date: block.start_date,
+                end_date: block.end_date || block.start_date,
+                reason: block.reason || 'admin_block',
+              });
+              entry.status = 'blocked';
+              entry.available = 0;
+            }
+          }
+
+          this.state.meta = { bookings: bookingsCount, blocks: blockCount };
+        } catch (error) {
+          console.error('Kalender konnte nicht geladen werden:', error);
+          const info = MMBCore.Utils.describeError(error,{headline:'Verfügbarkeiten konnten nicht geladen werden',context:(error&&error.context&&error.context.path)||'calendar_unavailable.php'});
+          this.state.error = info;
+          this.state.meta = { bookings: 0, blocks: 0 };
+          this.state.availability = availability;
+          return;
+        }
+
+        this.state.availability = availability;
+      }
+      escape(value){
+        if(value===null||value===undefined) return '';
+        return String(value).replace(/[&<>"']/g, ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+      }
+      escapeAttr(value){
+        return this.escape(value).replace(/\n/g,'&#10;');
+      }
+      translateStatus(status){
+        const normalized=(status||'').toLowerCase();
+        if(normalized==='confirmed') return 'Bestätigt';
+        if(normalized==='pending') return 'Ausstehend';
+        if(normalized==='blocked') return 'Blockiert';
+        return normalized||'Unbekannt';
+      }
+      describeDay(entry){
+        const lines=[];
+        if(entry?.blocks?.length){
+          entry.blocks.forEach(block=>{
+            const reason=block.reason?` (${block.reason})`:'';
+            lines.push(`Blockiert${reason}`);
+          });
+        }
+        if(entry?.bookings?.length){
+          entry.bookings.forEach(booking=>{
+            const label=`${displayIdFor(booking)}${booking.customer_name?` – ${booking.customer_name}`:''}`;
+            lines.push(`${label} (${this.translateStatus(booking.status)})`);
+          });
+        }
+        if(!lines.length){
+          lines.push('Keine Einträge');
+        }
+        return lines.join('\n');
+      }
+      renderDayBadge(entry){
+        if(!entry) return '';
+        if((entry.blocks && entry.blocks.length) || entry.status==='blocked'){
+          return '<span class="mmb-day-badge mmb-day-badge--blocked">Block</span>';
+        }
+        if(entry.bookings && entry.bookings.length){
+          const hasConfirmed=entry.bookings.some(b=>(b.status||'').toLowerCase()==='confirmed');
+          if(hasConfirmed){
+            return '<span class="mmb-day-badge mmb-day-badge--confirmed">Best.</span>';
+          }
+          return '<span class="mmb-day-badge mmb-day-badge--pending">Offen</span>';
+        }
+        return '';
       }
       render(){
+        if(this.state.loading){
+          this.renderLoading('Verfügbarkeiten werden geladen...');
+          return;
+        }
+        if(this.state.error){
+          this.root.innerHTML=this.renderErrorView();
+          return;
+        }
+        if(!this.state.box){
+          this.renderLoading('Keine Boxen konfiguriert.');
+          return;
+        }
+        const summary=this.state.meta||{bookings:0,blocks:0};
         this.root.innerHTML=`
           <div class="mmb-widget">
             <div class="mmb-admin-controls">
               <div class="mmb-box-buttons">
-                ${this.state.boxes.map(b=>`<button class="mmb-box-btn ${this.state.box?.id===b.id?'mmb-box-btn--active':''}" data-act="box" data-id="${b.id}">${b.name}</button>`).join('')}
+                ${this.state.boxes.map(b=>`<button class="mmb-box-btn ${this.state.box?.id===b.id?'mmb-box-btn--active':''}" data-act="box" data-id="${b.id}">${this.escape(b.name)}</button>`).join('')}
               </div>
 
               <div class="mmb-nav">
@@ -281,21 +653,38 @@
             </div>
 
             ${this.renderCalendar()}
+            <div class="mmb-admin-summary">Buchungen: ${summary.bookings} · Sperrungen: ${summary.blocks}</div>
           </div>`;
       }
       renderCalendar(){
         const days=MMBCore.Utils.generateCalendarDays(this.state.month);
+        const todayStart=new Date(); todayStart.setHours(0,0,0,0);
         return `
           <div class="mmb-calendar">
             <div class="mmb-calendar-header">${MMBCore.Utils.DAY_NAMES.map(d=>`<div class="mmb-day-header">${d}</div>`).join('')}</div>
             <div class="mmb-calendar-body">
               ${days.map(day=>{
-                const key=MMBCore.Utils.formatDate(day.date), av=this.state.availability[key];
-                const isPast=day.date<new Date().setHours(0,0,0,0);
-                let cls=['mmb-day']; if(day.otherMonth) cls.push('mmb-day--other-month');
-                if(isPast) cls.push('mmb-day--blocked');
-                else if(av){ if(av.available===0) cls.push('mmb-day--busy'); else cls.push('mmb-day--available'); }
-                return `<div class="${cls.join(' ')}" data-act="toggle-day" data-date="${key}">${day.date.getDate()}</div>`;
+                const key=MMBCore.Utils.formatDate(day.date);
+                const av=this.state.availability[key];
+                const isPast=day.date<todayStart;
+                const cls=['mmb-day'];
+                if(day.otherMonth) cls.push('mmb-day--other-month');
+                if(isPast){
+                  cls.push('mmb-day--status-blocked');
+                } else if(av){
+                  const status=(av.status||'').toLowerCase();
+                  if(status==='blocked') cls.push('mmb-day--status-blocked');
+                  else if(status==='confirmed') cls.push('mmb-day--status-confirmed');
+                  else if(status==='pending') cls.push('mmb-day--status-pending');
+                  else if(av.available===0) cls.push('mmb-day--busy');
+                  else cls.push('mmb-day--available');
+                } else {
+                  cls.push('mmb-day--available');
+                }
+                const badge=this.renderDayBadge(av);
+                const tooltip=av?this.escapeAttr(this.describeDay(av)):'';
+                const titleAttr=tooltip?` title="${tooltip}"`:'';
+                return `<div class="${cls.join(' ')}" data-act="toggle-day" data-date="${key}"${titleAttr}>${badge}<span>${day.date.getDate()}</span></div>`;
               }).join('')}
             </div>
           </div>`;
@@ -304,10 +693,12 @@
         this.root.addEventListener('click',e=>{
           const el=e.target.closest('[data-act]'); if(!el) return; e.preventDefault();
           const act=el.dataset.act;
-          if(act==='prev') this.changeMonth(-1);
-          if(act==='next') this.changeMonth(1);
-          if(act==='box'){ this.state.box=this.state.boxes.find(x=>x.id===el.dataset.id); this.loadAvailability().then(()=>this.render()); }
-          if(act==='block'){ this.state.blockMode=!this.state.blockMode; this.render(); }
+          if(act==='prev'){ this.changeMonth(-1).catch(err=>console.error(err)); return; }
+          if(act==='next'){ this.changeMonth(1).catch(err=>console.error(err)); return; }
+          if(act==='box'){ this.selectBox(el.dataset.id).catch(err=>console.error(err)); return; }
+          if(act==='block'){ this.state.blockMode=!this.state.blockMode; this.render(); return; }
+          if(act==='retry-load'){ this.reloadAvailability().catch(err=>console.error(err)); return; }
+          if(act==='copy-error'){ this.copyErrorDetails().catch(err=>console.error(err)); return; }
           if(act==='toggle-day'){ this.toggleDay(el.dataset.date); }
         });
         this.root.addEventListener('change',e=>{
@@ -316,14 +707,71 @@
           }
         });
       }
-      changeMonth(d){ const m=new Date(this.state.month); m.setMonth(m.getMonth()+d); const today=new Date(); if(m<new Date(today.getFullYear(),today.getMonth(),1)) return; this.state.month=m; this.loadAvailability().then(()=>this.render()); }
+      async selectBox(id){
+        const next=this.state.boxes.find(x=>x.id===id);
+        if(!next || (this.state.box && this.state.box.id===next.id)) return;
+        this.state.box=next;
+        this.state.loading=true;
+        this.render();
+        try {
+          await this.loadAvailability();
+        } finally {
+          this.state.loading=false;
+        }
+        this.render();
+      }
+      async changeMonth(delta){
+        const next=new Date(this.state.month);
+        next.setMonth(next.getMonth()+delta);
+        const today=new Date();
+        const min=new Date(today.getFullYear(),today.getMonth(),1);
+        if(next<min) return;
+        this.state.month=next;
+        this.state.loading=true;
+        this.render();
+        try {
+          await this.loadAvailability();
+        } finally {
+          this.state.loading=false;
+        }
+        this.render();
+      }
       toggleDay(dateStr){
-        if(!this.state.box) return; const today=new Date(); if(new Date(dateStr)<new Date(today.getFullYear(),today.getMonth(),today.getDate())) return;
-        const cur=this.state.availability[dateStr]||{available:this.state.box.quantity,status:'available'};
-        const next=this.state.blockMode?{...cur,available:0,status:'busy'}:{...cur,available:this.state.box.quantity,status:'available'};
-        this.state.availability[dateStr]=next; this.render();
-        // Optional persist:
-        // MMBApi.blockDays({box_id:this.state.box.id,start_date:dateStr,end_date:dateStr,reason:'admin_toggle'}).catch(()=>{/* Admin darf Meldungen sehen – optional */});
+        if(!this.state.box) return;
+        const target=parseISODate(dateStr);
+        if(!target) return;
+        const today=new Date();
+        const todayStart=new Date(today.getFullYear(),today.getMonth(),today.getDate());
+        if(target<todayStart) return;
+        const existing=this.state.availability[dateStr]||{
+          date:target,
+          available:this.state.box.quantity,
+          status:'available',
+          bookings:[],
+          blocks:[],
+        };
+        const nextEntry={
+          ...existing,
+          bookings:Array.isArray(existing.bookings)?[...existing.bookings]:[],
+          blocks:Array.isArray(existing.blocks)?[...existing.blocks]:[],
+        };
+        if(this.state.blockMode){
+          nextEntry.status='blocked';
+          nextEntry.available=0;
+          nextEntry.blocks.push({start_date:dateStr,end_date:dateStr,reason:'admin_manual'});
+        } else {
+          nextEntry.blocks=nextEntry.blocks.filter(block=>block.reason!=='admin_manual');
+          if(nextEntry.bookings.length){
+            const hasConfirmed=nextEntry.bookings.some(b=>(b.status||'').toLowerCase()==='confirmed');
+            nextEntry.status=hasConfirmed?'confirmed':'pending';
+            nextEntry.available=0;
+          } else {
+            nextEntry.status='available';
+            nextEntry.available=this.state.box.quantity;
+          }
+        }
+        this.state.availability[dateStr]=nextEntry;
+        this.render();
       }
     }
 

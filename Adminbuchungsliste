@@ -13,6 +13,10 @@
     .card .content{padding:1rem;}
     .mmb-error{margin-top:1.5rem;padding:1rem;border-radius:6px;background:#fee2e2;color:#b91c1c;font-weight:600;}
     .mmb-warning{margin:0 0 1rem 0;padding:0.85rem 1rem;border-radius:6px;background:#fef3c7;color:#92400e;font-weight:600;}
+    .mmb-error-meta{margin-top:.5rem;font-size:.8rem;color:#7f1d1d;text-transform:uppercase;letter-spacing:.05em;}
+    .mmb-error-details{margin-top:.75rem;font-size:.9rem;line-height:1.45;color:#7f1d1d;}
+    .mmb-error-details code{display:block;margin-top:.5rem;padding:.75rem;border-radius:6px;background:#fee2e2;color:#991b1b;white-space:pre-wrap;word-break:break-word;font-family:ui-monospace,SFMono-Regular,Consolas,'Liberation Mono',Menlo,monospace;}
+    .mmb-error-actions{margin-top:1rem;display:flex;flex-wrap:wrap;gap:.5rem;}
   </style>
 </head>
 <body>
@@ -77,6 +81,43 @@
         for(let d=1; d<=last.getDate(); d++){days.push({date:new Date(y,m,d),otherMonth:false});}
         const total=Math.ceil(days.length/7)*7; for(let d=1; d<=total-days.length; d++){days.push({date:new Date(y,m+1,d),otherMonth:true});}
         return days;},
+      escapeHtml(value){ if(value===null||value===undefined) return ''; return String(value).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])); },
+      describeError(error, options={}){
+        const headline=(typeof options.headline==='string'&&options.headline.trim())?options.headline.trim():'Unbekannter Fehler';
+        const fallback=(typeof options.fallbackMessage==='string'&&options.fallbackMessage.trim())?options.fallbackMessage.trim():'Bitte prüfen Sie die Browser-Konsole für weitere Details.';
+        const info={headline,message:fallback,status:null,context:typeof options.context==='string'?options.context:'',items:[],raw:null};
+        const pushDetail=(value)=>{
+          if(value===null||value===undefined) return;
+          if(typeof value==='string'){const trimmed=value.trim(); if(trimmed) info.items.push(trimmed); return;}
+          if(typeof value==='number'||typeof value==='boolean'){info.items.push(String(value)); return;}
+          if(Array.isArray(value)){value.forEach(pushDetail); return;}
+          try{const json=JSON.stringify(value,null,2); if(json) info.items.push(json);}catch(_){info.items.push(String(value));}
+        };
+        if(error instanceof Error){
+          if(typeof error.message==='string'&&error.message.trim()) info.message=error.message.trim();
+          if(typeof error.status==='number'&&!Number.isNaN(error.status)) info.status=error.status;
+          if(error.name&&error.name!=='Error') pushDetail(`Fehlertyp: ${error.name}`);
+          if('details' in error) pushDetail(error.details);
+          if('detail' in error) pushDetail(error.detail);
+          if('error' in error&&error.error!==error.message) pushDetail(error.error);
+          if(!info.context&&error.context){
+            if(typeof error.context==='string') info.context=error.context;
+            else if(error.context&&typeof error.context.path==='string') info.context=error.context.path;
+          }
+          if(typeof error.raw==='string'&&error.raw.trim()) info.raw=error.raw.slice(0,1200);
+        }else if(error&&typeof error==='object'){
+          if(typeof error.message==='string'&&error.message.trim()) info.message=error.message.trim();
+          if(typeof error.status==='number'&&!Number.isNaN(error.status)) info.status=error.status;
+          if(typeof error.context==='string') info.context=error.context;
+          pushDetail(error.details??error.detail??error.error??error);
+        }else if(typeof error==='string'&&error.trim()){
+          info.message=error.trim();
+        }
+        if(!info.context&&typeof options.context==='string') info.context=options.context;
+        if(typeof options.status==='number'&&!info.status) info.status=options.status;
+        if(options.extra) pushDetail(options.extra);
+        return info;
+      },
       showNotification(msg,type='info'){const ex=document.querySelector(`.mmb-${type}-notification`); if(ex) ex.remove(); const el=document.createElement('div'); el.className=`mmb-${type}-notification`; const bg=type==='error'?'var(--mmb-busy)':'var(--mmb-ok)';
         el.style.cssText=`position:fixed;top:20px;right:20px;background:${bg};color:#fff;padding:1rem;border-radius:4px;box-shadow:0 4px 6px rgba(0,0,0,.1);z-index:1000;max-width:300px;`; el.textContent=msg; document.body.appendChild(el); setTimeout(()=>el.remove(),5000);}
     };
@@ -123,12 +164,14 @@
     }
 
     async function requestJson(path,{method='GET',body=null}={},credentialsMode='include'){
+      const normalizedMethod=typeof method==='string'?method.toUpperCase():'GET';
+      const context={ path, method: normalizedMethod, credentialsMode };
       const fetchOptions={
-        method,
+        method: normalizedMethod,
         credentials:credentialsMode,
         headers:{},
       };
-      if(method.toUpperCase()==='POST'){
+      if(normalizedMethod==='POST'){
         fetchOptions.headers['Content-Type']='application/json';
         fetchOptions.body=JSON.stringify(body||{});
       }
@@ -139,6 +182,7 @@
         const err = networkError instanceof Error ? networkError : new Error(String(networkError));
         if(typeof err.status!=='number') err.status=0;
         err.credentialsMode=credentialsMode;
+        err.context = Object.assign({}, err.context||{}, context);
         throw err;
       }
       const text=await res.text();
@@ -151,6 +195,7 @@
         err.status=res.status;
         err.credentialsMode=credentialsMode;
         err.cause=parseError;
+        err.context=context;
         throw err;
       }
 
@@ -162,6 +207,7 @@
         error.details=payload;
         error.status=res.status;
         error.credentialsMode=credentialsMode;
+        error.context=context;
         throw error;
       }
 
@@ -184,6 +230,10 @@
           }
           return result;
         }catch(error){
+          if(error && typeof error==='object'){
+            error.retryMode = mode;
+            if(!error.context){ error.context = { path, method:'GET', credentialsMode: mode==='include'?'include':'omit' }; }
+          }
           lastError=error;
           if(mode==='include'){
             if(!preferPublicRequests && shouldRetryWithoutCredentials(error)){
@@ -197,8 +247,15 @@
           throw error;
         }
       }
-      if(lastError) throw lastError;
-      throw new Error('Unbekannter API-Fehler');
+      if(lastError){
+        if(lastError && typeof lastError==='object' && !lastError.context){
+          lastError.context = { path, method:'GET' };
+        }
+        throw lastError;
+      }
+      const fallbackError=new Error('Unbekannter API-Fehler');
+      fallbackError.context={ path, method:'GET' };
+      throw fallbackError;
     }
 
     async function mmbApiPost(path,body){
@@ -217,6 +274,10 @@
           }
           return result;
         }catch(error){
+          if(error && typeof error==='object'){
+            error.retryMode = mode;
+            if(!error.context){ error.context = { path, method:'POST', credentialsMode: mode==='include'?'include':'omit' }; }
+          }
           lastError=error;
           if(mode==='include'){
             if(!preferPublicRequests && shouldRetryWithoutCredentials(error)){
@@ -230,11 +291,18 @@
           throw error;
         }
       }
-      if(lastError) throw lastError;
-      throw new Error('Unbekannter API-Fehler');
+      if(lastError){
+        if(lastError && typeof lastError==='object' && !lastError.context){
+          lastError.context = { path, method:'POST' };
+        }
+        throw lastError;
+      }
+      const fallbackError=new Error('Unbekannter API-Fehler');
+      fallbackError.context={ path, method:'POST' };
+      throw fallbackError;
     }
 
-    const MMBApi={
+    var MMBApi={
       async listBookings(params = {}) {
         const q=new URLSearchParams();
         if(params.box_id) q.set('box_id', params.box_id);
@@ -440,7 +508,30 @@
 
     // Anzeige-ID (nur Ziffern), Prefix 00 + laufend ab 100
     const ID_CATEGORY = '00';
-    function displayId(rawId){ const num = 100 + (Number(rawId)||0); return ID_CATEGORY + String(num).padStart(3,'0'); }
+    function computeDisplayId(rawId){
+      const numeric = Number(rawId);
+      if (Number.isFinite(numeric) && numeric > 0) {
+        const base = Math.trunc(100 + numeric);
+        return ID_CATEGORY + String(base).padStart(3,'0');
+      }
+      const digits = String(rawId ?? '').replace(/[^0-9]/g,'');
+      if (digits) {
+        const tail = digits.slice(-3);
+        return ID_CATEGORY + tail.padStart(3,'0');
+      }
+      return ID_CATEGORY + '000';
+    }
+    function normalizeDisplayId(rawId, provided){
+      const direct = (typeof provided === 'string') ? provided.trim() : '';
+      if (direct) return direct;
+      return computeDisplayId(rawId);
+    }
+    function displayId(value){
+      if (value && typeof value === 'object') {
+        return normalizeDisplayId(value.id ?? value.booking_id ?? null, value.display_id ?? value.displayId ?? null);
+      }
+      return normalizeDisplayId(value, null);
+    }
 
     function injectAdminListCSS(){
       if(document.getElementById('mmb-admin-list-css')) return;
@@ -518,6 +609,7 @@
         this.state={
           bookings:[], originalBookings:[], boxes:[],
           loading:false,
+          error:null,
           filters:{ status:'', box:'', id:'', name:'' }
         };
         this.instanceId=Math.random().toString(36).substr(2,9); MMBCore.globalState.registerInstance(this.instanceId,this);
@@ -528,8 +620,11 @@
       async init(){ try{ this.render(); await this.loadInitialData(); this.bindUI(); this.applyFilters(); }catch(e){ console.error('AdminList init error:',e); MMBCore.Utils.showNotification('Fehler beim Initialisieren der Admin-Liste','error'); } }
 
       async loadInitialData(){
-        this.setState({loading:true});
-        await Promise.all([this.loadBookings(), this.loadBoxes()]);
+        this.setState({loading:true,error:null});
+        const [bookingsResult] = await Promise.allSettled([this.loadBookings(), Promise.resolve(this.loadBoxes())]);
+        if(bookingsResult.status==='rejected'){
+          console.error('Initiales Laden der Buchungsliste fehlgeschlagen:', bookingsResult.reason);
+        }
         this.setState({loading:false});
       }
 
@@ -541,37 +636,57 @@
             ? res.bookings
             : (Array.isArray(res.data) ? res.data : (Array.isArray(res) ? res : [])));
         const items=sourceItems.map(r=>{
-          const boxId = String(r.box_id);
+          const rawId = r.id ?? r.booking_id ?? null;
+          const id = rawId !== null ? String(rawId) : '';
+          const boxId = String(r.box_id ?? '');
           const totalAmount = Number(r.total_amount ?? 0);
           const deposit = Number(r.deposit_eur ?? 0);
           const fulfillmentPrice = Number(r.fulfillment_price_delta ?? 0);
           const rawDetails = r.fulfillment_details_json ?? r.fulfillment_details ?? '';
           const parsedDetails = parseFulfillmentDetails(rawDetails);
+          const apiDisplayId = typeof r.display_id === 'string' ? r.display_id.trim() : '';
+          const resolvedBoxName = (()=>{
+            const nameFromApi = typeof r.box_name === 'string' ? r.box_name.trim() : '';
+            if (nameFromApi) return nameFromApi;
+            if (BOX_MAP[boxId]) return BOX_MAP[boxId];
+            return boxId ? `Box #${boxId}` : 'Unbekannte Box';
+          })();
           return {
-            id:String(r.id),
-            box_id:boxId,
-            box_name: BOX_MAP[boxId] || r.box_name || ('Box #'+boxId),
-            start_date:r.start_date,
-            end_date:r.end_date,
-            status:(r.status||'').toString(),
-            customer_name:r.customer_name||'',
-            customer_email:r.customer_email||'',
-            customer_phone:r.customer_phone||'',
-            note:r.note ?? '',
-            price_total:Number.isFinite(totalAmount)?totalAmount:0,
-            deposit_eur:Number.isFinite(deposit)?deposit:0,
-            fulfillment_method:(r.fulfillment_method||'').toString(),
-            fulfillment_label:r.fulfillment_label ?? '',
-            fulfillment_note:r.fulfillment_note ?? '',
-            fulfillment_price_delta:Number.isFinite(fulfillmentPrice)?fulfillmentPrice:0,
+            id,
+            display_id: normalizeDisplayId(rawId, apiDisplayId),
+            box_id: boxId,
+            box_name: resolvedBoxName,
+            start_date: r.start_date,
+            end_date: r.end_date,
+            status: (r.status||'').toString(),
+            customer_name: r.customer_name||'',
+            customer_email: r.customer_email||'',
+            customer_phone: r.customer_phone||'',
+            note: r.note ?? '',
+            price_total: Number.isFinite(totalAmount)?totalAmount:0,
+            deposit_eur: Number.isFinite(deposit)?deposit:0,
+            fulfillment_method: (r.fulfillment_method||'').toString(),
+            fulfillment_label: r.fulfillment_label ?? '',
+            fulfillment_note: r.fulfillment_note ?? '',
+            fulfillment_price_delta: Number.isFinite(fulfillmentPrice)?fulfillmentPrice:0,
             fulfillment_details_json: typeof rawDetails === 'string' ? rawDetails : '',
             fulfillment_details: parsedDetails,
-            created_at:r.created_at
+            created_at: r.created_at
           };
         });
         this.state.originalBookings = items;
+        this.state.error = null;
         this.applyFilters(); // hält Filter aktiv nach jedem Reload/Statuswechsel
-      }catch(err){ console.error('loadBookings error:',err); MMBCore.Utils.showNotification('Buchungen konnten nicht geladen werden','error'); } }
+      }catch(err){
+        console.error('loadBookings error:',err);
+        const errorInfo = MMBCore.Utils.describeError(err,{headline:'Buchungen konnten nicht geladen werden',context:(err&&err.context&&err.context.path)||'list_bookings.php'});
+        this.setState({
+          error:errorInfo,
+          bookings:[],
+          originalBookings:[],
+        });
+        throw err;
+      } }
 
       async loadBoxes(){
         this.state.boxes = [
@@ -582,6 +697,16 @@
       }
 
       setState(ns){ this.state={...this.state,...ns}; this.render(); }
+
+      getErrorClipboardText(){
+        const info=this.state.error;
+        if(!info) return 'Keine Fehlerdaten vorhanden.';
+        try{
+          return JSON.stringify(info,null,2);
+        }catch(_){
+          return String(info);
+        }
+      }
 
       // ---------- Focus Snapshot ----------
       snapshotFocus(){
@@ -609,6 +734,11 @@
           this.container.innerHTML=`<div class="mmb-widget"><div class="mmb-loading">Lade Buchungen...</div></div>`;
           return;
         }
+        if(this.state.error){
+          this.container.innerHTML=this.renderErrorView();
+          this.bindErrorActions();
+          return;
+        }
         const f = this.state.filters;
         this.container.innerHTML=`
           <div class="mmb-widget">
@@ -619,6 +749,64 @@
         this.bindTableActions();
         const btn = document.getElementById(`btn-reset-${this.instanceId}`);
         if(btn && !btn._bound){ btn.addEventListener('click', ()=> this.resetFilters()); btn._bound=true; }
+      }
+
+      renderErrorView(){
+        const info=this.state.error||{};
+        const headline=this.escape(info.headline||'Unbekannter Fehler');
+        const message=this.escape(info.message||'Die Buchungsliste konnte nicht geladen werden.');
+        const status=info.status!==null&&info.status!==undefined?`<div class="mmb-error-meta">HTTP-Status: ${this.escape(String(info.status))}</div>`:'';
+        const context=info.context?`<div class="mmb-error-meta">Quelle: ${this.escape(info.context)}</div>`:'';
+        const details=Array.isArray(info.items)&&info.items.length
+          ? `<div class="mmb-error-details"><ul>${info.items.map(item=>`<li>${this.escape(String(item))}</li>`).join('')}</ul></div>`
+          : '';
+        const raw=info.raw?`<div class="mmb-error-details"><strong>Serverantwort</strong><code>${this.escape(String(info.raw))}</code></div>`:'';
+        return `
+          <div class="mmb-widget">
+            <div class="mmb-error">
+              <strong>${headline}</strong><br/>${message}
+              ${status}
+              ${context}
+              ${details}
+              ${raw}
+              <div class="mmb-error-actions">
+                <button type="button" class="mmb-btn" data-act="retry-load">Erneut versuchen</button>
+                <button type="button" class="mmb-btn mmb-btn-secondary" data-act="copy-error">Fehlerdetails kopieren</button>
+              </div>
+            </div>
+          </div>`;
+      }
+
+      bindErrorActions(){
+        const retryBtn=this.container.querySelector('[data-act="retry-load"]');
+        if(retryBtn && !retryBtn._bound){
+          retryBtn._bound=true;
+          retryBtn.addEventListener('click',()=>{ this.reloadData().catch(err=>console.error('retry load failed',err)); });
+        }
+        const copyBtn=this.container.querySelector('[data-act="copy-error"]');
+        if(copyBtn && !copyBtn._bound){
+          copyBtn._bound=true;
+          copyBtn.addEventListener('click',async()=>{
+            try{
+              await navigator.clipboard.writeText(this.getErrorClipboardText());
+              MMBCore.Utils.showNotification('Fehlerdetails kopiert','info');
+            }catch(err){
+              console.error('Clipboard copy failed',err);
+              MMBCore.Utils.showNotification('Kopieren nicht möglich – siehe Konsole.','error');
+            }
+          });
+        }
+      }
+
+      async reloadData(){
+        this.setState({loading:true,error:null});
+        try{
+          await this.loadBookings();
+        }catch(err){
+          console.error('Erneutes Laden der Buchungsliste fehlgeschlagen:',err);
+        }finally{
+          this.setState({loading:false});
+        }
       }
 
       renderFilters(f){
@@ -680,7 +868,7 @@
         const fulfillmentLabel = this.formatFulfillmentCell(b);
         return `
         <tr>
-          <td><span class="badge-id">${displayId(b.id)}</span></td>
+          <td><span class="badge-id">${this.escape(displayId(b))}</span></td>
           <td><div class="cell--name">${this.escape(b.customer_name)}</div><div class="cell--email" style="font-size:.75rem;color:var(--mmb-text-light);">${this.escape(b.customer_email)}</div></td>
           <td class="cell--box">${this.escape(b.box_name)}</td>
           <td class="cell--date">${this.renderDateCell(b)}</td>
@@ -801,13 +989,17 @@
 
       // ---------- Filterlogik ----------
       applyFilters(focusSnapshot=null){
+        if(this.state.error){
+          this.render();
+          return;
+        }
         const f = this.state.filters;
         const rows = this.state.originalBookings.filter(x=>{
           if (f.status && x.status!==f.status) return false;
           if (f.box && x.box_id!==f.box) return false;
 
           if (f.id){
-            const disp = displayId(x.id);
+            const disp = displayId(x);
             if (!disp.startsWith(f.id)) return false;
           }
 
@@ -841,10 +1033,10 @@
       // ---------- Aktionen ----------
       async confirmBooking(id){
         const b = this.state.originalBookings.find(x=>x.id===id); if(!b) return;
-        const subject = `Deine Buchung wurde bestätigt ✅ – Buchungs-ID: ${displayId(id)}`;
+        const subject = `Deine Buchung wurde bestätigt ✅ – Buchungs-ID: ${displayId(b)}`;
         const body = this.tplConfirm(b);
         const html = `
-          <div class="mmb-field"><strong>Buchung:</strong> ${displayId(id)} – ${this.escape(b.customer_name)} (${this.escape(b.box_name)})</div>
+          <div class="mmb-field"><strong>Buchung:</strong> ${displayId(b)} – ${this.escape(b.customer_name)} (${this.escape(b.box_name)})</div>
           <div class="mmb-field"><label>Betreff</label><input name="subject" value="${this.escape(subject)}"/></div>
           <div class="mmb-field"><label>Nachricht an Kund*in</label><textarea name="message">${this.escape(body)}</textarea></div>
         `;
@@ -857,10 +1049,10 @@
 
       async declineBooking(id){
         const b = this.state.originalBookings.find(x=>x.id===id); if(!b) return;
-        const subject = `Deine Buchung wurde abgelehnt ❌ – Buchungs-ID: ${displayId(id)}`;
+        const subject = `Deine Buchung wurde abgelehnt ❌ – Buchungs-ID: ${displayId(b)}`;
         const body = this.tplReject(b);
         const html = `
-          <div class="mmb-field"><strong>Buchung:</strong> ${displayId(id)} – ${this.escape(b.customer_name)} (${this.escape(b.box_name)})</div>
+          <div class="mmb-field"><strong>Buchung:</strong> ${displayId(b)} – ${this.escape(b.customer_name)} (${this.escape(b.box_name)})</div>
           <div class="mmb-field"><label>Grund (intern)</label><input name="reason" placeholder="z.B. Terminkonflikt"/></div>
           <div class="mmb-field"><label>Betreff</label><input name="subject" value="${this.escape(subject)}"/></div>
           <div class="mmb-field"><label>Nachricht an Kund*in</label><textarea name="message">${this.escape(body)}</textarea></div>
@@ -877,10 +1069,10 @@
         const alternatives = [{id:'2',name:BOX_MAP['2']},{id:'3',name:BOX_MAP['3']},{id:'1',name:BOX_MAP['1']}]
           .filter(x => x.id !== b.box_id);
         const altMap = Object.fromEntries(alternatives.map(a=>[a.id,a]));
-        const subject = `Konflikt bei deiner Buchung ⚠️ – Buchungs-ID: ${displayId(id)}`;
+        const subject = `Konflikt bei deiner Buchung ⚠️ – Buchungs-ID: ${displayId(b)}`;
         const initialSelection = alternatives.length ? [alternatives[0]] : [];
         const html = `
-          <div class="mmb-field"><strong>Buchung:</strong> ${displayId(id)} – ${this.escape(b.customer_name)}</div>
+          <div class="mmb-field"><strong>Buchung:</strong> ${displayId(b)} – ${this.escape(b.customer_name)}</div>
           <div class="mmb-field"><label>Alternative Box(en)</label>
             <div class="mmb-alt-options">
               ${alternatives.map((x,idx)=>`
@@ -957,7 +1149,7 @@
         const fulfillmentInstructionHtml = fulfillmentInstructionLines.length
           ? `<ul class="mmb-fulfillment-info-list">${fulfillmentInstructionLines.map(line=>'<li>'+this.escape(line)+'</li>').join('')}</ul>`
           : '<div class="mmb-text-muted">Keine zusätzlichen Informationen hinterlegt.</div>';
-        const baseSubject = `Deine Buchung wurde aktualisiert 👷🏽 – Buchungs-ID: ${displayId(id)}`;
+        const baseSubject = `Deine Buchung wurde aktualisiert 👷🏽 – Buchungs-ID: ${displayId(b)}`;
         const parseAmount = (val)=>{
           if(val===null || val===undefined) return NaN;
           if(typeof val==='number') return val;
@@ -1013,7 +1205,7 @@
           <div class="mmb-field" data-email-field><label>Nachricht (E-Mail an Kund*in)</label><textarea name="message">${this.escape(body)}</textarea></div>
         `;
         const values = await this.openModal({
-          title:`Buchung bearbeiten – ${displayId(id)}`,
+          title:`Buchung bearbeiten – ${displayId(b)}`,
           html,
           confirmText:'Änderungen speichern',
           onMount:(form)=>{
@@ -1402,7 +1594,7 @@
           <div class="mmb-field"><strong>Telefon</strong><div>${phoneHtml}</div></div>
           <div class="mmb-field"><strong>Anmerkungen</strong><div>${noteHtml}</div></div>
         `;
-        await this.openModal({ title:`Buchungsdetails – ${displayId(id)}`, html, confirmText:'Schließen', cancelText:'' });
+        await this.openModal({ title:`Buchungsdetails – ${displayId(b)}`, html, confirmText:'Schließen', cancelText:'' });
       }
 
       async showFulfillmentDetails(id){
@@ -1418,7 +1610,7 @@
           <div class="mmb-field"><strong>Abwicklung</strong><div>${this.escape(fulfillmentDisplayLabel(info))}</div>${noteHtml}</div>
           <div class="mmb-field"><strong>Informationen</strong>${instructionHtml}</div>
         `;
-        await this.openModal({ title:`Abwicklung – ${displayId(id)}`, html, confirmText:'Schließen', cancelText:'' });
+        await this.openModal({ title:`Abwicklung – ${displayId(b)}`, html, confirmText:'Schließen', cancelText:'' });
       }
 
       tplConfirm(b){
@@ -1427,7 +1619,7 @@
         return `Hallo ${b.customer_name},
 
 hier sind hervorragende Neuigkeiten für dich 🎉
-Wir haben deine Buchung mit der Buchungs-ID: ${displayId(b.id)} bestätigt.
+        Wir haben deine Buchung mit der Buchungs-ID: ${displayId(b)} bestätigt.
 
 Deine Buchung im Überblick:
 👤 Name: ${b.customer_name}
@@ -1456,7 +1648,7 @@ Telefon: 01742015500`;
         const range = `${new Date(b.start_date).toLocaleDateString('de-DE')} – ${new Date(b.end_date).toLocaleDateString('de-DE')}`;
         return `Hallo ${b.customer_name},
 
-vielen Dank für deine Buchung (${displayId(b.id)}) für den Zeitraum ${range}.
+        vielen Dank für deine Buchung (${displayId(b)}) für den Zeitraum ${range}.
 Leider können wir diese Buchung nicht annehmen, da zu deinem gewählten Zeitraum bereits alle unsere Musikboxen vermietet sind.
 
 Du kannst gerne direkt in unserem <a href="https://www.mietmichbox.de/buchungskalender" target="_blank" rel="noopener">Buchungskalender</a> eine neue Buchung zu einem anderen Zeitraum anfragen oder uns als Antwort auf diese E-Mail alternative Zeiträume nennen, sodass wir gemeinsam eine Lösung finden können. Wir helfen dir gerne schnellstmöglich weiter.
@@ -1492,7 +1684,7 @@ Telefon: 01742015500`;
 
 tut uns leid, aber unsere Musikboxen sind sehr gefragt 🔥
 
-Für deine Buchung (${displayId(b.id)}) ist die Musikbox ${b.box_name} für den Zeitraum ${range} leider nicht mehr verfügbar. ${altSentence}
+        Für deine Buchung (${displayId(b)}) ist die Musikbox ${b.box_name} für den Zeitraum ${range} leider nicht mehr verfügbar. ${altSentence}
 
 Du kannst gerne direkt in unserem <a href="https://www.mietmichbox.de/buchungskalender" target="_blank" rel="noopener">Buchungskalender</a> eine neue Buchung mit einer anderen Musikbox oder zu einem anderen Zeitraum anfragen. Alternativ kannst du uns auch als Antwort auf diese E-Mail die alternative Musikbox oder den alternativen Zeitraum nennen, sodass wir deine Buchung aktualisieren können. Wir helfen dir gerne schnellstmöglich weiter.
 
@@ -1526,7 +1718,7 @@ Telefon: 01742015500`;
         const instructions = this.fulfillmentInstructionText(b);
         return `Hallo ${name},
 
-wir haben Details in deiner Buchung (${displayId(b.id)}) aktualisiert.
+        wir haben Details in deiner Buchung (${displayId(b)}) aktualisiert.
 
 Deine aktualisierte Buchung im Überblick:
 👤 Name: ${name}

@@ -23,6 +23,7 @@ require __DIR__ . '/api_bootstrap.php';
 
 // Infrastruktur
 require __DIR__ . '/db.php';
+require_once __DIR__ . '/lib/booking_alternatives.php';
 
 // Mailer ist optional – nur laden, wenn vorhanden
 $HAS_MAILER = is_file(__DIR__ . '/mailer.php');
@@ -579,15 +580,18 @@ try {
 
   // 3) Alternative protokollieren (optional, falls Tabelle existiert)
   if ($altBoxIds) {
-    foreach ($altBoxIds as $altId) {
-      try {
-        $pdo->prepare("INSERT INTO booking_alternatives (booking_id, suggested_box_id, created_at) VALUES (?,?,NOW())")
-            ->execute([$id, $altId]);
-      } catch (Throwable $e) {
-        // Nicht kritisch – nur loggen, falls Tabelle nicht existiert
-        error_log('booking_alternatives insert failed: '.$e->getMessage());
-        break;
+    if (mmb_ensure_booking_alternatives_table($pdo)) {
+      foreach ($altBoxIds as $altId) {
+        try {
+          $pdo->prepare("INSERT INTO booking_alternatives (booking_id, suggested_box_id, created_at) VALUES (?,?,NOW())")
+              ->execute([$id, $altId]);
+        } catch (Throwable $e) {
+          // Nicht kritisch – nur loggen, falls Insert fehlschlägt
+          error_log('booking_alternatives insert failed: '.$e->getMessage());
+        }
       }
+    } else {
+      error_log('booking_alternatives table not available – skipping alternative logging');
     }
   }
 
