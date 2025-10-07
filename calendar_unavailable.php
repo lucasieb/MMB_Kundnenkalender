@@ -18,6 +18,16 @@ function calendar_json_response(array $payload, int $status = 200): void {
   echo $json !== false ? $json : '{"ok":false,"error":"json_encode_failed"}';
 }
 
+function calendar_exception_payload(Throwable $e): array {
+  return [
+    'type' => get_class($e),
+    'message' => $e->getMessage(),
+    'code' => $e->getCode(),
+    'file' => basename($e->getFile()),
+    'line' => $e->getLine(),
+  ];
+}
+
 try {
   $box_id = isset($_GET['box_id']) ? (int)$_GET['box_id'] : 0;
   $from   = isset($_GET['from'])   ? trim((string)$_GET['from'])   : '';
@@ -67,5 +77,12 @@ try {
     ]
   ]);
 } catch (Throwable $e) {
-  calendar_json_response(['ok'=>false,'error'=>$e->getMessage()], 500);
+  error_log(sprintf('[calendar_unavailable] %s in %s:%d', $e->getMessage(), $e->getFile(), $e->getLine()));
+  calendar_json_response([
+    'ok' => false,
+    'error' => 'Verfügbarkeiten konnten nicht geladen werden',
+    'details' => $e->getMessage(),
+    'exception' => calendar_exception_payload($e),
+    'trace' => array_slice(explode("\n", $e->getTraceAsString()), 0, 10),
+  ], 500);
 }

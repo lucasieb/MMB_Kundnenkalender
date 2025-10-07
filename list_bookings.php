@@ -31,6 +31,16 @@ function mmb_json_response(array $payload, int $status = 200): void {
     echo $json;
 }
 
+function mmb_exception_payload(Throwable $e): array {
+    return [
+        'type' => get_class($e),
+        'message' => $e->getMessage(),
+        'code' => $e->getCode(),
+        'file' => basename($e->getFile()),
+        'line' => $e->getLine(),
+    ];
+}
+
 $box_id = isset($_GET['box_id']) ? (int) $_GET['box_id'] : null;
 $status = isset($_GET['status']) ? trim((string) $_GET['status']) : null;
 $from   = isset($_GET['from'])   ? trim((string) $_GET['from'])   : null;
@@ -82,9 +92,12 @@ try {
         'items' => $rows,
     ]);
 } catch (Throwable $e) {
+    error_log(sprintf('[list_bookings] %s in %s:%d', $e->getMessage(), $e->getFile(), $e->getLine()));
     mmb_json_response([
-        'ok'    => false,
-        'error' => 'Daten konnten nicht geladen werden',
-        'details' => $e->getMessage(),
+        'ok'        => false,
+        'error'     => 'Daten konnten nicht geladen werden',
+        'details'   => $e->getMessage(),
+        'exception' => mmb_exception_payload($e),
+        'trace'     => array_slice(explode("\n", $e->getTraceAsString()), 0, 10),
     ], 500);
 }

@@ -13,6 +13,10 @@
     .card .content{padding:1rem;}
     .mmb-error{margin-top:1.5rem;padding:1rem;border-radius:6px;background:#fee2e2;color:#b91c1c;font-weight:600;}
     .mmb-warning{margin:0 0 1rem 0;padding:0.85rem 1rem;border-radius:6px;background:#fef3c7;color:#92400e;font-weight:600;}
+    .mmb-error-meta{margin-top:.5rem;font-size:.8rem;color:#7f1d1d;text-transform:uppercase;letter-spacing:.05em;}
+    .mmb-error-details{margin-top:.75rem;font-size:.9rem;line-height:1.45;color:#7f1d1d;}
+    .mmb-error-details code{display:block;margin-top:.5rem;padding:.75rem;border-radius:6px;background:#fee2e2;color:#991b1b;white-space:pre-wrap;word-break:break-word;font-family:ui-monospace,SFMono-Regular,Consolas,'Liberation Mono',Menlo,monospace;}
+    .mmb-error-actions{margin-top:1rem;display:flex;flex-wrap:wrap;gap:.5rem;}
   </style>
 </head>
 <body>
@@ -77,6 +81,43 @@
         for(let d=1; d<=last.getDate(); d++){days.push({date:new Date(y,m,d),otherMonth:false});}
         const total=Math.ceil(days.length/7)*7; for(let d=1; d<=total-days.length; d++){days.push({date:new Date(y,m+1,d),otherMonth:true});}
         return days;},
+      escapeHtml(value){ if(value===null||value===undefined) return ''; return String(value).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])); },
+      describeError(error, options={}){
+        const headline=(typeof options.headline==='string'&&options.headline.trim())?options.headline.trim():'Unbekannter Fehler';
+        const fallback=(typeof options.fallbackMessage==='string'&&options.fallbackMessage.trim())?options.fallbackMessage.trim():'Bitte prüfen Sie die Browser-Konsole für weitere Details.';
+        const info={headline,message:fallback,status:null,context:typeof options.context==='string'?options.context:'',items:[],raw:null};
+        const pushDetail=(value)=>{
+          if(value===null||value===undefined) return;
+          if(typeof value==='string'){const trimmed=value.trim(); if(trimmed) info.items.push(trimmed); return;}
+          if(typeof value==='number'||typeof value==='boolean'){info.items.push(String(value)); return;}
+          if(Array.isArray(value)){value.forEach(pushDetail); return;}
+          try{const json=JSON.stringify(value,null,2); if(json) info.items.push(json);}catch(_){info.items.push(String(value));}
+        };
+        if(error instanceof Error){
+          if(typeof error.message==='string'&&error.message.trim()) info.message=error.message.trim();
+          if(typeof error.status==='number'&&!Number.isNaN(error.status)) info.status=error.status;
+          if(error.name&&error.name!=='Error') pushDetail(`Fehlertyp: ${error.name}`);
+          if('details' in error) pushDetail(error.details);
+          if('detail' in error) pushDetail(error.detail);
+          if('error' in error&&error.error!==error.message) pushDetail(error.error);
+          if(!info.context&&error.context){
+            if(typeof error.context==='string') info.context=error.context;
+            else if(error.context&&typeof error.context.path==='string') info.context=error.context.path;
+          }
+          if(typeof error.raw==='string'&&error.raw.trim()) info.raw=error.raw.slice(0,1200);
+        }else if(error&&typeof error==='object'){
+          if(typeof error.message==='string'&&error.message.trim()) info.message=error.message.trim();
+          if(typeof error.status==='number'&&!Number.isNaN(error.status)) info.status=error.status;
+          if(typeof error.context==='string') info.context=error.context;
+          pushDetail(error.details??error.detail??error.error??error);
+        }else if(typeof error==='string'&&error.trim()){
+          info.message=error.trim();
+        }
+        if(!info.context&&typeof options.context==='string') info.context=options.context;
+        if(typeof options.status==='number'&&!info.status) info.status=options.status;
+        if(options.extra) pushDetail(options.extra);
+        return info;
+      },
       showNotification(msg,type='info'){const ex=document.querySelector(`.mmb-${type}-notification`); if(ex) ex.remove(); const el=document.createElement('div'); el.className=`mmb-${type}-notification`; const bg=type==='error'?'var(--mmb-busy)':'var(--mmb-ok)';
         el.style.cssText=`position:fixed;top:20px;right:20px;background:${bg};color:#fff;padding:1rem;border-radius:4px;box-shadow:0 4px 6px rgba(0,0,0,.1);z-index:1000;max-width:300px;`; el.textContent=msg; document.body.appendChild(el); setTimeout(()=>el.remove(),5000);}
     };
@@ -123,12 +164,14 @@
     }
 
     async function requestJson(path,{method='GET',body=null}={},credentialsMode='include'){
+      const normalizedMethod=typeof method==='string'?method.toUpperCase():'GET';
+      const context={ path, method: normalizedMethod, credentialsMode };
       const fetchOptions={
-        method,
+        method: normalizedMethod,
         credentials:credentialsMode,
         headers:{},
       };
-      if(method.toUpperCase()==='POST'){
+      if(normalizedMethod==='POST'){
         fetchOptions.headers['Content-Type']='application/json';
         fetchOptions.body=JSON.stringify(body||{});
       }
@@ -139,6 +182,7 @@
         const err = networkError instanceof Error ? networkError : new Error(String(networkError));
         if(typeof err.status!=='number') err.status=0;
         err.credentialsMode=credentialsMode;
+        err.context = Object.assign({}, err.context||{}, context);
         throw err;
       }
       const text=await res.text();
@@ -151,6 +195,7 @@
         err.status=res.status;
         err.credentialsMode=credentialsMode;
         err.cause=parseError;
+        err.context=context;
         throw err;
       }
 
@@ -162,6 +207,7 @@
         error.details=payload;
         error.status=res.status;
         error.credentialsMode=credentialsMode;
+        error.context=context;
         throw error;
       }
 
@@ -184,6 +230,10 @@
           }
           return result;
         }catch(error){
+          if(error && typeof error==='object'){
+            error.retryMode = mode;
+            if(!error.context){ error.context = { path, method:'GET', credentialsMode: mode==='include'?'include':'omit' }; }
+          }
           lastError=error;
           if(mode==='include'){
             if(!preferPublicRequests && shouldRetryWithoutCredentials(error)){
@@ -197,8 +247,15 @@
           throw error;
         }
       }
-      if(lastError) throw lastError;
-      throw new Error('Unbekannter API-Fehler');
+      if(lastError){
+        if(lastError && typeof lastError==='object' && !lastError.context){
+          lastError.context = { path, method:'GET' };
+        }
+        throw lastError;
+      }
+      const fallbackError=new Error('Unbekannter API-Fehler');
+      fallbackError.context={ path, method:'GET' };
+      throw fallbackError;
     }
 
     async function mmbApiPost(path,body){
@@ -217,6 +274,10 @@
           }
           return result;
         }catch(error){
+          if(error && typeof error==='object'){
+            error.retryMode = mode;
+            if(!error.context){ error.context = { path, method:'POST', credentialsMode: mode==='include'?'include':'omit' }; }
+          }
           lastError=error;
           if(mode==='include'){
             if(!preferPublicRequests && shouldRetryWithoutCredentials(error)){
@@ -230,8 +291,15 @@
           throw error;
         }
       }
-      if(lastError) throw lastError;
-      throw new Error('Unbekannter API-Fehler');
+      if(lastError){
+        if(lastError && typeof lastError==='object' && !lastError.context){
+          lastError.context = { path, method:'POST' };
+        }
+        throw lastError;
+      }
+      const fallbackError=new Error('Unbekannter API-Fehler');
+      fallbackError.context={ path, method:'POST' };
+      throw fallbackError;
     }
 
     const MMBApi={
@@ -541,6 +609,7 @@
         this.state={
           bookings:[], originalBookings:[], boxes:[],
           loading:false,
+          error:null,
           filters:{ status:'', box:'', id:'', name:'' }
         };
         this.instanceId=Math.random().toString(36).substr(2,9); MMBCore.globalState.registerInstance(this.instanceId,this);
@@ -551,8 +620,11 @@
       async init(){ try{ this.render(); await this.loadInitialData(); this.bindUI(); this.applyFilters(); }catch(e){ console.error('AdminList init error:',e); MMBCore.Utils.showNotification('Fehler beim Initialisieren der Admin-Liste','error'); } }
 
       async loadInitialData(){
-        this.setState({loading:true});
-        await Promise.all([this.loadBookings(), this.loadBoxes()]);
+        this.setState({loading:true,error:null});
+        const [bookingsResult] = await Promise.allSettled([this.loadBookings(), Promise.resolve(this.loadBoxes())]);
+        if(bookingsResult.status==='rejected'){
+          console.error('Initiales Laden der Buchungsliste fehlgeschlagen:', bookingsResult.reason);
+        }
         this.setState({loading:false});
       }
 
@@ -603,8 +675,18 @@
           };
         });
         this.state.originalBookings = items;
+        this.state.error = null;
         this.applyFilters(); // hält Filter aktiv nach jedem Reload/Statuswechsel
-      }catch(err){ console.error('loadBookings error:',err); MMBCore.Utils.showNotification('Buchungen konnten nicht geladen werden','error'); } }
+      }catch(err){
+        console.error('loadBookings error:',err);
+        const errorInfo = MMBCore.Utils.describeError(err,{headline:'Buchungen konnten nicht geladen werden',context:(err&&err.context&&err.context.path)||'list_bookings.php'});
+        this.setState({
+          error:errorInfo,
+          bookings:[],
+          originalBookings:[],
+        });
+        throw err;
+      } }
 
       async loadBoxes(){
         this.state.boxes = [
@@ -615,6 +697,16 @@
       }
 
       setState(ns){ this.state={...this.state,...ns}; this.render(); }
+
+      getErrorClipboardText(){
+        const info=this.state.error;
+        if(!info) return 'Keine Fehlerdaten vorhanden.';
+        try{
+          return JSON.stringify(info,null,2);
+        }catch(_){
+          return String(info);
+        }
+      }
 
       // ---------- Focus Snapshot ----------
       snapshotFocus(){
@@ -642,6 +734,11 @@
           this.container.innerHTML=`<div class="mmb-widget"><div class="mmb-loading">Lade Buchungen...</div></div>`;
           return;
         }
+        if(this.state.error){
+          this.container.innerHTML=this.renderErrorView();
+          this.bindErrorActions();
+          return;
+        }
         const f = this.state.filters;
         this.container.innerHTML=`
           <div class="mmb-widget">
@@ -652,6 +749,64 @@
         this.bindTableActions();
         const btn = document.getElementById(`btn-reset-${this.instanceId}`);
         if(btn && !btn._bound){ btn.addEventListener('click', ()=> this.resetFilters()); btn._bound=true; }
+      }
+
+      renderErrorView(){
+        const info=this.state.error||{};
+        const headline=this.escape(info.headline||'Unbekannter Fehler');
+        const message=this.escape(info.message||'Die Buchungsliste konnte nicht geladen werden.');
+        const status=info.status!==null&&info.status!==undefined?`<div class="mmb-error-meta">HTTP-Status: ${this.escape(String(info.status))}</div>`:'';
+        const context=info.context?`<div class="mmb-error-meta">Quelle: ${this.escape(info.context)}</div>`:'';
+        const details=Array.isArray(info.items)&&info.items.length
+          ? `<div class="mmb-error-details"><ul>${info.items.map(item=>`<li>${this.escape(String(item))}</li>`).join('')}</ul></div>`
+          : '';
+        const raw=info.raw?`<div class="mmb-error-details"><strong>Serverantwort</strong><code>${this.escape(String(info.raw))}</code></div>`:'';
+        return `
+          <div class="mmb-widget">
+            <div class="mmb-error">
+              <strong>${headline}</strong><br/>${message}
+              ${status}
+              ${context}
+              ${details}
+              ${raw}
+              <div class="mmb-error-actions">
+                <button type="button" class="mmb-btn" data-act="retry-load">Erneut versuchen</button>
+                <button type="button" class="mmb-btn mmb-btn-secondary" data-act="copy-error">Fehlerdetails kopieren</button>
+              </div>
+            </div>
+          </div>`;
+      }
+
+      bindErrorActions(){
+        const retryBtn=this.container.querySelector('[data-act="retry-load"]');
+        if(retryBtn && !retryBtn._bound){
+          retryBtn._bound=true;
+          retryBtn.addEventListener('click',()=>{ this.reloadData().catch(err=>console.error('retry load failed',err)); });
+        }
+        const copyBtn=this.container.querySelector('[data-act="copy-error"]');
+        if(copyBtn && !copyBtn._bound){
+          copyBtn._bound=true;
+          copyBtn.addEventListener('click',async()=>{
+            try{
+              await navigator.clipboard.writeText(this.getErrorClipboardText());
+              MMBCore.Utils.showNotification('Fehlerdetails kopiert','info');
+            }catch(err){
+              console.error('Clipboard copy failed',err);
+              MMBCore.Utils.showNotification('Kopieren nicht möglich – siehe Konsole.','error');
+            }
+          });
+        }
+      }
+
+      async reloadData(){
+        this.setState({loading:true,error:null});
+        try{
+          await this.loadBookings();
+        }catch(err){
+          console.error('Erneutes Laden der Buchungsliste fehlgeschlagen:',err);
+        }finally{
+          this.setState({loading:false});
+        }
       }
 
       renderFilters(f){
@@ -834,6 +989,10 @@
 
       // ---------- Filterlogik ----------
       applyFilters(focusSnapshot=null){
+        if(this.state.error){
+          this.render();
+          return;
+        }
         const f = this.state.filters;
         const rows = this.state.originalBookings.filter(x=>{
           if (f.status && x.status!==f.status) return false;
