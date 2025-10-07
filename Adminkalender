@@ -506,6 +506,9 @@
               customer_name: raw.customer_name || '',
               start_date: raw.start_date,
               end_date: raw.end_date || raw.start_date,
+              fulfillment_method: (raw.fulfillment_method || '').toString(),
+              fulfillment_label: (raw.fulfillment_display_label || raw.fulfillment_label || '').toString(),
+              fulfillment_needs_attention: raw.fulfillment_needs_attention === true || raw.fulfillment_needs_attention === 1 || raw.fulfillment_needs_attention === '1',
             };
 
             const clampedStart = clampDate(startDate, start, end);

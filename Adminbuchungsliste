@@ -438,69 +438,164 @@
       return 'pickup';
     };
 
-    const fulfillmentInstructionLines = (info, details)=>{
+    const buildFulfillmentDetails = (input, method='pickup')=>{
+      const normalizedMethod = (method||'').toString().trim().toLowerCase() || 'pickup';
+      let rawDetails;
+      if(input && typeof input === 'object' && !Array.isArray(input)){
+        if(input.raw && typeof input.raw === 'object'){ rawDetails = parseFulfillmentDetails(input.raw); }
+        else if(Object.prototype.hasOwnProperty.call(input,'contact') || Object.prototype.hasOwnProperty.call(input,'shipping') || Object.prototype.hasOwnProperty.call(input,'delivery') || Object.prototype.hasOwnProperty.call(input,'meta')){
+          rawDetails = parseFulfillmentDetails(input.raw ?? input);
+        }
+      }
+      if(!rawDetails){ rawDetails = parseFulfillmentDetails(input); }
+      const source = (value, fallback)=>{
+        if(value === undefined || value === null) return fallback;
+        return value;
+      };
+      const raw = rawDetails && typeof rawDetails === 'object' ? rawDetails : {};
+      const contactSource = (input && typeof input === 'object' && input.contact && typeof input.contact === 'object') ? input.contact : {};
+      const shippingSource = (input && typeof input === 'object' && input.shipping && typeof input.shipping === 'object') ? input.shipping : {};
+      const deliverySource = (input && typeof input === 'object' && input.delivery && typeof input.delivery === 'object') ? input.delivery : {};
+      const metaSource = (input && typeof input === 'object' && input.meta && typeof input.meta === 'object') ? input.meta : {};
+      const contact = {
+        name: (source(contactSource.name, raw.contact_name)||'').toString().trim(),
+        email: (source(contactSource.email, raw.contact_email)||'').toString().trim(),
+        phone: (source(contactSource.phone, raw.contact_phone)||'').toString().trim(),
+        consent: boolish(source(contactSource.consent, source(contactSource.consent_contact, source(raw.consent_contact, raw.consent_whatsapp))))
+      };
+      const shipping = {
+        address_line1: (source(shippingSource.address_line1, raw.address_line1)||'').toString().trim(),
+        address_line2: (source(shippingSource.address_line2, raw.address_line2)||'').toString().trim(),
+        postal_code: (source(shippingSource.postal_code, raw.postal_code)||'').toString().trim(),
+        city: (source(shippingSource.city, raw.city)||'').toString().trim(),
+        address_extra: (source(shippingSource.address_extra, raw.address_extra)||'').toString().trim(),
+      };
+      const delivery = {
+        meeting_point: (source(deliverySource.meeting_point, raw.meeting_point)||'').toString().trim(),
+        preferred_time: (source(deliverySource.preferred_time, raw.preferred_time)||'').toString().trim(),
+      };
+      const meta = {
+        submitted_at: (source(metaSource.submitted_at, raw.submitted_at)||'').toString().trim(),
+        submitted_via: (source(metaSource.submitted_via, raw.submitted_via)||'').toString().trim(),
+        booking_display_id: (source(metaSource.booking_display_id, raw.booking_display_id)||'').toString().trim(),
+      };
+      const requiresDetails = ['shipping','delivery'].includes(normalizedMethod);
+      const missing = [];
+      if(requiresDetails){
+        if(!contact.name) missing.push('Kontakt (Name)');
+        if(!contact.phone) missing.push('Kontakt (Telefon)');
+        if(!contact.email) missing.push('Kontakt (E-Mail)');
+        if(normalizedMethod === 'shipping'){
+          if(!shipping.address_line1) missing.push('Lieferadresse (Straße)');
+          if(!shipping.postal_code || !shipping.city) missing.push('Lieferadresse (PLZ/Ort)');
+        }else if(normalizedMethod === 'delivery'){
+          if(!delivery.meeting_point) missing.push('Treffpunkt');
+          if(!delivery.preferred_time) missing.push('Wunschzeit');
+        }
+      }
+      const providedMissing = Array.isArray(input?.missing) ? input.missing.map(x=>x&&x.toString().trim()).filter(Boolean) : [];
+      const mergedMissing = Array.from(new Set([...missing, ...providedMissing]));
+      const needsAttention = typeof input?.needs_attention === 'boolean'
+        ? Boolean(input.needs_attention)
+        : (requiresDetails && mergedMissing.length>0);
+      return {
+        raw,
+        contact,
+        shipping,
+        delivery,
+        meta,
+        missing: mergedMissing,
+        requires_details: requiresDetails,
+        needs_attention: needsAttention,
+      };
+    };
+
+    const normalizeFulfillmentPayload = (payload, fallbackMethod, structured)=>{
+      if(!payload || typeof payload !== 'object') return null;
+      const rawMethod = (payload.method ?? payload.id ?? fallbackMethod ?? '').toString().trim().toLowerCase();
+      const method = ['pickup','shipping','delivery'].includes(rawMethod) ? rawMethod : (fallbackMethod || 'pickup');
+      const infoLines = Array.isArray(payload.info_lines ?? payload.infoLines)
+        ? (payload.info_lines ?? payload.infoLines).map(x=>String(x))
+        : [];
+      const displayLabel = (payload.display_label ?? payload.displayLabel ?? '').toString().trim();
+      const missing = Array.isArray(payload.missing_details ?? payload.missingDetails)
+        ? (payload.missing_details ?? payload.missingDetails).map(x=>String(x).trim()).filter(Boolean)
+        : [];
+      const requiresDetails = typeof payload.requires_details === 'boolean'
+        ? Boolean(payload.requires_details)
+        : typeof payload.requiresDetails === 'boolean'
+          ? Boolean(payload.requiresDetails)
+          : ['shipping','delivery'].includes(method);
+      const detailsStructured = payload.details && typeof payload.details === 'object'
+        ? buildFulfillmentDetails(payload.details, method)
+        : structured;
+      const baseMissing = missing.length ? missing : (detailsStructured?.missing || []);
+      const needsAttention = typeof payload.needs_attention === 'boolean'
+        ? Boolean(payload.needs_attention)
+        : typeof payload.needsAttention === 'boolean'
+          ? Boolean(payload.needsAttention)
+          : (requiresDetails && baseMissing.length>0);
+      return {
+        id: method,
+        method,
+        label: (payload.label ?? '').toString(),
+        full: (payload.full ?? '').toString(),
+        note: (payload.note ?? '').toString(),
+        priceDelta: Number(payload.price_delta ?? payload.priceDelta ?? 0),
+        displaySuffix: (payload.display_suffix ?? payload.displaySuffix ?? '').toString(),
+        infoLines,
+        displayLabel,
+        requiresDetails,
+        missingDetails: baseMissing,
+        needsAttention,
+        details_structured: detailsStructured,
+      };
+    };
+
+    const fulfillmentInstructionLines = (info, detailsOverride)=>{
       const base = Array.isArray(info.infoLines) ? info.infoLines.map(x=>String(x).trim()).filter(Boolean) : [];
       const lines = base.slice();
+      const structured = info.details_structured
+        ? info.details_structured
+        : buildFulfillmentDetails(detailsOverride ?? info.details ?? {}, info.id || info.method);
+      const contact = structured.contact || {};
+      const shipping = structured.shipping || {};
+      const delivery = structured.delivery || {};
       const contactParts = [];
-      const name = (details.contact_name||'').toString().trim();
-      const phone = (details.contact_phone||'').toString().trim();
-      const email = (details.contact_email||'').toString().trim();
-      if(name) contactParts.push(name);
-      if(phone) contactParts.push(`Tel: ${phone}`);
-      if(email) contactParts.push(`E-Mail: ${email}`);
+      if(contact.name) contactParts.push(contact.name);
+      if(contact.phone) contactParts.push(`Tel: ${contact.phone}`);
+      if(contact.email) contactParts.push(`E-Mail: ${contact.email}`);
       const hasContact = contactParts.length>0;
       if(hasContact){ lines.push(`👤 Kontakt: ${contactParts.join(' | ')}`); }
 
-      const consent = boolish(details.consent_contact ?? details.consent_whatsapp);
-      if(consent === true){ lines.push('✅ Kontakt per Telefon & WhatsApp ist freigegeben.'); }
-      else if(consent === false){ lines.push('⚠️ Bitte nur per E-Mail kontaktieren (kein Telefon/WhatsApp).'); }
+      if(contact.consent === true){ lines.push('✅ Kontakt per Telefon & WhatsApp ist freigegeben.'); }
+      else if(contact.consent === false){ lines.push('⚠️ Bitte nur per E-Mail kontaktieren (kein Telefon/WhatsApp).'); }
 
-      let hasShippingAddress = false;
-      if(info.id === 'shipping'){
+      if((info.id||info.method) === 'shipping'){
         const parts = [];
-        const line1 = (details.address_line1||'').toString().trim();
-        const line2 = (details.address_line2||'').toString().trim();
-        const extra = (details.address_extra||'').toString().trim();
-        const postal = (details.postal_code||'').toString().trim();
-        const city = (details.city||'').toString().trim();
-        if(line1) parts.push(line1);
-        if(line2) parts.push(line2);
-        const cityPart = `${postal} ${city}`.trim();
+        if(shipping.address_line1) parts.push(shipping.address_line1);
+        if(shipping.address_line2) parts.push(shipping.address_line2);
+        const cityPart = [shipping.postal_code, shipping.city].filter(Boolean).join(' ').trim();
         if(cityPart) parts.push(cityPart);
-        if(extra) parts.push(extra);
-        if(parts.length){
-          hasShippingAddress = true;
-          lines.push(`🏠 Lieferadresse: ${parts.join(', ')}`);
-        }
+        if(shipping.address_extra) parts.push(shipping.address_extra);
+        if(parts.length) lines.push(`🏠 Lieferadresse: ${parts.join(', ')}`);
       }
 
-      let hasDeliveryDetails = false;
-      if(info.id === 'delivery'){
-        const meeting = (details.meeting_point||'').toString().trim();
-        const preferred = (details.preferred_time||'').toString().trim();
-        if(meeting){
-          hasDeliveryDetails = true;
-          lines.push(`📍 Treffpunkt: ${meeting}`);
-        }
-        if(preferred){
-          hasDeliveryDetails = true;
-          lines.push(`🕒 Wunschzeit (Mittag): ${preferred}`);
-        }
+      if((info.id||info.method) === 'delivery'){
+        if(delivery.meeting_point) lines.push(`📍 Treffpunkt: ${delivery.meeting_point}`);
+        if(delivery.preferred_time) lines.push(`🕒 Wunschzeit (Mittag): ${delivery.preferred_time}`);
       }
 
-      const needsExtra = info.id === 'shipping' || info.id === 'delivery';
-      if(needsExtra){
-        if(!hasContact){
-          lines.push('⚠️ Kein Kontakt für diese Abwicklung hinterlegt – bitte ergänzen.');
-        }
-        if(!hasShippingAddress && info.id === 'shipping'){
+      if(structured.requires_details){
+        if(!hasContact) lines.push('⚠️ Kein Kontakt für diese Abwicklung hinterlegt – bitte ergänzen.');
+        if((info.id||info.method)==='shipping' && (!shipping.address_line1 || !shipping.postal_code || !shipping.city)){
           lines.push('⚠️ Es liegt noch keine vollständige Lieferadresse vor.');
         }
-        if(!hasDeliveryDetails && info.id === 'delivery'){
+        if((info.id||info.method)==='delivery' && (!delivery.meeting_point || !delivery.preferred_time)){
           lines.push('⚠️ Treffpunkt oder Wunschzeit fehlen bislang.');
         }
-        if(!hasContact && !hasShippingAddress && !hasDeliveryDetails){
-          lines.push('❗ Noch keine zusätzlichen Angaben vom Kunden hinterlegt.');
+        if(Array.isArray(structured.missing) && structured.missing.length){
+          lines.push(`❗ Fehlende Angaben: ${structured.missing.join(', ')}`);
         }
       }
 
@@ -566,6 +661,7 @@
         .mmb-btn{background:var(--mmb-accent);color:#fff;border:none;padding:.45rem .65rem;border-radius:6px;font-size:.83rem;font-weight:500;cursor:pointer;transition:background-color .2s;}
         .mmb-btn:hover{background:#0284c7;} .mmb-btn:disabled{opacity:.45;cursor:not-allowed;filter:saturate(0.6) contrast(0.9);}
         .mmb-btn-small{padding:.25rem .5rem;font-size:.75rem;min-width:28px;}
+        .mmb-fulfillment-link[data-needs-attention="1"]{color:var(--mmb-busy);font-weight:600;}
         .mmb-btn-success{background:var(--mmb-ok);} .mmb-btn-success:hover{background:#059669;}
         .mmb-btn-danger{background:var(--mmb-busy);} .mmb-btn-danger:hover{background:#dc2626;}
         .mmb-btn-warning{background:var(--mmb-warn);} .mmb-btn-warning:hover{background:#d97706;}
@@ -642,9 +738,40 @@
           const boxId = String(r.box_id ?? '');
           const totalAmount = Number(r.total_amount ?? 0);
           const deposit = Number(r.deposit_eur ?? 0);
-          const fulfillmentPrice = Number(r.fulfillment_price_delta ?? 0);
           const rawDetails = r.fulfillment_details_json ?? r.fulfillment_details ?? '';
           const parsedDetails = parseFulfillmentDetails(rawDetails);
+          const inferredMethod = inferFulfillmentMethod(r, parsedDetails);
+          const structuredFromApi = (r.fulfillment_details_structured && typeof r.fulfillment_details_structured === 'object') ? r.fulfillment_details_structured : null;
+          const structuredDetails = buildFulfillmentDetails(structuredFromApi || parsedDetails, inferredMethod);
+          const payload = normalizeFulfillmentPayload(r.fulfillment, inferredMethod, structuredDetails);
+          const displayLabelFromApi = typeof r.fulfillment_display_label === 'string' ? r.fulfillment_display_label.trim() : '';
+          const missingFromApi = Array.isArray(r.fulfillment_missing_details) ? r.fulfillment_missing_details.map(x=>String(x).trim()).filter(Boolean) : [];
+          const needsAttentionFromApi = typeof r.fulfillment_needs_attention === 'boolean' ? Boolean(r.fulfillment_needs_attention) : null;
+          const requiresDetailsFromApi = typeof r.fulfillment_requires_details === 'boolean' ? Boolean(r.fulfillment_requires_details) : null;
+          const mergedMissing = missingFromApi.length ? missingFromApi : (payload?.missingDetails?.length ? payload.missingDetails : structuredDetails.missing);
+          const finalNeedsAttention = needsAttentionFromApi !== null ? needsAttentionFromApi : (payload?.needsAttention ?? structuredDetails.needs_attention);
+          const finalRequiresDetails = requiresDetailsFromApi !== null ? requiresDetailsFromApi : (payload?.requiresDetails ?? structuredDetails.requires_details);
+          const normalizedLabel = (()=>{
+            const direct = (r.fulfillment_label ?? '').toString();
+            if(direct.trim()) return direct.trim();
+            if(payload?.label && String(payload.label).trim()) return String(payload.label).trim();
+            const choice = FULFILLMENT_LOOKUP[inferredMethod];
+            return choice ? choice.label : '';
+          })();
+          const normalizedNote = (()=>{
+            const direct = (r.fulfillment_note ?? '').toString();
+            if(direct.trim()) return direct.trim();
+            if(payload?.note && String(payload.note).trim()) return String(payload.note).trim();
+            const choice = FULFILLMENT_LOOKUP[inferredMethod];
+            return choice ? (choice.note || '') : '';
+          })();
+          const normalizedPrice = (()=>{
+            const direct = Number(r.fulfillment_price_delta ?? NaN);
+            if(Number.isFinite(direct)) return direct;
+            if(payload && Number.isFinite(payload.priceDelta)) return payload.priceDelta;
+            return 0;
+          })();
+          const structuredPayloadDetails = payload?.details_structured || structuredDetails;
           const apiDisplayId = typeof r.display_id === 'string' ? r.display_id.trim() : '';
           const resolvedBoxName = (()=>{
             const nameFromApi = typeof r.box_name === 'string' ? r.box_name.trim() : '';
@@ -666,12 +793,18 @@
             note: r.note ?? '',
             price_total: Number.isFinite(totalAmount)?totalAmount:0,
             deposit_eur: Number.isFinite(deposit)?deposit:0,
-            fulfillment_method: (r.fulfillment_method||'').toString(),
-            fulfillment_label: r.fulfillment_label ?? '',
-            fulfillment_note: r.fulfillment_note ?? '',
-            fulfillment_price_delta: Number.isFinite(fulfillmentPrice)?fulfillmentPrice:0,
+            fulfillment_method: inferredMethod,
+            fulfillment_label: normalizedLabel,
+            fulfillment_note: normalizedNote,
+            fulfillment_price_delta: Number.isFinite(normalizedPrice)?normalizedPrice:0,
+            fulfillment_display_label: displayLabelFromApi || (payload?.displayLabel || ''),
             fulfillment_details_json: typeof rawDetails === 'string' ? rawDetails : '',
-            fulfillment_details: parsedDetails,
+            fulfillment_details: structuredPayloadDetails.raw || parsedDetails,
+            fulfillment_details_structured: structuredPayloadDetails,
+            fulfillment_missing_details: mergedMissing,
+            fulfillment_needs_attention: finalNeedsAttention,
+            fulfillment_requires_details: finalRequiresDetails,
+            fulfillment_payload: payload,
             created_at: r.created_at
           };
         });
@@ -864,16 +997,23 @@
         const isRejected  = b.status==='rejected';
         const isCancelled = b.status==='cancelled';
         const fulfillmentInfo = this.getFulfillmentInfo(b);
-        const fulfillmentNoteAttr = fulfillmentInfo.note ? ` title="${this.escape(fulfillmentInfo.note)}"` : '';
-
+        const tooltipParts = [];
+        if(fulfillmentInfo.note){ tooltipParts.push(fulfillmentInfo.note); }
+        if(fulfillmentInfo.needsAttention && Array.isArray(fulfillmentInfo.missingDetails) && fulfillmentInfo.missingDetails.length){
+          tooltipParts.push(`Fehlende Angaben: ${fulfillmentInfo.missingDetails.join(', ')}`);
+        }
+        const tooltipText = tooltipParts.filter(Boolean).join(' • ');
+        const fulfillmentNoteAttr = tooltipText ? ` title="${this.escape(tooltipText)}"` : '';
         const fulfillmentLabel = this.formatFulfillmentCell(b);
+        const fulfillmentButtonText = fulfillmentInfo.needsAttention ? `${fulfillmentLabel} ⚠️` : fulfillmentLabel;
+        const fulfillmentAttentionAttr = fulfillmentInfo.needsAttention ? ' data-needs-attention="1"' : '';
         return `
         <tr>
           <td><span class="badge-id">${this.escape(displayId(b))}</span></td>
           <td><div class="cell--name">${this.escape(b.customer_name)}</div><div class="cell--email" style="font-size:.75rem;color:var(--mmb-text-light);">${this.escape(b.customer_email)}</div></td>
           <td class="cell--box">${this.escape(b.box_name)}</td>
           <td class="cell--date">${this.renderDateCell(b)}</td>
-          <td class="cell--fulfillment"${fulfillmentNoteAttr}><button type="button" class="mmb-fulfillment-link" data-action="showFulfillmentDetails" data-id="${b.id}">${this.escape(fulfillmentLabel)}</button></td>
+          <td class="cell--fulfillment"${fulfillmentNoteAttr}><button type="button" class="mmb-fulfillment-link" data-action="showFulfillmentDetails" data-id="${b.id}"${fulfillmentAttentionAttr}>${this.escape(fulfillmentButtonText)}</button></td>
           <td class="cell--total">${this.formatEuro(b.price_total)}</td>
           <td class="cell--status"><span class="mmb-status-badge mmb-status-${b.status}">${this.translateStatus(b.status)}</span></td>
           <td class="cell--actions">
@@ -1533,26 +1673,57 @@
 
       getFulfillmentChoice(id){ return FULFILLMENT_LOOKUP[id] || FULFILLMENT_CHOICES[0]; }
       getFulfillmentInfo(b){
-        const rawDetails = b.fulfillment_details || b.fulfillment_details_json || '';
-        const details = parseFulfillmentDetails(rawDetails);
-        const method = inferFulfillmentMethod(b, details);
-        const choice = this.getFulfillmentChoice(method);
-        const price = Number(b.fulfillment_price_delta ?? choice.priceDelta);
+        const fallbackRaw = b.fulfillment_details || b.fulfillment_details_json || '';
+        const parsedDetails = parseFulfillmentDetails(fallbackRaw);
+        const methodFromState = (b.fulfillment_method || '').toString().trim().toLowerCase();
+        const inferredMethod = ['pickup','shipping','delivery'].includes(methodFromState)
+          ? methodFromState
+          : inferFulfillmentMethod(b, parsedDetails);
+        const choice = this.getFulfillmentChoice(inferredMethod);
+        const payload = (b.fulfillment_payload && typeof b.fulfillment_payload === 'object') ? b.fulfillment_payload : null;
+        const structured = (()=>{
+          if(payload?.details_structured && typeof payload.details_structured === 'object') return payload.details_structured;
+          if(b.fulfillment_details_structured && typeof b.fulfillment_details_structured === 'object') return b.fulfillment_details_structured;
+          return buildFulfillmentDetails(parsedDetails, inferredMethod);
+        })();
+        const displayLabel = (b.fulfillment_display_label || payload?.displayLabel || '').toString().trim();
+        const missing = Array.isArray(b.fulfillment_missing_details) && b.fulfillment_missing_details.length
+          ? b.fulfillment_missing_details.map(x=>String(x))
+          : (payload?.missingDetails && payload.missingDetails.length
+            ? payload.missingDetails.map(x=>String(x))
+            : (structured.missing || []));
+        const needsAttention = typeof b.fulfillment_needs_attention === 'boolean'
+          ? Boolean(b.fulfillment_needs_attention)
+          : (payload?.needsAttention ?? structured.needs_attention ?? false);
+        const requiresDetails = typeof b.fulfillment_requires_details === 'boolean'
+          ? Boolean(b.fulfillment_requires_details)
+          : (payload?.requiresDetails ?? structured.requires_details ?? ['shipping','delivery'].includes(inferredMethod));
+        const infoLines = (payload?.infoLines && payload.infoLines.length) ? payload.infoLines : (choice.infoLines || []);
+        const label = (b.fulfillment_label || payload?.label || choice.label || '').toString();
+        const note = (b.fulfillment_note || payload?.note || choice.note || '').toString();
+        const priceCandidates = [b.fulfillment_price_delta, payload?.priceDelta, choice.priceDelta];
+        const resolvedPrice = priceCandidates.find(value=>Number.isFinite(Number(value)));
         return {
-          id: choice.id,
-          method: choice.id,
-          label: b.fulfillment_label || choice.label,
-          full: choice.full,
-          note: b.fulfillment_note || choice.note || '',
-          priceDelta: Number.isFinite(price) ? price : choice.priceDelta,
-          displaySuffix: choice.displaySuffix || '',
-          infoLines: choice.infoLines || [],
-          details
+          id: inferredMethod,
+          method: inferredMethod,
+          label,
+          full: (payload?.full || choice.full || '').toString(),
+          note,
+          priceDelta: Number.isFinite(Number(resolvedPrice)) ? Number(resolvedPrice) : Number(choice.priceDelta),
+          displaySuffix: (payload?.displaySuffix || choice.displaySuffix || '').toString(),
+          infoLines,
+          details: structured.raw || parsedDetails,
+          details_structured: structured,
+          displayLabel,
+          missingDetails: missing,
+          needsAttention,
+          requiresDetails,
         };
       }
       formatFulfillmentCell(b){
         const info = this.getFulfillmentInfo(b);
-        return fulfillmentDisplayLabel(info);
+        const label = info.displayLabel && info.displayLabel.trim() ? info.displayLabel : fulfillmentDisplayLabel(info);
+        return label;
       }
       formatEuro(amount){
         const num = Number(amount||0);
@@ -1561,11 +1732,12 @@
       }
       fulfillmentEmailLine(b){
         const info = this.getFulfillmentInfo(b);
-        return fulfillmentDisplayLabel(info);
+        const label = info.displayLabel && info.displayLabel.trim() ? info.displayLabel : fulfillmentDisplayLabel(info);
+        return label;
       }
       fulfillmentInstructionLines(b){
         const info = this.getFulfillmentInfo(b);
-        return fulfillmentInstructionLines(info, info.details || {});
+        return fulfillmentInstructionLines(info, info.details_structured || info.details || {});
       }
       fulfillmentInstructionText(b){
         const lines = this.fulfillmentInstructionLines(b);
@@ -1576,6 +1748,7 @@
         const booking = this.state.originalBookings.find(x=>String(x.id)===String(id));
         if(!booking) return;
         const info = this.getFulfillmentInfo(booking);
+        const infoDisplay = info.displayLabel && info.displayLabel.trim() ? info.displayLabel : fulfillmentDisplayLabel(info);
         let createdLabel = '–';
         if(booking.created_at){
           const created = new Date(booking.created_at);
@@ -1590,7 +1763,7 @@
         const fulfillmentNoteHtml = info.note ? `<div class="mmb-text-muted" style="font-size:.85rem;">${this.escape(info.note)}</div>` : '';
         const html = `
           <div class="mmb-field"><strong>Kund*in</strong><div>${this.escape(booking.customer_name)}</div><div class="mmb-text-muted" style="font-size:.85rem;">${this.escape(booking.customer_email)}</div></div>
-          <div class="mmb-field"><strong>Abwicklung</strong><div>${this.escape(info.label)}</div>${fulfillmentNoteHtml}</div>
+          <div class="mmb-field"><strong>Abwicklung</strong><div>${this.escape(infoDisplay)}</div>${fulfillmentNoteHtml}</div>
           <div class="mmb-field"><strong>Buchung erstellt</strong><div>${createdLabel}</div></div>
           <div class="mmb-field"><strong>Telefon</strong><div>${phoneHtml}</div></div>
           <div class="mmb-field"><strong>Anmerkungen</strong><div>${noteHtml}</div></div>
@@ -1607,9 +1780,67 @@
           ? `<ul>${instructions.map(line=>'<li>'+this.escape(line)+'</li>').join('')}</ul>`
           : '<p class="mmb-text-muted">Keine zusätzlichen Informationen hinterlegt.</p>';
         const noteHtml = info.note ? `<div class="mmb-text-muted" style="font-size:.85rem;margin-top:.25rem;">${this.escape(info.note)}</div>` : '';
+        const structured = info.details_structured || buildFulfillmentDetails(info.details || {}, info.id);
+        const contact = structured.contact || {};
+        const shipping = structured.shipping || {};
+        const delivery = structured.delivery || {};
+        const meta = structured.meta || {};
+        const missing = Array.isArray(structured.missing) ? structured.missing.filter(Boolean) : [];
+        const consentLabel = contact.consent === true
+          ? 'Ja, Telefon/WhatsApp erlaubt'
+          : contact.consent === false
+            ? 'Nein, bitte nur E-Mail'
+            : 'Nicht angegeben';
+        const contactEntries = [];
+        if(contact.name) contactEntries.push(`<div><strong>Name:</strong> ${this.escape(contact.name)}</div>`);
+        if(contact.phone) contactEntries.push(`<div><strong>Telefon:</strong> ${this.escape(contact.phone)}</div>`);
+        if(contact.email) contactEntries.push(`<div><strong>E-Mail:</strong> ${this.escape(contact.email)}</div>`);
+        contactEntries.push(`<div><strong>Kontaktfreigabe:</strong> ${this.escape(consentLabel)}</div>`);
+        const contactHtml = contactEntries.join('') || '<div class="mmb-text-muted">Keine Angaben</div>';
+        const shippingLines = [];
+        if(shipping.address_line1) shippingLines.push(this.escape(shipping.address_line1));
+        if(shipping.address_line2) shippingLines.push(this.escape(shipping.address_line2));
+        const cityLine = [shipping.postal_code, shipping.city].filter(Boolean).join(' ').trim();
+        if(cityLine) shippingLines.push(this.escape(cityLine));
+        if(shipping.address_extra) shippingLines.push(this.escape(shipping.address_extra));
+        const shippingHtml = shippingLines.length ? `<div>${shippingLines.join('<br>')}</div>` : '<div class="mmb-text-muted">Keine Angaben</div>';
+        const deliveryLines = [];
+        if(delivery.meeting_point) deliveryLines.push(`<div><strong>Treffpunkt:</strong> ${this.escape(delivery.meeting_point)}</div>`);
+        if(delivery.preferred_time) deliveryLines.push(`<div><strong>Wunschzeit:</strong> ${this.escape(delivery.preferred_time)}</div>`);
+        const deliveryHtml = deliveryLines.length ? deliveryLines.join('') : '<div class="mmb-text-muted">Keine Angaben</div>';
+        let submittedLabel = '';
+        if(meta.submitted_at){
+          const submittedDate = new Date(meta.submitted_at);
+          if(!Number.isNaN(submittedDate.getTime())){
+            submittedLabel = submittedDate.toLocaleString('de-DE', { dateStyle:'long', timeStyle:'short' });
+          } else {
+            submittedLabel = meta.submitted_at;
+          }
+        }
+        const metaParts = [];
+        if(submittedLabel){ metaParts.push(`<div><strong>Eingereicht am:</strong> ${this.escape(submittedLabel)}</div>`); }
+        if(meta.submitted_via){ metaParts.push(`<div><strong>Eingang via:</strong> ${this.escape(meta.submitted_via)}</div>`); }
+        if(meta.booking_display_id){ metaParts.push(`<div><strong>Display-ID:</strong> ${this.escape(meta.booking_display_id)}</div>`); }
+        const metaHtml = metaParts.length ? `<div class="mmb-field"><strong>Metadaten</strong>${metaParts.join('')}</div>` : '';
+        const attentionHtml = info.needsAttention && missing.length
+          ? `<div class="mmb-warning" style="margin-top:.5rem;">⚠️ Es fehlen noch: ${this.escape(missing.join(', '))}</div>`
+          : '';
+        const detailSections = [];
+        detailSections.push(`<div class="mmb-field"><strong>Kontakt</strong>${contactHtml}</div>`);
+        if(info.method === 'shipping'){
+          detailSections.push(`<div class="mmb-field"><strong>Lieferadresse</strong>${shippingHtml}</div>`);
+        }
+        if(info.method === 'delivery'){
+          detailSections.push(`<div class="mmb-field"><strong>Lieferdetails</strong>${deliveryHtml}</div>`);
+        }
+        const detailHtml = detailSections.join('');
+        const display = info.displayLabel && info.displayLabel.trim() ? info.displayLabel : fulfillmentDisplayLabel(info);
         const html = `
-          <div class="mmb-field"><strong>Abwicklung</strong><div>${this.escape(fulfillmentDisplayLabel(info))}</div>${noteHtml}</div>
+          <div class="mmb-field"><strong>Abwicklung</strong><div>${this.escape(display)}</div>${noteHtml}</div>
+          ${attentionHtml}
           <div class="mmb-field"><strong>Informationen</strong>${instructionHtml}</div>
+          ${detailHtml}
+          ${metaHtml}
         `;
         await this.openModal({ title:`Abwicklung – ${displayId(b)}`, html, confirmText:'Schließen', cancelText:'' });
       }
