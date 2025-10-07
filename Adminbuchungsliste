@@ -52,6 +52,14 @@
       };
     })();
 
+    if(!global.AdminApi){
+      try{
+        global.AdminApi = AdminApi;
+      }catch(_){
+        /* ignore */
+      }
+    }
+
     function injectBaseCSS(){
       if (document.getElementById('mmb-core-css')) return;
       const style=document.createElement('style'); style.id='mmb-core-css';

@@ -449,6 +449,14 @@
       };
     })();
 
+    if(!global.AdminApi){
+      try{
+        global.AdminApi = AdminApi;
+      }catch(_){
+        /* ignore */
+      }
+    }
+
     const AVAILABILITY_MODE_KEY='MMB_AVAILABILITY_MODE'; // 'enforce' | 'ignore'
     const AVAIL={ENFORCE:'enforce',IGNORE:'ignore'};
     const getMode=()=>localStorage.getItem(AVAILABILITY_MODE_KEY)||AVAIL.ENFORCE;
