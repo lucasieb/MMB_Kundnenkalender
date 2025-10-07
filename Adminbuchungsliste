@@ -302,7 +302,7 @@
       throw fallbackError;
     }
 
-    const MMBApi={
+    var MMBApi={
       async listBookings(params = {}) {
         const q=new URLSearchParams();
         if(params.box_id) q.set('box_id', params.box_id);

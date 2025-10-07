@@ -298,7 +298,7 @@
     return performApiRequest(path);
   }
 
-  const MMBApi={
+  var MMBApi={
     async blockDays({box_id,start_date,end_date,reason='admin_block'}){
       return mmbApiPost('block_days.php',{box_id,start_date,end_date,reason});
     },
