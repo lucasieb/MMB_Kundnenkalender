@@ -384,6 +384,43 @@
   };
   global.MMBApi = MMBApi;
 
+  function resolveAdminApi(){
+    const globalApi = (global && typeof global.MMBApi === 'object') ? global.MMBApi : null;
+    if(globalApi && typeof globalApi.listBookings === 'function'){
+      return globalApi;
+    }
+    if(typeof MMBApi !== 'undefined' && MMBApi && typeof MMBApi.listBookings === 'function'){
+      if(!globalApi){
+        try{ global.MMBApi = MMBApi; }catch(_){ /* ignore */ }
+      }
+      return MMBApi;
+    }
+    const fallback={
+      blockDays(args){
+        return mmbApiPost('block_days.php',args||{});
+      },
+      listBookings(params={}){
+        const q=new URLSearchParams();
+        if(params.box_id) q.set('box_id', params.box_id);
+        if(params.from) q.set('from', params.from);
+        if(params.to) q.set('to', params.to);
+        if(params.status) q.set('status', params.status);
+        const suffix=q.toString();
+        return mmbApiGet('list_bookings.php'+(suffix?`?${suffix}`:''));
+      },
+      availabilityWindow(params={}){
+        const q=new URLSearchParams();
+        if(params.box_id) q.set('box_id', params.box_id);
+        if(params.from) q.set('from', params.from);
+        if(params.to) q.set('to', params.to);
+        return mmbApiGet('calendar_unavailable.php?'+q.toString());
+      }
+    };
+    try{ global.MMBApi = fallback; }catch(_){ /* ignore */ }
+    return fallback;
+  }
+  const AdminApi = resolveAdminApi();
+
   /* ============ Admin-Kalender mit Switch ============ */
   (function(global){'use strict';
     const AVAILABILITY_MODE_KEY='MMB_AVAILABILITY_MODE'; // 'enforce' | 'ignore'
@@ -536,8 +573,8 @@
 
         try {
           const [bookingsPayload, windowPayload] = await Promise.all([
-            MMBApi.listBookings({ box_id: this.state.box.id, from, to }),
-            MMBApi.availabilityWindow({ box_id: this.state.box.id, from, to })
+            AdminApi.listBookings({ box_id: this.state.box.id, from, to }),
+            AdminApi.availabilityWindow({ box_id: this.state.box.id, from, to })
           ]);
 
           const bookingItems = Array.isArray(bookingsPayload?.items)
