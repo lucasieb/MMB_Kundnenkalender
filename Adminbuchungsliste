@@ -34,6 +34,24 @@
   <script>
   (function(global){'use strict';
 
+    const AdminApi = (()=>{
+      const candidate = (global && typeof global.AdminApi === 'object') ? global.AdminApi : null;
+      if(candidate && typeof candidate.listBookings === 'function'){
+        return candidate;
+      }
+      const fallback = (global && typeof global.MMBApi === 'object') ? global.MMBApi : null;
+      if(fallback && typeof fallback.listBookings === 'function'){
+        try{ global.AdminApi = fallback; }catch(_){ /* ignore */ }
+        return fallback;
+      }
+      return {
+        listBookings(){ return Promise.reject(new Error('Admin API ist nicht verfügbar.')); },
+        updateBooking(){ return Promise.reject(new Error('Admin API ist nicht verfügbar.')); },
+        updateBookingStatus(){ return Promise.reject(new Error('Admin API ist nicht verfügbar.')); },
+        deleteBooking(){ return Promise.reject(new Error('Admin API ist nicht verfügbar.')); },
+      };
+    })();
+
     function injectBaseCSS(){
       if (document.getElementById('mmb-core-css')) return;
       const style=document.createElement('style'); style.id='mmb-core-css';
@@ -129,7 +147,71 @@
 
   <!-- ======================= MMB API ======================= -->
   <script>
-    const MMB_API_BASE = MMBAdminAuth.getApiBase();
+  (function(global){'use strict';
+
+    var MMBAdminAuth = (function(){
+      if (typeof window !== 'undefined' && window.MMBAdminAuth) {
+        return window.MMBAdminAuth;
+      }
+      const fallbackState = {
+        getApiBase: () => './',
+        getSessionState: () => ({ authDisabled: true, bootstrapSkipped: true }),
+        isAuthDisabled: () => true,
+        shouldSendCredentials: () => false,
+        enterPublicMode: () => {},
+        exitPublicMode: () => {},
+      };
+      if (typeof window !== 'undefined') {
+        try {
+          window.MMBAdminAuth = fallbackState;
+        } catch (_) {
+          try {
+            Object.defineProperty(window, 'MMBAdminAuth', { value: fallbackState });
+          } catch (__) {
+            /* ignore */
+          }
+        }
+      }
+      return fallbackState;
+    })();
+
+    function mmbResolveApiBase(){
+      let base = './';
+      try {
+        if (MMBAdminAuth && typeof MMBAdminAuth.getApiBase === 'function') {
+          base = MMBAdminAuth.getApiBase();
+        }
+      } catch (_) {
+        base = './';
+      }
+      if (base && typeof base === 'object' && typeof base.href === 'string') {
+        base = base.href;
+      }
+      base = (base || './').toString();
+      if (!base.endsWith('/')) {
+        base += base.indexOf('?') === -1 ? '/' : '';
+      }
+      return base;
+    }
+
+    const rawApiBase = mmbResolveApiBase();
+    let resolvedBaseUrl;
+    try {
+      resolvedBaseUrl = new URL(rawApiBase || './', global.location?.href || global.document?.baseURI || 'https://example.com/');
+    } catch (_) {
+      resolvedBaseUrl = new URL('./', global.location?.href || global.document?.baseURI || 'https://example.com/');
+    }
+    if (!resolvedBaseUrl.pathname.endsWith('/')) {
+      resolvedBaseUrl = new URL('./', resolvedBaseUrl);
+    }
+    const MMB_API_BASE = resolvedBaseUrl.href;
+    function buildApiUrl(path){
+      try{
+        return new URL(path, MMB_API_BASE).href;
+      }catch(_){
+        return MMB_API_BASE + path;
+      }
+    }
     let preferPublicRequests = false;
 
     function refreshPreferredCredentials(){
@@ -165,7 +247,8 @@
 
     async function requestJson(path,{method='GET',body=null}={},credentialsMode='include'){
       const normalizedMethod=typeof method==='string'?method.toUpperCase():'GET';
-      const context={ path, method: normalizedMethod, credentialsMode };
+      const targetUrl=buildApiUrl(path);
+      const context={ path, url: targetUrl, method: normalizedMethod, credentialsMode };
       const fetchOptions={
         method: normalizedMethod,
         credentials:credentialsMode,
@@ -177,7 +260,7 @@
       }
       let res;
       try{
-        res=await fetch(MMB_API_BASE+path,fetchOptions);
+        res=await fetch(targetUrl,fetchOptions);
       }catch(networkError){
         const err = networkError instanceof Error ? networkError : new Error(String(networkError));
         if(typeof err.status!=='number') err.status=0;
@@ -318,8 +401,62 @@
       async updateBookingStatus(payload){
         return mmbApiPost('update_booking_status.php', payload);
       },
+      async deleteBooking(input){
+        const value = (input && typeof input === 'object') ? (input.booking_id ?? input.id) : input;
+        const numericId = Number(value);
+        if(!Number.isFinite(numericId) || numericId <= 0){
+          throw new Error('Ungültige Buchungs-ID');
+        }
+        return mmbApiPost('delete_booking.php', { booking_id: numericId });
+      },
     };
     global.MMBApi = MMBApi;
+
+    function resolveAdminApi(){
+      const globalApi = (global && typeof global.MMBApi === 'object') ? global.MMBApi : null;
+      if(globalApi && typeof globalApi.listBookings === 'function'){
+        return globalApi;
+      }
+      if(typeof MMBApi !== 'undefined' && MMBApi && typeof MMBApi.listBookings === 'function'){
+        if(!globalApi){
+          try{ global.MMBApi = MMBApi; }catch(_){ /* ignore */ }
+        }
+        return MMBApi;
+      }
+      const fallback = {
+        listBookings(params = {}){
+          const q=new URLSearchParams();
+          if(params.box_id) q.set('box_id', params.box_id);
+          if(params.status) q.set('status', params.status);
+          if(params.from) q.set('from', params.from);
+          if(params.to) q.set('to', params.to);
+          return mmbApiGet('list_bookings.php'+(q.toString()?`?${q}`:''));
+        },
+        updateBooking(payload){
+          return mmbApiPost('update_booking.php', payload||{});
+        },
+        updateBookingStatus(payload){
+          return mmbApiPost('update_booking_status.php', payload||{});
+        },
+        deleteBooking(input){
+          const value = (input && typeof input === 'object') ? (input.booking_id ?? input.id ?? input) : input;
+          const numericId = Number(value);
+          if(!Number.isFinite(numericId) || numericId <= 0){
+            return Promise.reject(new Error('Ungültige Buchungs-ID'));
+          }
+          return mmbApiPost('delete_booking.php', { booking_id: numericId });
+        },
+      };
+      try{ global.MMBApi = fallback; }catch(_){ /* ignore */ }
+      return fallback;
+    }
+    const AdminApi = resolveAdminApi();
+    try {
+      global.AdminApi = AdminApi;
+    } catch (_) {
+      /* ignore */
+    }
+  })(typeof globalThis !== 'undefined' ? globalThis : (typeof window !== 'undefined' ? window : this));
   </script>
 
   <!-- ======================= ADMIN – LISTE ======================= -->
@@ -656,7 +793,7 @@
         .mmb-bookings-table th.cell-head-price,.mmb-bookings-table td.cell--total{text-align:right;width:80px;}
         .mmb-bookings-table th.cell-head-status,.mmb-bookings-table td.cell--status{width:92px;}
         .mmb-bookings-table td.cell--total{font-variant-numeric:tabular-nums;white-space:nowrap;}
-        .mmb-bookings-table th.cell-head-actions,.mmb-bookings-table td.cell--actions{min-width:232px;}
+        .mmb-bookings-table th.cell-head-actions,.mmb-bookings-table td.cell--actions{min-width:272px;}
         .mmb-bookings-table td.cell--actions{white-space:nowrap;}
         .mmb-btn{background:var(--mmb-accent);color:#fff;border:none;padding:.45rem .65rem;border-radius:6px;font-size:.83rem;font-weight:500;cursor:pointer;transition:background-color .2s;}
         .mmb-btn:hover{background:#0284c7;} .mmb-btn:disabled{opacity:.45;cursor:not-allowed;filter:saturate(0.6) contrast(0.9);}
@@ -726,7 +863,7 @@
       }
 
       async loadBookings(){ try{
-        const res=await MMBApi.listBookings();
+        const res=await AdminApi.listBookings();
         const sourceItems = Array.isArray(res.items)
           ? res.items
           : (Array.isArray(res.bookings)
@@ -1038,6 +1175,10 @@
               <button class="mmb-btn mmb-btn-small"
                       data-action="editBooking" data-id="${b.id}"
                       title="Buchung bearbeiten">✍🏼</button>
+
+              <button class="mmb-btn mmb-btn-small mmb-btn-danger"
+                      data-action="deleteBooking" data-id="${b.id}"
+                      title="Buchung endgültig löschen" aria-label="Buchung löschen">🗑️</button>
             </div>
           </td>
         </tr>`;
@@ -1119,6 +1260,7 @@
           if(btn.dataset.action==='declineBooking') await this.declineBooking(id);
           if(btn.dataset.action==='offerAlternative') await this.offerAlternative(id);
           if(btn.dataset.action==='editBooking') await this.editBooking(id);
+          if(btn.dataset.action==='deleteBooking') await this.deleteBooking(id);
         });
       }
 
@@ -1183,7 +1325,7 @@
         `;
         const values = await this.openModal({ title:'Buchung bestätigen', html, confirmText:'Status auf „Bestätigt“ setzen' });
         if(!values) return;
-        await MMBApi.updateBookingStatus({ booking_id: Number(id), status: 'confirmed', send_email: 1, subject: values.subject, message: values.message });
+        await AdminApi.updateBookingStatus({ booking_id: Number(id), status: 'confirmed', send_email: 1, subject: values.subject, message: values.message });
         await this.loadBookings();
         MMBCore.Utils.showNotification('Buchung wurde bestätigt');
       }
@@ -1200,7 +1342,7 @@
         `;
         const values = await this.openModal({ title:'Buchung ablehnen', html, confirmText:'Als „Abgelehnt“ markieren' });
         if(!values) return;
-        await MMBApi.updateBookingStatus({ booking_id: Number(id), status: 'rejected', send_email: 1, subject: values.subject, message: values.message });
+        await AdminApi.updateBookingStatus({ booking_id: Number(id), status: 'rejected', send_email: 1, subject: values.subject, message: values.message });
         await this.loadBookings();
         MMBCore.Utils.showNotification('Buchung wurde abgelehnt');
       }
@@ -1264,7 +1406,7 @@
           message: values.message
         };
 
-        const response = await MMBApi.updateBookingStatus(payload);
+        const response = await AdminApi.updateBookingStatus(payload);
         await this.loadBookings();
 
         const mailInfo = response?.mail || null;
@@ -1565,7 +1707,7 @@
           });
 
           try {
-            await MMBApi.updateBooking(updatePayload);
+            await AdminApi.updateBooking(updatePayload);
             updatesApplied = true;
           } catch (err) {
             console.error('updateBooking failed:', err);
@@ -1591,7 +1733,7 @@
           }
 
           try {
-            const response = await MMBApi.updateBookingStatus(emailPayload);
+            const response = await AdminApi.updateBookingStatus(emailPayload);
             mailInfo = response && response.mail ? response.mail : null;
             if(mailInfo && mailInfo.sent === false){
               emailFailed = true;
@@ -1620,6 +1762,63 @@
           }
         }else if(updatesApplied){
           MMBCore.Utils.showNotification('Buchung aktualisiert');
+        }
+      }
+
+      async deleteBooking(id){
+        const booking = this.state.originalBookings.find(x=>String(x.id)===String(id));
+        if(!booking) return;
+
+        const formatDate = (value)=>{
+          if(!value) return '–';
+          const d = new Date(value);
+          return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString('de-DE');
+        };
+        const rangeLabel = `${formatDate(booking.start_date)} – ${formatDate(booking.end_date)}`;
+        const emailSuffix = booking.customer_email ? ` (${this.escape(booking.customer_email)})` : '';
+        const html = `
+          <p style="margin-top:0;">Soll diese Buchung wirklich endgültig gelöscht werden? Dieser Schritt kann nicht rückgängig gemacht werden.</p>
+          <div class="mmb-field"><strong>Buchung:</strong> ${this.escape(displayId(booking))}</div>
+          <div class="mmb-field"><strong>Kund*in:</strong> ${this.escape(booking.customer_name)}${emailSuffix}</div>
+          <div class="mmb-field"><strong>Zeitraum:</strong> ${this.escape(rangeLabel)}</div>
+          <div class="mmb-warning" style="margin-top:.75rem;">⚠️ Die Buchung wird vollständig entfernt. Es wird keine automatische E-Mail an die Kundschaft gesendet.</div>
+        `;
+        const confirmed = await this.openModal({
+          title: 'Buchung löschen',
+          html,
+          confirmText: 'Buchung endgültig löschen',
+          cancelText: 'Abbrechen',
+        });
+        if(confirmed === null || confirmed === undefined) return;
+
+        try {
+          await AdminApi.deleteBooking({ booking_id: Number(id) });
+        } catch (err) {
+          console.error('deleteBooking failed:', err);
+          const errorInfo = MMBCore.Utils.describeError(err, {
+            headline: 'Buchung konnte nicht gelöscht werden',
+            context: (err && err.context && err.context.path) || 'delete_booking.php',
+          });
+          MMBCore.Utils.showNotification(errorInfo.message || 'Buchung konnte nicht gelöscht werden', 'error');
+          return;
+        }
+
+        const focusSnapshot = this.snapshotFocus();
+        this.state.originalBookings = this.state.originalBookings.filter(x=>String(x.id)!==String(id));
+        this.applyFilters(focusSnapshot);
+
+        let reloadFailed = false;
+        try {
+          await this.loadBookings();
+        } catch (err) {
+          reloadFailed = true;
+          console.error('Reload after delete failed:', err);
+        }
+
+        if(reloadFailed){
+          MMBCore.Utils.showNotification('Buchung gelöscht, Liste konnte nicht neu geladen werden', 'error');
+        }else{
+          MMBCore.Utils.showNotification('Buchung wurde gelöscht');
         }
       }
 
