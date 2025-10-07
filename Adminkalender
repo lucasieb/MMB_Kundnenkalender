@@ -125,204 +125,326 @@
   })(window);
 
   /* ============ API ============ */
-  const MMB_API_BASE = MMBAdminAuth.getApiBase();
-  let apiUsesCredentials = true;
+  (function(global){'use strict';
 
-  function syncApiCredentialPreference(){
-    if (typeof MMBAdminAuth.shouldSendCredentials !== 'function') {
-      return;
-    }
-    try {
-      const result = MMBAdminAuth.shouldSendCredentials();
-      if (typeof result === 'boolean') {
-        apiUsesCredentials = result;
+    function ensureAdminAuth(){
+      const existing = global.MMBAdminAuth;
+      if (existing && typeof existing.getApiBase === 'function') {
+        if (typeof existing.ensureSession !== 'function') {
+          existing.ensureSession = () => Promise.resolve(existing.getSessionState ? existing.getSessionState() : {});
+        }
+        return existing;
       }
-    } catch (_) {
-      /* Ignorieren – wir behalten die zuletzt bekannte Einstellung. */
-    }
-  }
-
-  syncApiCredentialPreference();
-
-  function switchToPublicMode(){
-    if (!apiUsesCredentials) {
-      return;
-    }
-    apiUsesCredentials = false;
-    if (typeof MMBAdminAuth.enterPublicMode === 'function') {
-      MMBAdminAuth.enterPublicMode();
-    }
-  }
-
-  function switchToCredentialMode(){
-    if (apiUsesCredentials) {
-      return;
-    }
-    apiUsesCredentials = true;
-    if (typeof MMBAdminAuth.exitPublicMode === 'function') {
-      MMBAdminAuth.exitPublicMode();
-    }
-  }
-
-  function shouldRetryWithoutCredentials(error){
-    if (!error) {
-      return false;
-    }
-    if (error.isNetworkError || error.isParseError) {
-      return true;
-    }
-    const status = typeof error.status === 'number' ? error.status : 0;
-    return status === 0 || status === 401 || status === 403;
-  }
-
-  function shouldRetryWithCredentials(error){
-    if (!error) {
-      return false;
-    }
-    if (error.isNetworkError) {
-      return true;
-    }
-    const status = typeof error.status === 'number' ? error.status : 0;
-    return status === 401 || status === 403;
-  }
-
-  async function executeApiRequest(path, init, useCredentials){
-    const normalizedMethod = typeof init?.method === 'string' ? init.method.toUpperCase() : 'GET';
-    const context = { path, method: normalizedMethod, credentialsMode: useCredentials ? 'include' : 'omit' };
-    const requestInit = Object.assign({}, init, {
-      credentials: useCredentials ? 'include' : 'omit',
-      method: normalizedMethod,
-    });
-
-    let response;
-    try {
-      response = await fetch(MMB_API_BASE + path, requestInit);
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      err.isNetworkError = true;
-      if (typeof err.status !== 'number') {
-        err.status = 0;
-      }
-      err.context = Object.assign({}, err.context || {}, context);
-      throw err;
-    }
-
-    const text = await response.text();
-    let data;
-    try {
-      data = text ? JSON.parse(text) : {};
-    } catch (error) {
-      const err = new Error('Server lieferte keine gültige JSON-Antwort');
-      err.cause = error instanceof Error ? error : new Error(String(error));
-      err.raw = text;
-      err.status = response.status;
-      err.isParseError = true;
-      err.context = context;
-      throw err;
-    }
-
-    const payload = (data && typeof data === 'object') ? data : {};
-    const okFlag = Object.prototype.hasOwnProperty.call(payload, 'ok') ? Boolean(payload.ok) : true;
-    if (!response.ok || !okFlag) {
-      const message = payload.error || payload.message || `HTTP ${response.status}`;
-      const err = new Error(message);
-      err.details = payload;
-      err.status = response.status;
-      err.context = context;
-      throw err;
-    }
-
-    return payload;
-  }
-
-  async function performApiRequest(path, init = {}){
-    const credentialOrder = apiUsesCredentials ? ['include', 'omit'] : ['omit', 'include'];
-    let lastError = null;
-
-    for (let index = 0; index < credentialOrder.length; index++) {
-      const mode = credentialOrder[index];
-      const useCredentials = mode === 'include';
+      const fallbackState = {
+        getApiBase: () => './',
+        getSessionState: () => ({ authDisabled: true, bootstrapSkipped: true }),
+        isAuthDisabled: () => true,
+        shouldSendCredentials: () => false,
+        ensureSession: () => Promise.resolve({ authDisabled: true, bootstrapSkipped: true }),
+        enterPublicMode: () => {},
+        exitPublicMode: () => {},
+      };
       try {
-        const payload = await executeApiRequest(path, init, useCredentials);
-        if (useCredentials) {
-          switchToCredentialMode();
-        } else {
-          switchToPublicMode();
+        global.MMBAdminAuth = fallbackState;
+      } catch (_) {
+        try {
+          Object.defineProperty(global, 'MMBAdminAuth', { value: fallbackState });
+        } catch (__) {
+          /* ignore */
         }
-        return payload;
-      } catch (error) {
-        const err = error instanceof Error ? error : new Error(String(error));
-        err.retryMode = mode;
-        if (!err.context) {
-          err.context = { path, method: init?.method || 'GET', credentialsMode: useCredentials ? 'include' : 'omit' };
+      }
+      return fallbackState;
+    }
+
+    const MMBAdminAuth = ensureAdminAuth();
+
+    if (global.AdminApi && typeof global.AdminApi.listBookings === 'function') {
+      if (!global.MMBApi) {
+        try { global.MMBApi = global.AdminApi; } catch (_) { /* ignore */ }
+      }
+      return;
+    }
+
+    function getDocument(){
+      if (typeof global.document !== 'undefined') {
+        return global.document;
+      }
+      return null;
+    }
+
+    function findScriptBase(){
+      const doc = getDocument();
+      if (!doc) {
+        return null;
+      }
+      if (doc.currentScript) {
+        return doc.currentScript;
+      }
+      const scripts = doc.getElementsByTagName('script');
+      for (let i = scripts.length - 1; i >= 0; i--) {
+        const candidate = scripts[i];
+        if (!candidate) continue;
+        if (candidate.getAttribute('data-api-base') || candidate.getAttribute('data-auth-base')) {
+          return candidate;
         }
-        lastError = err;
-        const hasNext = index < credentialOrder.length - 1;
-        if (!hasNext) {
-          throw err;
+      }
+      return scripts.length ? scripts[scripts.length - 1] : null;
+    }
+
+    function normalizeBase(value){
+      const fallback = global.location?.href || global.document?.baseURI || 'https://example.com/';
+      let url;
+      try {
+        url = new URL(value || './', fallback);
+      } catch (_) {
+        url = new URL('./', fallback);
+      }
+      if (!url.pathname.endsWith('/')) {
+        url.pathname = url.pathname.replace(/[^/]*$/, '');
+        if (!url.pathname.endsWith('/')) {
+          url.pathname += '/';
         }
-        const shouldRetry = useCredentials
-          ? shouldRetryWithoutCredentials(err)
-          : shouldRetryWithCredentials(err);
-        if (!shouldRetry) {
-          throw err;
+      }
+      url.search = '';
+      url.hash = '';
+      return url;
+    }
+
+    function resolveBaseUrl(){
+      if (MMBAdminAuth && typeof MMBAdminAuth.getApiBase === 'function') {
+        const base = MMBAdminAuth.getApiBase();
+        if (base) {
+          return normalizeBase(base);
         }
-        if (useCredentials) {
-          console.warn('Kalender-API mit Credentials fehlgeschlagen – erneuter Versuch ohne Credentials.', err);
-        } else {
-          console.warn('Kalender-API ohne Credentials fehlgeschlagen – erneuter Versuch mit Credentials.', err);
+      }
+      const script = findScriptBase();
+      if (script) {
+        const attr = script.getAttribute('data-api-base') || script.getAttribute('data-auth-base') || script.src;
+        if (attr) {
+          return normalizeBase(attr);
         }
+      }
+      return normalizeBase('./');
+    }
+
+    const baseUrl = resolveBaseUrl();
+    const preferIncludeFirst = MMBAdminAuth && typeof MMBAdminAuth.shouldSendCredentials === 'function'
+      ? !!MMBAdminAuth.shouldSendCredentials()
+      : true;
+
+    function buildUrl(path){
+      try {
+        return new URL(path, baseUrl).href;
+      } catch (_) {
+        return baseUrl.href + path;
       }
     }
 
-    if (lastError) {
-      if (!lastError.context) {
-        lastError.context = { path, method: init?.method || 'GET' };
+    function toBody(body, headers){
+      if (body == null) {
+        return null;
       }
-      throw lastError;
+      if (typeof body === 'string' || body instanceof String) {
+        if (!headers['Content-Type']) {
+          headers['Content-Type'] = 'application/json';
+        }
+        return body;
+      }
+      if (typeof FormData !== 'undefined' && body instanceof FormData) {
+        return body;
+      }
+      if (typeof Blob !== 'undefined' && body instanceof Blob) {
+        return body;
+      }
+      headers['Content-Type'] = 'application/json';
+      return JSON.stringify(body);
     }
-    const fallbackError = new Error('Kalender-API konnte nicht erreicht werden');
-    fallbackError.context = { path, method: init?.method || 'GET' };
-    throw fallbackError;
-  }
 
-  async function mmbApiPost(path,body){
-    return performApiRequest(path, {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify(body||{})
-    });
-  }
+    async function requestJson(path, options = {}, credentialsMode = 'include'){
+      const method = options.method || 'GET';
+      const headers = Object.assign({ Accept: 'application/json' }, options.headers || {});
+      const payload = toBody(options.body, headers);
+      const url = buildUrl(path);
+      let response;
+      try {
+        response = await fetch(url, {
+          method,
+          headers,
+          body: payload,
+          credentials: credentialsMode,
+          cache: 'no-store',
+        });
+      } catch (cause) {
+        const error = new Error('Netzwerkfehler beim Zugriff auf die Admin-API.');
+        error.name = 'AdminApiNetworkError';
+        error.cause = cause;
+        error.context = { path: url, method, credentialsMode };
+        throw error;
+      }
 
-  async function mmbApiGet(path){
-    return performApiRequest(path);
-  }
+      const text = await response.text();
+      if (!response.ok) {
+        const error = new Error(response.status === 401 ? 'Nicht autorisiert.' : 'Serverfehler beim Admin-API-Aufruf.');
+        error.name = 'AdminApiHttpError';
+        error.status = response.status;
+        error.raw = text;
+        error.context = { path: url, method, credentialsMode };
+        throw error;
+      }
 
-  var MMBApi={
-    async blockDays({box_id,start_date,end_date,reason='admin_block'}){
-      return mmbApiPost('block_days.php',{box_id,start_date,end_date,reason});
-    },
-    async listBookings(params = {}){
-      const q = new URLSearchParams();
-      if(params.box_id) q.set('box_id', params.box_id);
-      if(params.from) q.set('from', params.from);
-      if(params.to) q.set('to', params.to);
-      if(params.status) q.set('status', params.status);
-      const suffix = q.toString();
-      return mmbApiGet('list_bookings.php' + (suffix ? `?${suffix}` : ''));
-    },
-    async availabilityWindow(params){
-      const q = new URLSearchParams();
-      q.set('box_id', params.box_id);
-      q.set('from', params.from);
-      q.set('to', params.to);
-      return mmbApiGet('calendar_unavailable.php?' + q.toString());
+      if (!text) {
+        return {};
+      }
+
+      try {
+        return JSON.parse(text);
+      } catch (_) {
+        const error = new Error('Server lieferte keine gültige JSON-Antwort');
+        error.name = 'AdminApiInvalidJsonError';
+        error.status = response.status;
+        error.raw = text.slice(0, 1200);
+        error.context = { path: url, method, credentialsMode };
+        throw error;
+      }
     }
-  };
-  global.MMBApi = MMBApi;
 
+    async function requestWithFallback(path, options){
+      const order = preferIncludeFirst ? ['include', 'omit'] : ['omit', 'include'];
+      let lastError = null;
+      for (const mode of order) {
+        try {
+          return await requestJson(path, options, mode === 'include' ? 'include' : 'omit');
+        } catch (error) {
+          lastError = error;
+          if (error && typeof error === 'object' && error.status === 401) {
+            continue;
+          }
+          if (error && error.name === 'AdminApiNetworkError') {
+            continue;
+          }
+          if (mode === order[order.length - 1]) {
+            throw error;
+          }
+        }
+      }
+      if (lastError) {
+        throw lastError;
+      }
+      throw new Error('Admin-API ist nicht erreichbar.');
+    }
+
+    function withQuery(path, params){
+      const search = new URLSearchParams();
+      (params ? Object.entries(params) : []).forEach(([key, value]) => {
+        if (value === undefined || value === null || value === '') {
+          return;
+        }
+        search.set(key, value);
+      });
+      const suffix = search.toString();
+      return suffix ? `${path}?${suffix}` : path;
+    }
+
+    const client = {
+      listBookings(params = {}) {
+        return requestWithFallback(withQuery('list_bookings.php', {
+          box_id: params.box_id,
+          status: params.status,
+          from: params.from,
+          to: params.to,
+        }), { method: 'GET' });
+      },
+      updateBooking(payload = {}) {
+        return requestWithFallback('update_booking.php', { method: 'POST', body: payload });
+      },
+      updateBookingStatus(payload = {}) {
+        return requestWithFallback('update_booking_status.php', { method: 'POST', body: payload });
+      },
+      deleteBooking(input) {
+        const value = input && typeof input === 'object' ? (input.booking_id ?? input.id) : input;
+        const numericId = Number(value);
+        if (!Number.isFinite(numericId) || numericId <= 0) {
+          return Promise.reject(new Error('Ungültige Buchungs-ID'));
+        }
+        return requestWithFallback('delete_booking.php', {
+          method: 'POST',
+          body: { booking_id: numericId },
+        });
+      },
+      availabilityWindow(params = {}) {
+        return requestWithFallback(withQuery('calendar_unavailable.php', {
+          box_id: params.box_id,
+          from: params.from,
+          to: params.to,
+        }), { method: 'GET' });
+      },
+      blockDays(payload = {}) {
+        return requestWithFallback('block_days.php', { method: 'POST', body: payload });
+      },
+    };
+
+    try {
+      global.AdminApi = client;
+      global.MMBApi = client;
+    } catch (_) {
+      global.AdminApi = client;
+      try { global.MMBApi = client; } catch (__) { /* ignore */ }
+    }
+  })(typeof globalThis !== 'undefined' ? globalThis : (typeof window !== 'undefined' ? window : this));
   /* ============ Admin-Kalender mit Switch ============ */
   (function(global){'use strict';
+    function createNotAvailableError(method){
+      const error=new Error('Admin API ist nicht verfügbar.');
+      error.name='AdminApiUnavailableError';
+      error.context={ method };
+      return error;
+    }
+
+    function isUsable(candidate){
+      return candidate && typeof candidate==='object' && typeof candidate.listBookings==='function';
+    }
+
+    let delegate=null;
+    let stub=null;
+
+    function resolveDelegate(){
+      if(delegate && isUsable(delegate)){
+        return delegate;
+      }
+      const candidates=[
+        (global && global.AdminApi && global.AdminApi!==stub) ? global.AdminApi : null,
+        (global && global.MMBApi) ? global.MMBApi : null,
+      ];
+      for(const candidate of candidates){
+        if(candidate && candidate!==stub && isUsable(candidate)){
+          delegate=candidate;
+          try{ global.AdminApi=candidate; }catch(_){ /* ignore */ }
+          return delegate;
+        }
+      }
+      return null;
+    }
+
+    function createProxy(method){
+      return function proxyMethod(){
+        const resolved=resolveDelegate();
+        if(resolved && typeof resolved[method]==='function'){
+          return resolved[method].apply(resolved, arguments);
+        }
+        return Promise.reject(createNotAvailableError(method));
+      };
+    }
+
+    stub={
+      listBookings:createProxy('listBookings'),
+      availabilityWindow:createProxy('availabilityWindow'),
+      blockDays:createProxy('blockDays'),
+    };
+
+    if(!global.AdminApi || global.AdminApi===stub){
+      try{ global.AdminApi = stub; }catch(_){ /* ignore */ }
+    }
+
     const AVAILABILITY_MODE_KEY='MMB_AVAILABILITY_MODE'; // 'enforce' | 'ignore'
     const AVAIL={ENFORCE:'enforce',IGNORE:'ignore'};
     const getMode=()=>localStorage.getItem(AVAILABILITY_MODE_KEY)||AVAIL.ENFORCE;
@@ -473,8 +595,8 @@
 
         try {
           const [bookingsPayload, windowPayload] = await Promise.all([
-            MMBApi.listBookings({ box_id: this.state.box.id, from, to }),
-            MMBApi.availabilityWindow({ box_id: this.state.box.id, from, to })
+            AdminApi.listBookings({ box_id: this.state.box.id, from, to }),
+            AdminApi.availabilityWindow({ box_id: this.state.box.id, from, to })
           ]);
 
           const bookingItems = Array.isArray(bookingsPayload?.items)
