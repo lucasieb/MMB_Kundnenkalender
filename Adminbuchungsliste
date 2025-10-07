@@ -319,6 +319,7 @@
         return mmbApiPost('update_booking_status.php', payload);
       },
     };
+    global.MMBApi = MMBApi;
   </script>
 
   <!-- ======================= ADMIN – LISTE ======================= -->

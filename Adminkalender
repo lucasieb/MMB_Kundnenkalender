@@ -319,6 +319,7 @@
       return mmbApiGet('calendar_unavailable.php?' + q.toString());
     }
   };
+  global.MMBApi = MMBApi;
 
   /* ============ Admin-Kalender mit Switch ============ */
   (function(global){'use strict';
