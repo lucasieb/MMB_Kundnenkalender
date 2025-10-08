@@ -514,7 +514,345 @@
     </div>
   </div>
 
-  <script src="admin_portal.js" data-api-base="./"></script>
+  <script data-api-base="./">
+  (function () {
+    if (window.MMBAdminPortal) {
+      return;
+    }
+
+    const script = document.currentScript;
+
+    function resolveBase() {
+      const baseAttr = script ? script.getAttribute('data-api-base') : null;
+      try {
+        return new URL(baseAttr || './', window.location.href);
+      } catch (error) {
+        return new URL('./', window.location.href);
+      }
+    }
+
+    const baseUrl = resolveBase();
+    const STORAGE_KEY = 'mmb-admin-password';
+    const unauthorizedListeners = new Set();
+
+    let storedPassword = '';
+    try {
+      storedPassword = sessionStorage.getItem(STORAGE_KEY) || '';
+    } catch (_) {
+      storedPassword = '';
+    }
+
+    function setPassword(value) {
+      storedPassword = typeof value === 'string' ? value : '';
+      try {
+        if (storedPassword) {
+          sessionStorage.setItem(STORAGE_KEY, storedPassword);
+        } else {
+          sessionStorage.removeItem(STORAGE_KEY);
+        }
+      } catch (_) {
+        /* ignore storage errors */
+      }
+    }
+
+    function getPassword() {
+      return storedPassword;
+    }
+
+    async function validatePassword(candidate) {
+      if (!candidate) {
+        return false;
+      }
+
+      const response = await fetch(new URL('admin_validate_password.php', baseUrl).href, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({ password: candidate }),
+        mode: 'cors',
+        credentials: 'omit',
+      });
+
+      if (response.status === 401) {
+        return false;
+      }
+
+      if (!response.ok) {
+        throw new Error('Serverfehler beim Prüfen des Passworts.');
+      }
+
+      const payload = await response.json().catch(() => ({}));
+      return !!payload.ok;
+    }
+
+    function normalizeBody(body, headers) {
+      if (
+        !body ||
+        typeof body === 'string' ||
+        body instanceof String ||
+        body instanceof FormData ||
+        body instanceof Blob ||
+        (typeof ArrayBuffer !== 'undefined' && (body instanceof ArrayBuffer || body instanceof Uint8Array))
+      ) {
+        return body;
+      }
+
+      if (!headers['Content-Type']) {
+        headers['Content-Type'] = 'application/json';
+      }
+
+      return JSON.stringify(body);
+    }
+
+    async function request(path, options = {}) {
+      const password = getPassword();
+      if (!password) {
+        const error = new Error('Kein Passwort gesetzt');
+        error.code = 'NO_PASSWORD';
+        throw error;
+      }
+
+      const headers = Object.assign({ Accept: 'application/json' }, options.headers || {});
+      headers['X-Admin-Password'] = password;
+
+      const payload = normalizeBody(options.body, headers);
+
+      const response = await fetch(new URL(path, baseUrl).href, {
+        method: options.method || 'GET',
+        headers,
+        body: payload,
+        mode: options.mode || 'cors',
+        credentials: 'omit',
+      });
+
+      if (response.status === 401) {
+        setPassword('');
+        unauthorizedListeners.forEach((listener) => {
+          try {
+            listener();
+          } catch (_) {
+            /* ignore */
+          }
+        });
+        const error = new Error('Passwort ungültig');
+        error.code = 'UNAUTHORIZED';
+        throw error;
+      }
+
+      if (!response.ok) {
+        const text = await response.text();
+        const error = new Error('Serverfehler');
+        error.code = 'HTTP_ERROR';
+        error.status = response.status;
+        error.body = text;
+        throw error;
+      }
+
+      const text = await response.text();
+      if (!text) {
+        return null;
+      }
+
+      try {
+        return JSON.parse(text);
+      } catch (_) {
+        return text;
+      }
+    }
+
+    function onUnauthorized(listener) {
+      if (typeof listener === 'function') {
+        unauthorizedListeners.add(listener);
+      }
+      return () => unauthorizedListeners.delete(listener);
+    }
+
+    function renderLogin(container, options) {
+      container.innerHTML = '';
+      const form = document.createElement('form');
+      form.className = 'admin-login-form';
+      form.innerHTML = `
+        <div class="admin-login-form__heading">
+          <h2>${options.title || 'Admin-Zugang'}</h2>
+          <p>${options.description || 'Bitte gib das Passwort ein, um fortzufahren.'}</p>
+        </div>
+        <label class="admin-login-form__field">
+          <span>Passwort</span>
+          <input type="password" name="password" autocomplete="current-password" required />
+        </label>
+        <button type="submit">Anmelden</button>
+        <p class="admin-login-form__message" aria-live="assertive"></p>
+      `;
+      container.appendChild(form);
+
+      const input = form.querySelector('input[name="password"]');
+      const button = form.querySelector('button[type="submit"]');
+      const message = form.querySelector('.admin-login-form__message');
+
+      function setMessage(text, type) {
+        if (!message) {
+          return;
+        }
+        message.textContent = text || '';
+        message.classList.remove('is-error', 'is-success');
+        if (type === 'error') {
+          message.classList.add('is-error');
+        } else if (type === 'success') {
+          message.classList.add('is-success');
+        }
+      }
+
+      async function handleSubmit(event) {
+        event.preventDefault();
+        if (!input || !button) {
+          return;
+        }
+
+        const value = input.value.trim();
+        if (!value) {
+          setMessage('Bitte Passwort eingeben.', 'error');
+          input.focus();
+          return;
+        }
+
+        button.disabled = true;
+        button.textContent = 'Prüfe Passwort …';
+        setMessage('', null);
+
+        try {
+          const ok = await validatePassword(value);
+          if (!ok) {
+            setMessage('Passwort ist ungültig.', 'error');
+            button.disabled = false;
+            button.textContent = 'Anmelden';
+            input.focus();
+            input.select();
+            return;
+          }
+
+          setPassword(value);
+          setMessage('Erfolgreich angemeldet.', 'success');
+          if (typeof options.onSuccess === 'function') {
+            await options.onSuccess();
+          }
+        } catch (error) {
+          setMessage(error && error.message ? String(error.message) : 'Unbekannter Fehler.', 'error');
+          button.disabled = false;
+          button.textContent = 'Anmelden';
+        }
+      }
+
+      form.addEventListener('submit', handleSubmit);
+
+      if (input) {
+        input.focus();
+      }
+
+      return {
+        setMessage,
+        focus() {
+          if (input) {
+            input.focus();
+            input.select();
+          }
+        },
+      };
+    }
+
+    function mount(host, options = {}) {
+      if (!host) {
+        throw new Error('Container fehlt.');
+      }
+
+      const shell = document.createElement('div');
+      shell.className = 'admin-shell';
+      const loginHost = document.createElement('div');
+      loginHost.className = 'admin-shell__login';
+      const contentHost = document.createElement('div');
+      contentHost.className = 'admin-shell__content';
+
+      shell.appendChild(loginHost);
+      shell.appendChild(contentHost);
+
+      host.innerHTML = '';
+      host.appendChild(shell);
+
+      let cleanupUnauthorized = null;
+
+      async function showApp() {
+        shell.classList.add('admin-shell--authenticated');
+        contentHost.innerHTML = '';
+        if (typeof options.renderApp === 'function') {
+          await options.renderApp(contentHost);
+        }
+      }
+
+      function showLogin(message) {
+        shell.classList.remove('admin-shell--authenticated');
+        contentHost.innerHTML = '';
+        const login = renderLogin(loginHost, {
+          title: options.loginTitle,
+          description: options.loginDescription,
+          async onSuccess() {
+            await showApp();
+          },
+        });
+        if (message) {
+          login.setMessage(message, 'error');
+        }
+      }
+
+      cleanupUnauthorized = onUnauthorized(() => {
+        showLogin('Bitte Passwort erneut eingeben.');
+      });
+
+      showLogin();
+
+      const existing = getPassword();
+      if (existing) {
+        validatePassword(existing)
+          .then((ok) => {
+            if (ok) {
+              showApp();
+            } else {
+              setPassword('');
+            }
+          })
+          .catch(() => {
+            setPassword('');
+          });
+      }
+
+      return {
+        destroy() {
+          if (cleanupUnauthorized) {
+            cleanupUnauthorized();
+            cleanupUnauthorized = null;
+          }
+        },
+        refresh() {
+          if (shell.classList.contains('admin-shell--authenticated')) {
+            showApp();
+          }
+        },
+      };
+    }
+
+    window.MMBAdminPortal = {
+      mount,
+      request,
+      validatePassword,
+      getPassword,
+      setPassword,
+      onUnauthorized,
+      getApiBase() {
+        return baseUrl.href;
+      },
+    };
+  })();
+  </script>
   <script>
   (function () {
     const portal = window.MMBAdminPortal;

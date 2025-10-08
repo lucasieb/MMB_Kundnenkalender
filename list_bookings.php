@@ -293,6 +293,38 @@ function mmb_enrich_booking_row(array $row): array
     $row['total_amount'] = isset($row['total_amount']) ? (float) $row['total_amount'] : 0.0;
     $row['price_total'] = $row['total_amount'];
     $row['deposit_eur'] = isset($row['deposit_eur']) ? (float) $row['deposit_eur'] : 0.0;
+    $row['price_comment'] = mmb_trim($row['price_comment'] ?? '');
+
+    $priceKeys = [
+        'price_base',
+        'base_price',
+        'price_weekend',
+        'price_extension',
+        'price_delivery',
+        'price_services',
+        'price_extra',
+        'price_additional',
+        'price_discount',
+    ];
+
+    foreach ($priceKeys as $priceKey) {
+        if (!array_key_exists($priceKey, $row)) {
+            $row[$priceKey] = null;
+            continue;
+        }
+
+        $value = $row[$priceKey];
+        if ($value === null || $value === '') {
+            $row[$priceKey] = null;
+            continue;
+        }
+
+        if (is_numeric($value)) {
+            $row[$priceKey] = (float) $value;
+        } else {
+            $row[$priceKey] = null;
+        }
+    }
 
     $row['fulfillment_method'] = $method;
     $row['fulfillment_label'] = $label;

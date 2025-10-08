@@ -12,11 +12,15 @@
       --admin-text: #111827;
       --admin-muted: #6b7280;
       --admin-accent: #0ea5e9;
+      --admin-accent-strong: #0284c7;
       --admin-error: #dc2626;
       --admin-success: #16a34a;
-      --admin-warning: #f59e0b;
       --admin-radius: 14px;
       --admin-shadow: 0 20px 45px rgba(15, 23, 42, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
     }
 
     body {
@@ -25,11 +29,12 @@
       background: var(--admin-bg);
       font-family: 'Poppins', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
       color: var(--admin-text);
+      min-height: 100vh;
     }
 
     .card {
-      max-width: 1100px;
-      min-height: 640px;
+      max-width: 1220px;
+      min-height: 700px;
       margin: 40px auto;
       background: var(--admin-card-bg);
       border-radius: var(--admin-radius);
@@ -43,7 +48,7 @@
       margin: 0;
       padding: 28px 32px;
       border-bottom: 1px solid var(--admin-border);
-      font-size: 1.6rem;
+      font-size: 1.65rem;
       font-weight: 600;
       letter-spacing: 0.01em;
     }
@@ -54,6 +59,7 @@
       display: flex;
       flex-direction: column;
       gap: 24px;
+      min-height: 0;
     }
 
     .admin-shell {
@@ -69,6 +75,7 @@
       flex: 1;
       display: flex;
       flex-direction: column;
+      min-height: 0;
     }
 
     .admin-shell__content {
@@ -150,7 +157,7 @@
     }
 
     .admin-login-form button:hover:not(:disabled) {
-      background: #0284c7;
+      background: var(--admin-accent-strong);
       transform: translateY(-1px);
     }
 
@@ -245,12 +252,32 @@
       border-color: rgba(22, 163, 74, 0.12);
     }
 
+    .admin-layout {
+      display: flex;
+      gap: 20px;
+      align-items: stretch;
+      min-height: 440px;
+    }
+
+    .admin-layout__list,
+    .admin-layout__details {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: #fff;
+      border: 1px solid var(--admin-border);
+      border-radius: 18px;
+      overflow: hidden;
+      min-width: 0;
+    }
+
+    .admin-layout__list {
+      flex: 1.45;
+    }
+
     .admin-table-wrapper {
       flex: 1;
-      min-height: 320px;
-      overflow: hidden;
-      border-radius: 16px;
-      border: 1px solid var(--admin-border);
+      overflow: auto;
     }
 
     table {
@@ -261,21 +288,63 @@
 
     thead {
       background: #f8fafc;
-      font-size: 0.85rem;
+      font-size: 0.78rem;
       text-transform: uppercase;
       letter-spacing: 0.04em;
       color: var(--admin-muted);
     }
 
-    th, td {
+    th,
+    td {
       padding: 12px 16px;
       border-bottom: 1px solid var(--admin-border);
       vertical-align: top;
       text-align: left;
     }
 
+    tbody tr {
+      transition: background 0.18s ease;
+      cursor: pointer;
+    }
+
     tbody tr:hover {
       background: rgba(14, 165, 233, 0.06);
+    }
+
+    tbody tr.is-selected {
+      background: rgba(14, 165, 233, 0.12);
+    }
+
+    tbody tr.is-needs-attention td:first-child::before {
+      content: '⚠️';
+      margin-right: 6px;
+    }
+
+    .admin-table__customer span {
+      display: block;
+      line-height: 1.35;
+    }
+
+    .admin-table__customer span:last-child {
+      color: var(--admin-muted);
+      font-size: 0.84rem;
+    }
+
+    .admin-table__info-btn {
+      border: 1px solid var(--admin-border);
+      border-radius: 999px;
+      padding: 8px 14px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      background: #fff;
+      cursor: pointer;
+      transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .admin-table__info-btn:hover {
+      background: var(--admin-accent);
+      color: #fff;
+      box-shadow: 0 8px 18px rgba(14, 165, 233, 0.2);
     }
 
     .status-badge {
@@ -285,7 +354,7 @@
       padding: 4px 10px;
       border-radius: 999px;
       font-weight: 600;
-      font-size: 0.85rem;
+      font-size: 0.82rem;
       text-transform: capitalize;
     }
 
@@ -295,14 +364,142 @@
     }
 
     .status-badge--confirmed {
-      background: rgba(220, 38, 38, 0.18);
-      color: #991b1b;
+      background: rgba(22, 163, 74, 0.18);
+      color: #166534;
     }
 
     .status-badge--cancelled,
     .status-badge--rejected {
       background: rgba(75, 85, 99, 0.18);
       color: #1f2937;
+    }
+
+    .admin-details-header {
+      padding: 20px 24px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .admin-details-header h2 {
+      margin: 0;
+      font-size: 1.25rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .admin-details-header p {
+      margin: 0;
+      color: var(--admin-muted);
+      font-size: 0.9rem;
+    }
+
+    .admin-details-body {
+      flex: 1;
+      padding: 16px 24px 24px;
+      overflow: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .admin-details-empty {
+      margin: auto;
+      text-align: center;
+      color: var(--admin-muted);
+      line-height: 1.6;
+    }
+
+    .detail-section {
+      background: #f8fafc;
+      border-radius: 14px;
+      padding: 18px 20px;
+      border: 1px solid rgba(15, 23, 42, 0.05);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .detail-section h3 {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .detail-grid {
+      display: grid;
+      gap: 10px 16px;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    }
+
+    .detail-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 0.9rem;
+    }
+
+    .detail-item dt {
+      font-weight: 600;
+      color: var(--admin-muted);
+    }
+
+    .detail-item dd {
+      margin: 0;
+      color: var(--admin-text);
+      line-height: 1.45;
+      white-space: pre-line;
+      word-break: break-word;
+    }
+
+    .detail-price-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+
+    .detail-price-table tbody tr td {
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+    }
+
+    .detail-price-table tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    .detail-price-table td:first-child {
+      color: var(--admin-muted);
+    }
+
+    .detail-price-table td:last-child {
+      text-align: right;
+      font-weight: 600;
+    }
+
+    .detail-price-table tfoot td {
+      padding-top: 10px;
+      font-weight: 700;
+      border-top: 2px solid rgba(15, 23, 42, 0.08);
+    }
+
+    .admin-details-note {
+      background: rgba(14, 165, 233, 0.12);
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+
+    .admin-details-note strong {
+      display: block;
+      font-size: 0.82rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--admin-muted);
+      margin-bottom: 6px;
     }
 
     .muted {
@@ -316,26 +513,19 @@
       text-overflow: ellipsis;
     }
 
-    @media (max-width: 960px) {
+    @media (max-width: 1080px) {
       .card {
-        margin: 24px auto;
-        border-radius: 18px;
+        margin: 28px auto;
       }
 
-      .card h1 {
-        padding: 24px;
+      .admin-layout {
+        flex-direction: column;
       }
 
-      .card .content {
-        padding: 24px;
-      }
-
-      th, td {
-        padding: 10px 12px;
-      }
-
-      .text-ellipsis {
-        max-width: 160px;
+      .admin-layout__list,
+      .admin-layout__details {
+        flex: 1;
+        min-height: 360px;
       }
     }
 
@@ -349,26 +539,272 @@
         padding: 20px;
       }
 
-      .admin-meta {
-        flex-direction: column;
-        gap: 8px;
-      }
-
       .admin-toolbar {
         flex-direction: column;
         align-items: stretch;
       }
 
-      .admin-toolbar__actions {
-        justify-content: flex-start;
+      .admin-meta {
+        flex-direction: column;
+        gap: 8px;
       }
 
       table {
         font-size: 0.85rem;
       }
 
-      .text-ellipsis {
-        max-width: 120px;
+      .detail-grid {
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Admin – Buchungsliste</h1>
+    <div class="content">
+      <div id="admin-app" class="admin-app">
+        <noscript>
+          <p class="admin-details-empty">JavaScript ist deaktiviert. Bitte JavaScript aktivieren, um die Buchungsübersicht zu sehen.</p>
+        </noscript>
+      </div>
+    </div>
+  </div>
+
+  <script data-api-base="./">
+  (function () {
+    if (window.MMBAdminPortal) {
+      return;
+    }
+
+    const script = document.currentScript;
+
+    function resolveBase() {
+      const baseAttr = script ? script.getAttribute('data-api-base') : null;
+      try {
+        return new URL(baseAttr || './', window.location.href);
+      } catch (error) {
+        return new URL('./', window.location.href);
+      }
+    }
+
+    const baseUrl = resolveBase();
+    const STORAGE_KEY = 'mmb-admin-password';
+    const unauthorizedListeners = new Set();
+
+    let storedPassword = '';
+    try {
+      storedPassword = sessionStorage.getItem(STORAGE_KEY) || '';
+    } catch (_) {
+      storedPassword = '';
+    }
+
+    function setPassword(value) {
+      storedPassword = typeof value === 'string' ? value : '';
+      try {
+        if (storedPassword) {
+          sessionStorage.setItem(STORAGE_KEY, storedPassword);
+        } else {
+          sessionStorage.removeItem(STORAGE_KEY);
+        }
+      } catch (_) {
+        /* ignore storage errors */
+      }
+    }
+
+    function getPassword() {
+      return storedPassword;
+    }
+
+    async function validatePassword(candidate) {
+      if (!candidate) {
+        return false;
+      }
+
+      const response = await fetch(new URL('admin_validate_password.php', baseUrl).href, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({ password: candidate }),
+        mode: 'cors',
+        credentials: 'omit',
+      });
+
+      if (response.status === 401) {
+        return false;
+      }
+
+      if (!response.ok) {
+        throw new Error('Serverfehler beim Prüfen des Passworts.');
+      }
+
+      const payload = await response.json().catch(() => ({}));
+      return !!payload.ok;
+    }
+
+    function normalizeBody(body, headers) {
+      if (
+        !body ||
+        typeof body === 'string' ||
+        body instanceof String ||
+        body instanceof FormData ||
+        body instanceof Blob ||
+        (typeof ArrayBuffer !== 'undefined' && (body instanceof ArrayBuffer || body instanceof Uint8Array))
+      ) {
+        return body;
+      }
+
+      if (!headers['Content-Type']) {
+        headers['Content-Type'] = 'application/json';
+      }
+
+      return JSON.stringify(body);
+    }
+
+    async function request(path, options = {}) {
+      const password = getPassword();
+      if (!password) {
+        const error = new Error('Kein Passwort gesetzt');
+        error.code = 'NO_PASSWORD';
+        throw error;
+      }
+
+      const headers = Object.assign({ Accept: 'application/json' }, options.headers || {});
+      headers['X-Admin-Password'] = password;
+
+      const payload = normalizeBody(options.body, headers);
+
+      const response = await fetch(new URL(path, baseUrl).href, {
+        method: options.method || 'GET',
+        headers,
+        body: payload,
+        mode: options.mode || 'cors',
+        credentials: 'omit',
+      });
+
+      if (response.status === 401) {
+        setPassword('');
+        unauthorizedListeners.forEach((listener) => {
+          try {
+            listener();
+          } catch (_) {
+            /* ignore */
+          }
+        });
+        const error = new Error('Passwort ungültig');
+        error.code = 'UNAUTHORIZED';
+        throw error;
+      }
+
+      if (!response.ok) {
+        const text = await response.text();
+        const error = new Error('Serverfehler');
+        error.code = 'HTTP_ERROR';
+        error.status = response.status;
+        error.body = text;
+        throw error;
+      }
+
+      const text = await response.text();
+      if (!text) {
+        return null;
+      }
+
+      try {
+        return JSON.parse(text);
+      } catch (_) {
+        return text;
+      }
+    }
+
+    function onUnauthorized(listener) {
+      if (typeof listener === 'function') {
+        unauthorizedListeners.add(listener);
+      }
+      return () => unauthorizedListeners.delete(listener);
+    }
+
+    function renderLogin(container, options) {
+      container.innerHTML = '';
+      const form = document.createElement('form');
+      form.className = 'admin-login-form';
+      form.innerHTML = `
+        <div class="admin-login-form__heading">
+          <h2>${options.title || 'Admin-Zugang'}</h2>
+          <p>${options.description || 'Bitte gib das Passwort ein, um fortzufahren.'}</p>
+        </div>
+        <label class="admin-login-form__field">
+          <span>Passwort</span>
+          <input type="password" name="password" autocomplete="current-password" required />
+        </label>
+        <button type="submit">Anmelden</button>
+        <p class="admin-login-form__message" aria-live="assertive"></p>
+      `;
+      container.appendChild(form);
+
+      const input = form.querySelector('input[name="password"]');
+      const button = form.querySelector('button[type="submit"]');
+      const message = form.querySelector('.admin-login-form__message');
+
+      function setMessage(text, type) {
+        if (!message) {
+          return;
+        }
+        message.textContent = text || '';
+        message.classList.remove('is-error', 'is-success');
+        if (type === 'error') {
+          message.classList.add('is-error');
+        } else if (type === 'success') {
+          message.classList.add('is-success');
+        }
+      }
+
+      async function handleSubmit(event) {
+        event.preventDefault();
+        if (!input || !button) {
+          return;
+        }
+
+        const value = input.value.trim();
+        if (!value) {
+          setMessage('Bitte Passwort eingeben.', 'error');
+          input.focus();
+          return;
+        }
+
+        button.disabled = true;
+        button.textContent = 'Prüfe Passwort …';
+        setMessage('', null);
+
+        try {
+          const ok = await validatePassword(value);
+          if (!ok) {
+            setMessage('Passwort ist ungültig.', 'error');
+            button.disabled = false;
+            button.textContent = 'Anmelden';
+            input.focus();
+            input.select();
+            return;
+          }
+
+          setPassword(value);
+          setMessage('Erfolgreich angemeldet.', 'success');
+          if (typeof options.onSuccess === 'function') {
+            await options.onSuccess();
+          }
+        } catch (error) {
+          setMessage(error && error.message ? String(error.message) : 'Unbekannter Fehler.', 'error');
+          button.disabled = false;
+          button.textContent = 'Anmelden';
+        }
+      }
+
+      form.addEventListener('submit', handleSubmit);
+
+      if (input) {
+        input.focus();
       }
     }
   </style>
@@ -381,18 +817,126 @@
     </div>
   </div>
 
-  <script src="admin_portal.js" data-api-base="./"></script>
-  <script>
+      return {
+        setMessage,
+        focus() {
+          if (input) {
+            input.focus();
+            input.select();
+          }
+        },
+      };
+    }
+
+    function mount(host, options = {}) {
+      if (!host) {
+        throw new Error('Container fehlt.');
+      }
+
+      const shell = document.createElement('div');
+      shell.className = 'admin-shell';
+      const loginHost = document.createElement('div');
+      loginHost.className = 'admin-shell__login';
+      const contentHost = document.createElement('div');
+      contentHost.className = 'admin-shell__content';
+
+      shell.appendChild(loginHost);
+      shell.appendChild(contentHost);
+
+      host.innerHTML = '';
+      host.appendChild(shell);
+
+      let cleanupUnauthorized = null;
+
+      async function showApp() {
+        shell.classList.add('admin-shell--authenticated');
+        contentHost.innerHTML = '';
+        if (typeof options.renderApp === 'function') {
+          await options.renderApp(contentHost);
+        }
+      }
+
+      function showLogin(message) {
+        shell.classList.remove('admin-shell--authenticated');
+        contentHost.innerHTML = '';
+        const login = renderLogin(loginHost, {
+          title: options.loginTitle,
+          description: options.loginDescription,
+          async onSuccess() {
+            await showApp();
+          },
+        });
+        if (message) {
+          login.setMessage(message, 'error');
+        }
+      }
+
+      cleanupUnauthorized = onUnauthorized(() => {
+        showLogin('Bitte Passwort erneut eingeben.');
+      });
+
+      showLogin();
+
+      const existing = getPassword();
+      if (existing) {
+        validatePassword(existing)
+          .then((ok) => {
+            if (ok) {
+              showApp();
+            } else {
+              setPassword('');
+            }
+          })
+          .catch(() => {
+            setPassword('');
+          });
+      }
+
+      return {
+        destroy() {
+          if (cleanupUnauthorized) {
+            cleanupUnauthorized();
+            cleanupUnauthorized = null;
+          }
+        },
+        refresh() {
+          if (shell.classList.contains('admin-shell--authenticated')) {
+            showApp();
+          }
+        },
+      };
+    }
+
+    window.MMBAdminPortal = {
+      mount,
+      request,
+      validatePassword,
+      getPassword,
+      setPassword,
+      onUnauthorized,
+      getApiBase() {
+        return baseUrl.href;
+      },
+    };
+  })();
+  </script>
+
+  <script data-api-base="./">
   (function () {
     const portal = window.MMBAdminPortal;
     const host = document.getElementById('admin-app');
     if (!portal || !host) {
+      if (host) {
+        host.innerHTML = '<p class="admin-details-empty">Admin-Skript konnte nicht geladen werden.</p>';
+      }
       return;
     }
 
     const state = {
       lastLoadedAt: null,
       loading: false,
+      bookings: [],
+      selectedId: null,
     };
 
     portal.mount(host, {
@@ -427,43 +971,69 @@
         status.className = 'admin-status';
         status.textContent = 'Bereit.';
 
-        const tableWrapper = document.createElement('div');
-        tableWrapper.className = 'admin-table-wrapper';
-        tableWrapper.innerHTML = `
-          <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Box</th>
-                <th>Kunde</th>
-                <th>E-Mail</th>
-                <th>Zeitraum</th>
-                <th>Status</th>
-                <th>Gesamt (€)</th>
-                <th>Erstellt</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
+        const layout = document.createElement('div');
+        layout.className = 'admin-layout';
+
+        const listSection = document.createElement('section');
+        listSection.className = 'admin-layout__list';
+        listSection.innerHTML = `
+          <div class="admin-table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Kunde</th>
+                  <th>Box</th>
+                  <th>Zeitraum</th>
+                  <th>Fulfillment</th>
+                  <th>Preis</th>
+                  <th>Status</th>
+                  <th>Aktion</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
         `;
-        const tbody = tableWrapper.querySelector('tbody');
+        const tbody = listSection.querySelector('tbody');
+
+        const detailsSection = document.createElement('section');
+        detailsSection.className = 'admin-layout__details';
+        detailsSection.innerHTML = `
+          <div class="admin-details-header">
+            <h2><span data-detail="title">Details</span> <span data-detail="status"></span></h2>
+            <p data-detail="subtitle">Bitte wähle eine Buchung aus, um alle Informationen zu sehen.</p>
+          </div>
+          <div class="admin-details-body">
+            <div class="admin-details-empty">Keine Buchung ausgewählt.</div>
+          </div>
+        `;
+        const detailsBody = detailsSection.querySelector('.admin-details-body');
+        const detailsTitle = detailsSection.querySelector('[data-detail="title"]');
+        const detailsSubtitle = detailsSection.querySelector('[data-detail="subtitle"]');
+        const detailsStatus = detailsSection.querySelector('[data-detail="status"]');
+
+        layout.appendChild(listSection);
+        layout.appendChild(detailsSection);
 
         container.appendChild(toolbar);
+        container.appendChild(layout);
         container.appendChild(status);
-        container.appendChild(tableWrapper);
 
         refreshBtn.addEventListener('click', () => {
-          loadData();
+          loadData(true);
         });
 
-        async function loadData() {
-          if (state.loading) {
+        async function loadData(force) {
+          if (state.loading && !force) {
             return;
           }
           state.loading = true;
           status.className = 'admin-status';
           status.textContent = 'Lade Buchungen …';
-          tbody.innerHTML = '';
+          if (tbody) {
+            tbody.classList.add('is-loading');
+          }
 
           try {
             const data = await portal.request('list_bookings.php');
@@ -472,8 +1042,16 @@
             }
 
             const items = Array.isArray(data.items) ? data.items : [];
-            renderRows(items);
+            state.bookings = items;
+            renderRows();
             updateMeta(data.meta || {}, items.length);
+
+            if (items.length) {
+              const preferredId = state.selectedId || items[0].id;
+              selectBooking(preferredId);
+            } else {
+              selectBooking(null);
+            }
 
             state.lastLoadedAt = new Date();
             status.className = 'admin-status is-success';
@@ -484,43 +1062,75 @@
             }
             status.className = 'admin-status is-error';
             status.textContent = error && error.message ? String(error.message) : 'Unbekannter Fehler beim Laden der Buchungen.';
-            tbody.innerHTML = '<tr><td colspan="8" class="muted">Keine Daten verfügbar.</td></tr>';
+            if (tbody) {
+              tbody.innerHTML = '<tr><td colspan="8" class="muted">Keine Daten verfügbar.</td></tr>';
+            }
+            selectBooking(null);
           } finally {
             state.loading = false;
+            if (tbody) {
+              tbody.classList.remove('is-loading');
+            }
           }
         }
 
-        function renderRows(items) {
-          if (!items.length) {
+        function renderRows() {
+          if (!tbody) {
+            return;
+          }
+
+          if (!state.bookings.length) {
             tbody.innerHTML = '<tr><td colspan="8" class="muted">Keine Buchungen vorhanden.</td></tr>';
             return;
           }
 
-          const rows = items.map((item) => {
-            const displayId = escapeHtml(item.display_id || item.id || '–');
-            const boxName = escapeHtml(item.box_name || (item.box_id ? `Box #${item.box_id}` : '–'));
-            const customer = escapeHtml(item.customer_name || '–');
-            const email = escapeHtml(item.customer_email || '–');
-            const period = `${formatDate(item.start_date)} – ${formatDate(item.end_date)}`;
-            const statusBadge = createStatusBadge(item.status);
-            const total = formatCurrency(item.total_amount);
-            const created = formatTimestamp(item.created_at);
+          const rows = state.bookings.map((item) => {
+            const row = document.createElement('tr');
+            row.dataset.bookingId = String(item.id);
+            if (item.fulfillment_needs_attention) {
+              row.classList.add('is-needs-attention');
+            }
+            if (String(item.id) === String(state.selectedId)) {
+              row.classList.add('is-selected');
+            }
 
-            return `
-              <tr>
-                <td>${displayId}</td>
-                <td class="text-ellipsis" title="${boxName}">${boxName}</td>
-                <td class="text-ellipsis" title="${customer}">${customer}</td>
-                <td class="text-ellipsis" title="${email}">${email}</td>
-                <td>${escapeHtml(period)}</td>
-                <td>${statusBadge}</td>
-                <td>${escapeHtml(total)}</td>
-                <td>${escapeHtml(created)}</td>
-              </tr>
+            const customerName = escapeHtml(item.customer_name || '–');
+            const email = escapeHtml(item.customer_email || '–');
+            const boxName = escapeHtml(item.box_name || (item.box_id ? `Box #${item.box_id}` : '–'));
+            const period = `${formatDate(item.start_date)} – ${formatDate(item.end_date)}`;
+            const fulfillment = escapeHtml(item.fulfillment_display_label || item.fulfillment_label || item.fulfillment_method || '–');
+            const total = formatCurrency(item.total_amount);
+            const statusCell = createStatusBadge(item.status);
+            const displayId = escapeHtml(item.display_id || item.id || '–');
+
+            row.innerHTML = `
+              <td>${displayId}</td>
+              <td class="admin-table__customer"><span>${customerName}</span><span>${email}</span></td>
+              <td class="text-ellipsis" title="${boxName}">${boxName}</td>
+              <td>${escapeHtml(period)}</td>
+              <td class="text-ellipsis" title="${fulfillment}">${fulfillment}</td>
+              <td>${escapeHtml(total)}</td>
+              <td>${statusCell}</td>
+              <td><button type="button" class="admin-table__info-btn">Info</button></td>
             `;
+
+            row.addEventListener('click', () => {
+              selectBooking(item.id);
+            });
+
+            const infoBtn = row.querySelector('.admin-table__info-btn');
+            if (infoBtn) {
+              infoBtn.addEventListener('click', (event) => {
+                event.stopPropagation();
+                selectBooking(item.id);
+              });
+            }
+
+            return row;
           });
 
-          tbody.innerHTML = rows.join('');
+          tbody.innerHTML = '';
+          rows.forEach((row) => tbody.appendChild(row));
         }
 
         function updateMeta(metaData, rowCount) {
@@ -532,11 +1142,261 @@
             countEl.textContent = String(rowCount ?? metaData.count ?? 0);
           }
           if (needsEl) {
-            needsEl.textContent = String(metaData.requires_details ?? 0);
+            const value = metaData.requires_details ?? metaData.needs_attention ?? 0;
+            needsEl.textContent = String(value);
           }
           if (updatedEl) {
             updatedEl.textContent = state.lastLoadedAt ? formatTimestamp(state.lastLoadedAt) : '–';
           }
+        }
+
+        function selectBooking(id) {
+          state.selectedId = id !== null ? Number(id) : null;
+          if (tbody) {
+            Array.from(tbody.querySelectorAll('tr')).forEach((row) => {
+              row.classList.toggle('is-selected', String(row.dataset.bookingId) === String(state.selectedId));
+            });
+          }
+
+          const booking = state.bookings.find((item) => String(item.id) === String(state.selectedId));
+          renderDetails(booking || null);
+        }
+
+        function renderDetails(item) {
+          if (!detailsBody || !detailsTitle || !detailsSubtitle || !detailsStatus) {
+            return;
+          }
+
+          if (!item) {
+            detailsTitle.textContent = 'Details';
+            detailsStatus.innerHTML = '';
+            detailsSubtitle.textContent = 'Bitte wähle eine Buchung aus, um alle Informationen zu sehen.';
+            detailsBody.innerHTML = '<div class="admin-details-empty">Keine Buchung ausgewählt.</div>';
+            return;
+          }
+
+          detailsTitle.textContent = `Buchung ${item.display_id || item.id}`;
+          detailsStatus.innerHTML = createStatusBadge(item.status);
+          detailsSubtitle.textContent = `Zeitraum: ${formatDate(item.start_date)} – ${formatDate(item.end_date)}`;
+
+          const sections = [];
+          sections.push(renderDefinitionSection('Buchung & Zeitraum', [
+            { label: 'Buchungs-ID', value: item.display_id || item.id },
+            { label: 'Status', value: formatStatusText(item.status) },
+            { label: 'Box', value: item.box_name || (item.box_id ? `Box #${item.box_id}` : '') },
+            { label: 'Start', value: formatDate(item.start_date) },
+            { label: 'Ende', value: formatDate(item.end_date) },
+            { label: 'Erstellt', value: formatTimestamp(item.created_at) },
+            { label: 'Letzte Änderung', value: formatTimestamp(item.updated_at) },
+          ]));
+
+          sections.push(renderDefinitionSection('Kunde', [
+            { label: 'Name', value: item.customer_name },
+            { label: 'E-Mail', value: item.customer_email },
+            { label: 'Telefon', value: item.customer_phone },
+          ]));
+
+          sections.push(renderPriceSection(item));
+
+          sections.push(renderFulfillmentSection(item));
+
+          sections.push(renderContactSection(item));
+
+          const noteSection = renderNoteSection(item);
+          if (noteSection) {
+            sections.push(noteSection);
+          }
+
+          detailsBody.innerHTML = sections.map((section) => section).join('');
+        }
+
+        function renderDefinitionSection(title, rows) {
+          const normalized = Array.isArray(rows) ? rows : [];
+          const content = normalized.map((row) => {
+            const value = row && row.value !== undefined && row.value !== null && row.value !== ''
+              ? escapeHtml(String(row.value)).replace(/\n/g, '<br/>')
+              : '<span class="muted">–</span>';
+            return `
+              <div class="detail-item">
+                <dt>${escapeHtml(row.label || '')}</dt>
+                <dd>${value}</dd>
+              </div>
+            `;
+          }).join('');
+
+          return `
+            <section class="detail-section">
+              <h3>${escapeHtml(title)}</h3>
+              <div class="detail-grid">
+                ${content}
+              </div>
+            </section>
+          `;
+        }
+
+        function renderPriceSection(item) {
+          const pricing = extractPricing(item);
+          const rows = pricing.rows.map((row) => `
+            <tr>
+              <td>${escapeHtml(row.label)}</td>
+              <td>${escapeHtml(formatCurrency(row.amount))}</td>
+            </tr>
+          `).join('');
+
+          const depositRow = pricing.deposit !== null
+            ? `<tr><td>Kaution</td><td>${escapeHtml(formatCurrency(pricing.deposit))}</td></tr>`
+            : '';
+
+          const otherRows = rows + depositRow || '<tr><td colspan="2" class="muted">Keine Preisdetails vorhanden.</td></tr>';
+
+          const totalCell = pricing.total !== null
+            ? formatCurrency(pricing.total)
+            : '–';
+
+          return `
+            <section class="detail-section">
+              <h3>Rechnung</h3>
+              <table class="detail-price-table">
+                <tbody>
+                  ${otherRows}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td>Gesamtsumme</td>
+                    <td>${escapeHtml(totalCell)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </section>
+          `;
+        }
+
+        function extractPricing(item) {
+          const result = {
+            rows: [],
+            deposit: null,
+            total: null,
+          };
+
+          const numberKeys = [
+            ['price_base', 'Grundpreis'],
+            ['base_price', 'Grundpreis'],
+            ['price_weekend', 'Wochenendzuschlag'],
+            ['price_extension', 'Verlängerung'],
+            ['price_delivery', 'Lieferung'],
+            ['price_services', 'Service'],
+            ['price_extra', 'Zusatzkosten'],
+            ['price_additional', 'Zusatzkosten'],
+            ['price_discount', 'Rabatt'],
+          ];
+
+          const seen = new Set();
+          numberKeys.forEach(([key, label]) => {
+            if (key in item && isNumeric(item[key])) {
+              seen.add(key);
+              const amount = Number(item[key]);
+              if (amount !== 0 || key === 'price_base' || key === 'base_price') {
+                result.rows.push({ label, amount });
+              }
+            }
+          });
+
+          if (!seen.has('price_base') && !seen.has('base_price')) {
+            const total = isNumeric(item.total_amount) ? Number(item.total_amount) : null;
+            const fulfillment = isNumeric(item.fulfillment_price_delta) ? Number(item.fulfillment_price_delta) : 0;
+            if (total !== null) {
+              const base = total - fulfillment;
+              if (!Number.isNaN(base) && base !== 0) {
+                result.rows.unshift({ label: 'Grundpreis', amount: base });
+              }
+            }
+          }
+
+          if (isNumeric(item.fulfillment_price_delta)) {
+            const amount = Number(item.fulfillment_price_delta);
+            result.rows.push({ label: 'Fulfillment', amount });
+          }
+
+          if (isNumeric(item.deposit_eur)) {
+            result.deposit = Number(item.deposit_eur);
+          }
+
+          if (isNumeric(item.total_amount)) {
+            result.total = Number(item.total_amount);
+          }
+
+          return result;
+        }
+
+        function renderFulfillmentSection(item) {
+          const structured = item.fulfillment_details_structured || item.fulfillment_details || {};
+          const fulfillment = item.fulfillment || {};
+          const missing = Array.isArray(structured.missing) ? structured.missing : [];
+          const requires = !!structured.requires_details;
+          const needs = !!structured.needs_attention;
+
+          const rows = [
+            { label: 'Mietart', value: item.fulfillment_display_label || fulfillment.display_label || item.fulfillment_label || item.fulfillment_method },
+            { label: 'Beschreibung', value: fulfillment.full || item.fulfillment_note || fulfillment.note },
+            { label: 'Preisanteil', value: formatCurrency(item.fulfillment_price_delta) },
+            { label: 'Details benötigt', value: requires ? 'Ja' : 'Nein' },
+            { label: 'Nachfragen offen', value: needs ? (missing.length ? missing.join('\n') : 'Ja') : 'Nein' },
+          ];
+
+          if (structured.meta) {
+            rows.push({ label: 'Letzte Übermittlung', value: structured.meta.submitted_at || '' });
+            rows.push({ label: 'Übermittelt via', value: structured.meta.submitted_via || '' });
+          }
+
+          return renderDefinitionSection('Fulfillment', rows);
+        }
+
+        function renderContactSection(item) {
+          const structured = item.fulfillment_details_structured || item.fulfillment_details || {};
+          const contact = structured.contact || {};
+          const shipping = structured.shipping || {};
+          const delivery = structured.delivery || {};
+
+          const addressParts = [
+            shipping.address_line1,
+            shipping.address_line2,
+            [shipping.postal_code, shipping.city].filter(Boolean).join(' '),
+            shipping.address_extra,
+          ].filter((part) => part && String(part).trim() !== '').map((part) => String(part));
+
+          const address = addressParts.length ? addressParts.join('\n') : '';
+
+          const rows = [
+            { label: 'Kontaktperson', value: contact.name || item.customer_name },
+            { label: 'Kontakt-E-Mail', value: contact.email || item.customer_email },
+            { label: 'Kontakt-Telefon', value: contact.phone || item.customer_phone },
+            { label: 'Einwilligung WhatsApp', value: contact.consent === true ? 'Ja' : contact.consent === false ? 'Nein' : '' },
+            { label: 'Versandadresse', value: address },
+            { label: 'Treffpunkt (Lieferung)', value: delivery.meeting_point || '' },
+            { label: 'Wunschzeit', value: delivery.preferred_time || '' },
+          ];
+
+          return renderDefinitionSection('Kontakt & Lieferung', rows);
+        }
+
+        function renderNoteSection(item) {
+          const note = item.note && String(item.note).trim() !== '' ? String(item.note) : '';
+          const priceComment = item.price_comment || '';
+          const combined = [note, priceComment].filter((value) => value && value.trim() !== '').join('\n\n');
+
+          if (!combined) {
+            return '<section class="detail-section"><h3>Notizen</h3><p class="muted">Keine Notiz hinterlegt.</p></section>';
+          }
+
+          return `
+            <section class="detail-section">
+              <h3>Notizen</h3>
+              <div class="admin-details-note">
+                <strong>Kommentar</strong>
+                <span>${escapeHtml(combined).replace(/\n/g, '<br/>')}</span>
+              </div>
+            </section>
+          `;
         }
 
         function escapeHtml(value) {
@@ -584,7 +1444,11 @@
           if (Number.isFinite(number)) {
             return number.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
           }
-          return value !== undefined && value !== null ? String(value) : '–';
+          return value !== undefined && value !== null && value !== '' ? String(value) : '–';
+        }
+
+        function isNumeric(value) {
+          return value !== null && value !== '' && !Number.isNaN(Number(value));
         }
 
         function createStatusBadge(status) {
@@ -601,7 +1465,15 @@
           return `<span class="${cls}">${escapeHtml(label)}</span>`;
         }
 
-        loadData();
+        function formatStatusText(status) {
+          const normalized = String(status || '').toLowerCase();
+          if (!normalized) {
+            return '–';
+          }
+          return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+        }
+
+        loadData(true);
       },
     });
   })();
