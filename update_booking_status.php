@@ -52,13 +52,8 @@ function bookingsHasColumn(PDO $pdo, string $name): bool {
   return isset($cols[strtolower($name)]);
 }
 
-// Optionaler Admin-Schutz
-if (is_file(__DIR__ . '/auth.php')) {
-  require __DIR__ . '/auth.php';
-  if (function_exists('require_admin')) {
-    require_admin();
-  }
-}
+require __DIR__ . '/admin_guard.php';
+admin_require_password();
 
 /* ========= Hilfsfunktionen wie in deinem System ========= */
 

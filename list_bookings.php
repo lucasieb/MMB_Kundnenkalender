@@ -3,11 +3,11 @@ declare(strict_types=1);
 
 require __DIR__ . '/cors.php';        // <-- NEU: muss vor jeglicher Ausgabe stehen
 require __DIR__ . '/db.php';
-require __DIR__ . '/auth.php';        // falls genutzt
+require __DIR__ . '/admin_guard.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
-require_admin();
+admin_require_password();
 
 const MMB_FULFILLMENT_DEFS = [
     'pickup' => [

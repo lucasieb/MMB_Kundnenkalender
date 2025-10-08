@@ -3,9 +3,9 @@ declare(strict_types=1);
 
 require __DIR__ . '/api_bootstrap.php';
 require __DIR__ . '/db.php';
-require __DIR__ . '/auth.php';
+require __DIR__ . '/admin_guard.php';
 
-require_admin();
+admin_require_password();
 
 /**
  * Sendet eine JSON-Antwort mit optionalem HTTP-Statuscode.

@@ -2,8 +2,8 @@
 // offer_alternative.php
 require __DIR__ . '/cors.php';
 header('Content-Type: application/json; charset=utf-8');
-require_once __DIR__ . '/auth.php';
-require_admin();
+require_once __DIR__ . '/admin_guard.php';
+admin_require_password();
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/lib/booking_alternatives.php';
 

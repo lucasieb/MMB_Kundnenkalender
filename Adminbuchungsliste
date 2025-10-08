@@ -2,2204 +2,609 @@
 <html lang="de">
 <head>
   <meta charset="utf-8"/>
-  <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>MietMichBox – Admin Buchungsliste</title>
   <style>
-    body{margin:0; padding:1rem; background:#f5f5f5; font-family:'Poppins',sans-serif;}
-    .page{max-width:1400px;margin:0 auto;}
-    .card{background:#fff;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.1);overflow:hidden;}
-    .card h1{margin:0;padding:1rem;border-bottom:1px solid #e5e7eb;background:#f8f9fa;font-size:1.25rem;}
-    .card .content{padding:1rem;}
-    .mmb-error{margin-top:1.5rem;padding:1rem;border-radius:6px;background:#fee2e2;color:#b91c1c;font-weight:600;}
-    .mmb-warning{margin:0 0 1rem 0;padding:0.85rem 1rem;border-radius:6px;background:#fef3c7;color:#92400e;font-weight:600;}
-    .mmb-error-meta{margin-top:.5rem;font-size:.8rem;color:#7f1d1d;text-transform:uppercase;letter-spacing:.05em;}
-    .mmb-error-details{margin-top:.75rem;font-size:.9rem;line-height:1.45;color:#7f1d1d;}
-    .mmb-error-details code{display:block;margin-top:.5rem;padding:.75rem;border-radius:6px;background:#fee2e2;color:#991b1b;white-space:pre-wrap;word-break:break-word;font-family:ui-monospace,SFMono-Regular,Consolas,'Liberation Mono',Menlo,monospace;}
-    .mmb-error-actions{margin-top:1rem;display:flex;flex-wrap:wrap;gap:.5rem;}
+    :root {
+      --admin-bg: #f5f5f5;
+      --admin-card-bg: #ffffff;
+      --admin-border: #e5e7eb;
+      --admin-text: #111827;
+      --admin-muted: #6b7280;
+      --admin-accent: #0ea5e9;
+      --admin-error: #dc2626;
+      --admin-success: #16a34a;
+      --admin-warning: #f59e0b;
+      --admin-radius: 14px;
+      --admin-shadow: 0 20px 45px rgba(15, 23, 42, 0.08);
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background: var(--admin-bg);
+      font-family: 'Poppins', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      color: var(--admin-text);
+    }
+
+    .card {
+      max-width: 1100px;
+      min-height: 640px;
+      margin: 40px auto;
+      background: var(--admin-card-bg);
+      border-radius: var(--admin-radius);
+      box-shadow: var(--admin-shadow);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .card h1 {
+      margin: 0;
+      padding: 28px 32px;
+      border-bottom: 1px solid var(--admin-border);
+      font-size: 1.6rem;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+    }
+
+    .card .content {
+      flex: 1;
+      padding: 28px 32px 36px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .admin-shell {
+      position: relative;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .admin-shell__login,
+    .admin-shell__content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .admin-shell__content {
+      display: none;
+    }
+
+    .admin-shell--authenticated .admin-shell__login {
+      display: none;
+    }
+
+    .admin-shell--authenticated .admin-shell__content {
+      display: flex;
+    }
+
+    .admin-login-form {
+      margin: auto;
+      max-width: 360px;
+      width: 100%;
+      padding: 32px 28px;
+      border: 1px solid var(--admin-border);
+      border-radius: 18px;
+      background: #fff;
+      box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      text-align: center;
+    }
+
+    .admin-login-form__heading h2 {
+      margin: 0 0 8px 0;
+      font-size: 1.35rem;
+      font-weight: 600;
+      color: var(--admin-text);
+    }
+
+    .admin-login-form__heading p {
+      margin: 0;
+      font-size: 0.95rem;
+      color: var(--admin-muted);
+    }
+
+    .admin-login-form__field {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 6px;
+      text-align: left;
+      font-size: 0.95rem;
+      color: var(--admin-text);
+    }
+
+    .admin-login-form__field input {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--admin-border);
+      font-size: 1rem;
+      font-family: inherit;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .admin-login-form__field input:focus {
+      outline: none;
+      border-color: var(--admin-accent);
+      box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.18);
+    }
+
+    .admin-login-form button {
+      border: none;
+      border-radius: 999px;
+      background: var(--admin-accent);
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 600;
+      padding: 12px 0;
+      cursor: pointer;
+      transition: background 0.2s ease, transform 0.2s ease;
+    }
+
+    .admin-login-form button:hover:not(:disabled) {
+      background: #0284c7;
+      transform: translateY(-1px);
+    }
+
+    .admin-login-form button:disabled {
+      opacity: 0.6;
+      cursor: wait;
+    }
+
+    .admin-login-form__message {
+      min-height: 1.2rem;
+      font-size: 0.9rem;
+      color: var(--admin-muted);
+    }
+
+    .admin-login-form__message.is-error {
+      color: var(--admin-error);
+    }
+
+    .admin-login-form__message.is-success {
+      color: var(--admin-success);
+    }
+
+    .admin-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .admin-toolbar__actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .admin-btn {
+      background: #fff;
+      border: 1px solid var(--admin-border);
+      border-radius: 999px;
+      padding: 10px 18px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      color: var(--admin-text);
+      transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .admin-btn:hover {
+      background: var(--admin-accent);
+      color: #fff;
+      box-shadow: 0 12px 24px rgba(14, 165, 233, 0.18);
+    }
+
+    .admin-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      color: var(--admin-muted);
+      font-size: 0.9rem;
+    }
+
+    .admin-meta__item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .admin-meta__item strong {
+      color: var(--admin-text);
+      font-weight: 600;
+    }
+
+    .admin-status {
+      font-size: 0.95rem;
+      padding: 12px 16px;
+      border-radius: 10px;
+      background: #f8fafc;
+      color: var(--admin-muted);
+      border: 1px solid rgba(15, 23, 42, 0.05);
+    }
+
+    .admin-status.is-error {
+      color: var(--admin-error);
+      background: rgba(220, 38, 38, 0.08);
+      border-color: rgba(220, 38, 38, 0.12);
+    }
+
+    .admin-status.is-success {
+      color: var(--admin-success);
+      background: rgba(22, 163, 74, 0.08);
+      border-color: rgba(22, 163, 74, 0.12);
+    }
+
+    .admin-table-wrapper {
+      flex: 1;
+      min-height: 320px;
+      overflow: hidden;
+      border-radius: 16px;
+      border: 1px solid var(--admin-border);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.92rem;
+    }
+
+    thead {
+      background: #f8fafc;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--admin-muted);
+    }
+
+    th, td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--admin-border);
+      vertical-align: top;
+      text-align: left;
+    }
+
+    tbody tr:hover {
+      background: rgba(14, 165, 233, 0.06);
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-weight: 600;
+      font-size: 0.85rem;
+      text-transform: capitalize;
+    }
+
+    .status-badge--pending {
+      background: rgba(245, 158, 11, 0.16);
+      color: #92400e;
+    }
+
+    .status-badge--confirmed {
+      background: rgba(220, 38, 38, 0.18);
+      color: #991b1b;
+    }
+
+    .status-badge--cancelled,
+    .status-badge--rejected {
+      background: rgba(75, 85, 99, 0.18);
+      color: #1f2937;
+    }
+
+    .muted {
+      color: var(--admin-muted);
+    }
+
+    .text-ellipsis {
+      max-width: 220px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    @media (max-width: 960px) {
+      .card {
+        margin: 24px auto;
+        border-radius: 18px;
+      }
+
+      .card h1 {
+        padding: 24px;
+      }
+
+      .card .content {
+        padding: 24px;
+      }
+
+      th, td {
+        padding: 10px 12px;
+      }
+
+      .text-ellipsis {
+        max-width: 160px;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .card {
+        margin: 16px;
+        border-radius: 18px;
+      }
+
+      .card .content {
+        padding: 20px;
+      }
+
+      .admin-meta {
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .admin-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .admin-toolbar__actions {
+        justify-content: flex-start;
+      }
+
+      table {
+        font-size: 0.85rem;
+      }
+
+      .text-ellipsis {
+        max-width: 120px;
+      }
+    }
   </style>
 </head>
 <body>
-  <div class="page">
-    <div class="card">
-      <h1>Admin – Buchungsliste</h1>
-      <div class="content">
-        <div id="mmb-admin-list"></div>
-      </div>
+  <div class="card">
+    <h1>Admin – Buchungsliste</h1>
+    <div class="content">
+      <div id="admin-app" class="admin-app"></div>
     </div>
   </div>
 
-  <!-- ======================= MMB CORE ======================= -->
-  <script src="admin_auth.js" data-api-base="./"></script>
+  <script src="admin_portal.js" data-api-base="./"></script>
   <script>
-  (function(global){'use strict';
-
-    function createNotAvailableError(method){
-      const error=new Error('Admin API ist nicht verfügbar.');
-      error.name='AdminApiUnavailableError';
-      error.context={ method };
-      return error;
-    }
-
-    function isUsable(candidate){
-      return candidate && typeof candidate==='object' && typeof candidate.listBookings==='function';
-    }
-
-    let delegate=null;
-    let stub=null;
-
-    function resolveDelegate(){
-      if(delegate && isUsable(delegate)){
-        return delegate;
-      }
-      const candidates=[
-        (global && global.AdminApi && global.AdminApi!==stub) ? global.AdminApi : null,
-        (global && global.MMBApi) ? global.MMBApi : null,
-      ];
-      for(const candidate of candidates){
-        if(candidate && candidate!==stub && isUsable(candidate)){
-          delegate=candidate;
-          try{ global.AdminApi=candidate; }catch(_){ /* ignore */ }
-          return delegate;
-        }
-      }
-      return null;
-    }
-
-    function createProxy(method){
-      return function proxyMethod(){
-        const resolved=resolveDelegate();
-        if(resolved && typeof resolved[method]==='function'){
-          return resolved[method].apply(resolved, arguments);
-        }
-        return Promise.reject(createNotAvailableError(method));
-      };
-    }
-
-    stub={
-      listBookings:createProxy('listBookings'),
-      updateBooking:createProxy('updateBooking'),
-      updateBookingStatus:createProxy('updateBookingStatus'),
-      deleteBooking:createProxy('deleteBooking'),
-    };
-
-    try {
-      Object.defineProperty(stub,'__mmbIsPlaceholder',{value:true,enumerable:false,configurable:true});
-    } catch(_) {
-      stub.__mmbIsPlaceholder = true;
-    }
-
-    if(!global.AdminApi || global.AdminApi===stub){
-      try{ global.AdminApi = stub; }catch(_){ /* ignore */ }
-    }
-
-    function injectBaseCSS(){
-      if (document.getElementById('mmb-core-css')) return;
-      const style=document.createElement('style'); style.id='mmb-core-css';
-      style.textContent=`
-        :root{
-          --mmb-primary:#3b3b3b; --mmb-accent:#0EA5E9; --mmb-bg:#efefe6;
-          --mmb-muted:#f8f9fa; --mmb-ok:#10b981; --mmb-warn:#f59e0b;
-          --mmb-busy:#ef4444; --mmb-border:#e5e7eb; --mmb-text:#3b3b3b; --mmb-text-light:#6b7280;
-        }
-        @media (prefers-color-scheme: dark){
-          :root{ --mmb-bg:#3b3b3b; --mmb-muted:#4a4a4a; --mmb-border:#555; --mmb-text:#fff; --mmb-text-light:#ccc; --mmb-primary:#fff; }
-        }
-        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap');
-
-        .mmb-widget{font-family:'Poppins',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,sans-serif;background:var(--mmb-bg);color:var(--mmb-text);border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.1);}
-        .mmb-loading{display:flex;justify-content:center;align-items:center;height:200px;font-size:.875rem;color:var(--mmb-text-light);}
-        @media (prefers-reduced-motion: reduce){.mmb-day,.mmb-btn,.mmb-nav-btn{transition:none;}}
-      `;
-      document.head.appendChild(style);
-    }
-
-    class EventEmitter{constructor(){this.events={};} on(e,l){(this.events[e]??=[]).push(l);} off(e,l){if(!this.events[e])return; this.events[e]=this.events[e].filter(x=>x!==l);} emit(e,d){(this.events[e]||[]).forEach(l=>l(d));}}
-
-    class GlobalState{
-      constructor(){ this.instances=new Map(); this.sharedState={availability:{}, bookings:[], customerBookings:new Map()};}
-      registerInstance(id,inst){this.instances.set(id,inst);} unregisterInstance(id){this.instances.delete(id);}
-      updateAvailability(boxId,dateString,availability,source='admin'){
-        const key=`${boxId}_${dateString}`; this.sharedState.availability[key]=availability;
-        if(source==='customer'&&availability.available===0){ this.sharedState.customerBookings.set(key,true); }
-        else if(source==='admin'&&availability.available>0){ this.sharedState.customerBookings.delete(key); }
-        MMBCore.events.emit('availability:changed',{boxId,dateString,availability,source});
-      }
-      getAvailability(boxId,dateString){ return this.sharedState.availability[`${boxId}_${dateString}`]; }
-      isCustomerBooked(boxId,dateString){ return this.sharedState.customerBookings.has(`${boxId}_${dateString}`); }
-    }
-
-    const Utils={
-      MONTH_NAMES:['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'],
-      DAY_NAMES:['Mo','Di','Mi','Do','Fr','Sa','So'],
-      formatDate(d){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),da=String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${da}`;},
-      formatMonthYear(d){return `${this.MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;},
-      formatDateRange(s,e){return `${s.toLocaleDateString('de-DE')} - ${e.toLocaleDateString('de-DE')}`;},
-      generateCalendarDays(cur){const y=cur.getFullYear(),m=cur.getMonth(),first=new Date(y,m,1),last=new Date(y,m+1,0); const start=(first.getDay()===0?6:first.getDay()-1); const days=[]; const prevLast=new Date(y,m,0);
-        for(let i=start-1;i>=0;i--){days.push({date:new Date(y,m-1,prevLast.getDate()-i),otherMonth:true});}
-        for(let d=1; d<=last.getDate(); d++){days.push({date:new Date(y,m,d),otherMonth:false});}
-        const total=Math.ceil(days.length/7)*7; for(let d=1; d<=total-days.length; d++){days.push({date:new Date(y,m+1,d),otherMonth:true});}
-        return days;},
-      escapeHtml(value){ if(value===null||value===undefined) return ''; return String(value).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])); },
-      describeError(error, options={}){
-        const headline=(typeof options.headline==='string'&&options.headline.trim())?options.headline.trim():'Unbekannter Fehler';
-        const fallback=(typeof options.fallbackMessage==='string'&&options.fallbackMessage.trim())?options.fallbackMessage.trim():'Bitte prüfen Sie die Browser-Konsole für weitere Details.';
-        const info={headline,message:fallback,status:null,context:typeof options.context==='string'?options.context:'',items:[],raw:null};
-        const pushDetail=(value)=>{
-          if(value===null||value===undefined) return;
-          if(typeof value==='string'){const trimmed=value.trim(); if(trimmed) info.items.push(trimmed); return;}
-          if(typeof value==='number'||typeof value==='boolean'){info.items.push(String(value)); return;}
-          if(Array.isArray(value)){value.forEach(pushDetail); return;}
-          try{const json=JSON.stringify(value,null,2); if(json) info.items.push(json);}catch(_){info.items.push(String(value));}
-        };
-        if(error instanceof Error){
-          if(typeof error.message==='string'&&error.message.trim()) info.message=error.message.trim();
-          if(typeof error.status==='number'&&!Number.isNaN(error.status)) info.status=error.status;
-          if(error.name&&error.name!=='Error') pushDetail(`Fehlertyp: ${error.name}`);
-          if('details' in error) pushDetail(error.details);
-          if('detail' in error) pushDetail(error.detail);
-          if('error' in error&&error.error!==error.message) pushDetail(error.error);
-          if(!info.context&&error.context){
-            if(typeof error.context==='string') info.context=error.context;
-            else if(error.context&&typeof error.context.path==='string') info.context=error.context.path;
-          }
-          if(typeof error.raw==='string'&&error.raw.trim()) info.raw=error.raw.slice(0,1200);
-        }else if(error&&typeof error==='object'){
-          if(typeof error.message==='string'&&error.message.trim()) info.message=error.message.trim();
-          if(typeof error.status==='number'&&!Number.isNaN(error.status)) info.status=error.status;
-          if(typeof error.context==='string') info.context=error.context;
-          pushDetail(error.details??error.detail??error.error??error);
-        }else if(typeof error==='string'&&error.trim()){
-          info.message=error.trim();
-        }
-        if(!info.context&&typeof options.context==='string') info.context=options.context;
-        if(typeof options.status==='number'&&!info.status) info.status=options.status;
-        if(options.extra) pushDetail(options.extra);
-        return info;
-      },
-      showNotification(msg,type='info'){const ex=document.querySelector(`.mmb-${type}-notification`); if(ex) ex.remove(); const el=document.createElement('div'); el.className=`mmb-${type}-notification`; const bg=type==='error'?'var(--mmb-busy)':'var(--mmb-ok)';
-        el.style.cssText=`position:fixed;top:20px;right:20px;background:${bg};color:#fff;padding:1rem;border-radius:4px;box-shadow:0 4px 6px rgba(0,0,0,.1);z-index:1000;max-width:300px;`; el.textContent=msg; document.body.appendChild(el); setTimeout(()=>el.remove(),5000);}
-    };
-
-    injectBaseCSS(); const events=new EventEmitter(), globalState=new GlobalState();
-    global.MMBCore={events,globalState,Utils,version:'1.0.0'};
-  })(window);
-  </script>
-
-  <!-- ======================= MMB API ======================= -->
-  <script>
-  (function(global){'use strict';
-
-    function ensureAdminAuth(){
-      const existing = global.MMBAdminAuth;
-      if (existing && typeof existing.getApiBase === 'function') {
-        if (typeof existing.ensureSession !== 'function') {
-          existing.ensureSession = () => Promise.resolve(existing.getSessionState ? existing.getSessionState() : {});
-        }
-        return existing;
-      }
-      const fallbackState = {
-        getApiBase: () => './',
-        getSessionState: () => ({ authDisabled: true, bootstrapSkipped: true }),
-        isAuthDisabled: () => true,
-        shouldSendCredentials: () => false,
-        ensureSession: () => Promise.resolve({ authDisabled: true, bootstrapSkipped: true }),
-        enterPublicMode: () => {},
-        exitPublicMode: () => {},
-      };
-      try {
-        global.MMBAdminAuth = fallbackState;
-      } catch (_) {
-        try {
-          Object.defineProperty(global, 'MMBAdminAuth', { value: fallbackState });
-        } catch (__) {
-          /* ignore */
-        }
-      }
-      return fallbackState;
-    }
-
-    const MMBAdminAuth = ensureAdminAuth();
-
-    const existingApi = global.AdminApi;
-    const existingIsPlaceholder = !!(existingApi && existingApi.__mmbIsPlaceholder === true);
-
-    if (existingApi && typeof existingApi.listBookings === 'function' && !existingIsPlaceholder) {
-      if (!global.MMBApi) {
-        try { global.MMBApi = global.AdminApi; } catch (_) { /* ignore */ }
-      }
+  (function () {
+    const portal = window.MMBAdminPortal;
+    const host = document.getElementById('admin-app');
+    if (!portal || !host) {
       return;
     }
 
-    function getDocument(){
-      if (typeof global.document !== 'undefined') {
-        return global.document;
-      }
-      return null;
-    }
-
-    function findScriptBase(){
-      const doc = getDocument();
-      if (!doc) {
-        return null;
-      }
-      if (doc.currentScript) {
-        return doc.currentScript;
-      }
-      const scripts = doc.getElementsByTagName('script');
-      for (let i = scripts.length - 1; i >= 0; i--) {
-        const candidate = scripts[i];
-        if (!candidate) continue;
-        if (candidate.getAttribute('data-api-base') || candidate.getAttribute('data-auth-base')) {
-          return candidate;
-        }
-      }
-      return scripts.length ? scripts[scripts.length - 1] : null;
-    }
-
-    function normalizeBase(value){
-      const fallback = global.location?.href || global.document?.baseURI || 'https://example.com/';
-      let url;
-      try {
-        url = new URL(value || './', fallback);
-      } catch (_) {
-        url = new URL('./', fallback);
-      }
-      if (!url.pathname.endsWith('/')) {
-        url.pathname = url.pathname.replace(/[^/]*$/, '');
-        if (!url.pathname.endsWith('/')) {
-          url.pathname += '/';
-        }
-      }
-      url.search = '';
-      url.hash = '';
-      return url;
-    }
-
-    function resolveBaseUrl(){
-      if (MMBAdminAuth && typeof MMBAdminAuth.getApiBase === 'function') {
-        const base = MMBAdminAuth.getApiBase();
-        if (base) {
-          return normalizeBase(base);
-        }
-      }
-      const script = findScriptBase();
-      if (script) {
-        const attr = script.getAttribute('data-api-base') || script.getAttribute('data-auth-base') || script.src;
-        if (attr) {
-          return normalizeBase(attr);
-        }
-      }
-      return normalizeBase('./');
-    }
-
-    const baseUrl = resolveBaseUrl();
-    const preferIncludeFirst = MMBAdminAuth && typeof MMBAdminAuth.shouldSendCredentials === 'function'
-      ? !!MMBAdminAuth.shouldSendCredentials()
-      : true;
-
-    function buildUrl(path){
-      try {
-        return new URL(path, baseUrl).href;
-      } catch (_) {
-        return baseUrl.href + path;
-      }
-    }
-
-    function toBody(body, headers){
-      if (body == null) {
-        return null;
-      }
-      if (typeof body === 'string' || body instanceof String) {
-        if (!headers['Content-Type']) {
-          headers['Content-Type'] = 'application/json';
-        }
-        return body;
-      }
-      if (typeof FormData !== 'undefined' && body instanceof FormData) {
-        return body;
-      }
-      if (typeof Blob !== 'undefined' && body instanceof Blob) {
-        return body;
-      }
-      headers['Content-Type'] = 'application/json';
-      return JSON.stringify(body);
-    }
-
-    async function requestJson(path, options = {}, credentialsMode = 'include'){
-      const method = options.method || 'GET';
-      const headers = Object.assign({ Accept: 'application/json' }, options.headers || {});
-      const payload = toBody(options.body, headers);
-      const url = buildUrl(path);
-      let response;
-      try {
-        response = await fetch(url, {
-          method,
-          headers,
-          body: payload,
-          credentials: credentialsMode,
-          cache: 'no-store',
-        });
-      } catch (cause) {
-        const error = new Error('Netzwerkfehler beim Zugriff auf die Admin-API.');
-        error.name = 'AdminApiNetworkError';
-        error.cause = cause;
-        error.context = { path: url, method, credentialsMode };
-        throw error;
-      }
-
-      const text = await response.text();
-      if (!response.ok) {
-        const error = new Error(response.status === 401 ? 'Nicht autorisiert.' : 'Serverfehler beim Admin-API-Aufruf.');
-        error.name = 'AdminApiHttpError';
-        error.status = response.status;
-        error.raw = text;
-        error.context = { path: url, method, credentialsMode };
-        throw error;
-      }
-
-      if (!text) {
-        return {};
-      }
-
-      try {
-        return JSON.parse(text);
-      } catch (_) {
-        const error = new Error('Server lieferte keine gültige JSON-Antwort');
-        error.name = 'AdminApiInvalidJsonError';
-        error.status = response.status;
-        error.raw = text.slice(0, 1200);
-        error.context = { path: url, method, credentialsMode };
-        throw error;
-      }
-    }
-
-    async function requestWithFallback(path, options){
-      const order = preferIncludeFirst ? ['include', 'omit'] : ['omit', 'include'];
-      let lastError = null;
-      for (const mode of order) {
-        try {
-          return await requestJson(path, options, mode === 'include' ? 'include' : 'omit');
-        } catch (error) {
-          lastError = error;
-          if (error && typeof error === 'object' && error.status === 401) {
-            continue;
-          }
-          if (error && error.name === 'AdminApiNetworkError') {
-            continue;
-          }
-          if (mode === order[order.length - 1]) {
-            throw error;
-          }
-        }
-      }
-      if (lastError) {
-        throw lastError;
-      }
-      throw new Error('Admin-API ist nicht erreichbar.');
-    }
-
-    function withQuery(path, params){
-      const search = new URLSearchParams();
-      (params ? Object.entries(params) : []).forEach(([key, value]) => {
-        if (value === undefined || value === null || value === '') {
-          return;
-        }
-        search.set(key, value);
-      });
-      const suffix = search.toString();
-      return suffix ? `${path}?${suffix}` : path;
-    }
-
-    const client = {
-      listBookings(params = {}) {
-        return requestWithFallback(withQuery('list_bookings.php', {
-          box_id: params.box_id,
-          status: params.status,
-          from: params.from,
-          to: params.to,
-        }), { method: 'GET' });
-      },
-      updateBooking(payload = {}) {
-        return requestWithFallback('update_booking.php', { method: 'POST', body: payload });
-      },
-      updateBookingStatus(payload = {}) {
-        return requestWithFallback('update_booking_status.php', { method: 'POST', body: payload });
-      },
-      deleteBooking(input) {
-        const value = input && typeof input === 'object' ? (input.booking_id ?? input.id) : input;
-        const numericId = Number(value);
-        if (!Number.isFinite(numericId) || numericId <= 0) {
-          return Promise.reject(new Error('Ungültige Buchungs-ID'));
-        }
-        return requestWithFallback('delete_booking.php', {
-          method: 'POST',
-          body: { booking_id: numericId },
-        });
-      },
-      availabilityWindow(params = {}) {
-        return requestWithFallback(withQuery('calendar_unavailable.php', {
-          box_id: params.box_id,
-          from: params.from,
-          to: params.to,
-        }), { method: 'GET' });
-      },
-      blockDays(payload = {}) {
-        return requestWithFallback('block_days.php', { method: 'POST', body: payload });
-      },
+    const state = {
+      lastLoadedAt: null,
+      loading: false,
     };
 
-    try {
-      global.AdminApi = client;
-      global.MMBApi = client;
-    } catch (_) {
-      global.AdminApi = client;
-      try { global.MMBApi = client; } catch (__) { /* ignore */ }
-    }
-  })(typeof globalThis !== 'undefined' ? globalThis : (typeof window !== 'undefined' ? window : this));
-  </script>
-  <!-- ======================= ADMIN – LISTE ======================= -->
-  <script>
-  (function(global){'use strict';
+    portal.mount(host, {
+      loginTitle: 'Admin-Zugang',
+      loginDescription: 'Bitte gib das Passwort ein, um die Buchungsübersicht zu sehen.',
+      renderApp: async function renderApp(container) {
+        container.innerHTML = '';
 
-    const BOX_MAP = { '1':'Marshall Bromley 750', '2':'Teufel Rockster Neo', '3':'Soundboks 4' };
-    const EURO_FORMATTER = new Intl.NumberFormat('de-DE', {maximumFractionDigits:0});
-    const FULFILLMENT_CHOICES = [
-      {
-        id:'pickup',
-        label:'Abholung',
-        full:'Abholung in Wesel',
-        note:'',
-        priceDelta:0,
-        displaySuffix:'in Wesel',
-        infoLines:[
-          '📍 Treffpunkt stimmen wir individuell in Wesel ab.',
-          '🕚 Abholung ab deinem Miettag um 11:00 Uhr möglich.',
-          '🔁 Rückgabe am Folgetag nach Mietende bis 10:00 Uhr.'
-        ]
-      },
-      {
-        id:'shipping',
-        label:'Versand',
-        full:'Versand (deutschlandweit)',
-        note:'inkl. Express-Hin- & Rückversand sowie Vorbereitungspauschale',
-        priceDelta:80,
-        displaySuffix:'ganz.de',
-        infoLines:[
-          '🚚 Wir versenden die Musikbox einen Tag vor Mietbeginn per Express.',
-          '📦 Rückversand am letzten Miettag mit dem beiliegenden QR-Code.',
-          '📝 Bitte halte Lieferadresse sowie Kontaktinfos bereit, falls noch nicht übermittelt.'
-        ]
-      },
-      {
-        id:'delivery',
-        label:'Lieferung',
-        full:'Lieferung (NRW-weit)',
-        note:'zzgl. individueller Lieferpauschale – wir melden uns mit einem Angebot',
-        priceDelta:0,
-        displaySuffix:'ganz.nrb',
-        infoLines:[
-          '🚗 Wir liefern die Musikbox persönlich innerhalb von NRW.',
-          '🕒 Wunschzeit am Mittag (halbstündlich) stimmen wir individuell ab.',
-          '📍 Bitte teile uns Treffpunkt oder Lieferadresse mit.'
-        ]
-      }
-    ];
-    const FULFILLMENT_LOOKUP = Object.fromEntries(FULFILLMENT_CHOICES.map(opt=>[opt.id,opt]));
+        const toolbar = document.createElement('div');
+        toolbar.className = 'admin-toolbar';
 
-    const boolish = (value)=>{
-      if(typeof value === 'boolean') return value;
-      if(typeof value === 'number') return value === 1;
-      if(typeof value === 'string'){
-        const v = value.trim().toLowerCase();
-        if(!v) return null;
-        if(['1','true','yes','ja','y','on'].includes(v)) return true;
-        if(['0','false','no','nein','off','n'].includes(v)) return false;
-      }
-      return null;
-    };
+        const actions = document.createElement('div');
+        actions.className = 'admin-toolbar__actions';
+        const refreshBtn = document.createElement('button');
+        refreshBtn.className = 'admin-btn';
+        refreshBtn.type = 'button';
+        refreshBtn.textContent = 'Aktualisieren';
+        actions.appendChild(refreshBtn);
 
-    const parseFulfillmentDetails = (raw)=>{
-      if(!raw) return {};
-      if(typeof raw === 'object'){
-        try{ return JSON.parse(JSON.stringify(raw)); }catch{return {...raw}; }
-      }
-      if(typeof raw === 'string'){
-        const trimmed = raw.trim();
-        if(!trimmed) return {};
-        try{
-          const parsed = JSON.parse(trimmed);
-          return (parsed && typeof parsed === 'object') ? parsed : {};
-        }catch(err){ return {}; }
-      }
-      return {};
-    };
-
-    const fulfillmentDisplayLabel = (info)=>{
-      const suffix = (info.displaySuffix || '').toString().trim();
-      const base = (info.label || info.full || '').toString();
-      return suffix ? `${base} (${suffix})` : base;
-    };
-
-    const inferFulfillmentMethod = (booking, parsedDetails = {})=>{
-      const direct = (booking?.fulfillment_method ?? '').toString().trim().toLowerCase();
-      if(['pickup','shipping','delivery'].includes(direct)) return direct;
-
-      const detailSources = [];
-      if(parsedDetails && typeof parsedDetails === 'object') detailSources.push(parsedDetails);
-      ['fulfillment_details_json','fulfillment_details'].forEach(key=>{
-        const raw = booking?.[key];
-        if(!raw) return;
-        if(typeof raw === 'object'){ detailSources.push(raw); return; }
-        if(typeof raw === 'string'){
-          try{
-            const decoded = JSON.parse(raw);
-            if(decoded && typeof decoded === 'object') detailSources.push(decoded);
-          }catch(_){}
-        }
-      });
-      for(const candidate of detailSources){
-        const method = (candidate?.method ?? '').toString().trim().toLowerCase();
-        if(['pickup','shipping','delivery'].includes(method)) return method;
-      }
-
-      const textSources = [booking?.fulfillment_label, booking?.fulfillment_note];
-      for(const text of textSources){
-        if(!text) continue;
-        const lower = text.toString().toLowerCase();
-        if(lower.includes('versand')) return 'shipping';
-        if(lower.includes('liefer')) return 'delivery';
-      }
-
-      return 'pickup';
-    };
-
-    const buildFulfillmentDetails = (input, method='pickup')=>{
-      const normalizedMethod = (method||'').toString().trim().toLowerCase() || 'pickup';
-      let rawDetails;
-      if(input && typeof input === 'object' && !Array.isArray(input)){
-        if(input.raw && typeof input.raw === 'object'){ rawDetails = parseFulfillmentDetails(input.raw); }
-        else if(Object.prototype.hasOwnProperty.call(input,'contact') || Object.prototype.hasOwnProperty.call(input,'shipping') || Object.prototype.hasOwnProperty.call(input,'delivery') || Object.prototype.hasOwnProperty.call(input,'meta')){
-          rawDetails = parseFulfillmentDetails(input.raw ?? input);
-        }
-      }
-      if(!rawDetails){ rawDetails = parseFulfillmentDetails(input); }
-      const source = (value, fallback)=>{
-        if(value === undefined || value === null) return fallback;
-        return value;
-      };
-      const raw = rawDetails && typeof rawDetails === 'object' ? rawDetails : {};
-      const contactSource = (input && typeof input === 'object' && input.contact && typeof input.contact === 'object') ? input.contact : {};
-      const shippingSource = (input && typeof input === 'object' && input.shipping && typeof input.shipping === 'object') ? input.shipping : {};
-      const deliverySource = (input && typeof input === 'object' && input.delivery && typeof input.delivery === 'object') ? input.delivery : {};
-      const metaSource = (input && typeof input === 'object' && input.meta && typeof input.meta === 'object') ? input.meta : {};
-      const contact = {
-        name: (source(contactSource.name, raw.contact_name)||'').toString().trim(),
-        email: (source(contactSource.email, raw.contact_email)||'').toString().trim(),
-        phone: (source(contactSource.phone, raw.contact_phone)||'').toString().trim(),
-        consent: boolish(source(contactSource.consent, source(contactSource.consent_contact, source(raw.consent_contact, raw.consent_whatsapp))))
-      };
-      const shipping = {
-        address_line1: (source(shippingSource.address_line1, raw.address_line1)||'').toString().trim(),
-        address_line2: (source(shippingSource.address_line2, raw.address_line2)||'').toString().trim(),
-        postal_code: (source(shippingSource.postal_code, raw.postal_code)||'').toString().trim(),
-        city: (source(shippingSource.city, raw.city)||'').toString().trim(),
-        address_extra: (source(shippingSource.address_extra, raw.address_extra)||'').toString().trim(),
-      };
-      const delivery = {
-        meeting_point: (source(deliverySource.meeting_point, raw.meeting_point)||'').toString().trim(),
-        preferred_time: (source(deliverySource.preferred_time, raw.preferred_time)||'').toString().trim(),
-      };
-      const meta = {
-        submitted_at: (source(metaSource.submitted_at, raw.submitted_at)||'').toString().trim(),
-        submitted_via: (source(metaSource.submitted_via, raw.submitted_via)||'').toString().trim(),
-        booking_display_id: (source(metaSource.booking_display_id, raw.booking_display_id)||'').toString().trim(),
-      };
-      const requiresDetails = ['shipping','delivery'].includes(normalizedMethod);
-      const missing = [];
-      if(requiresDetails){
-        if(!contact.name) missing.push('Kontakt (Name)');
-        if(!contact.phone) missing.push('Kontakt (Telefon)');
-        if(!contact.email) missing.push('Kontakt (E-Mail)');
-        if(normalizedMethod === 'shipping'){
-          if(!shipping.address_line1) missing.push('Lieferadresse (Straße)');
-          if(!shipping.postal_code || !shipping.city) missing.push('Lieferadresse (PLZ/Ort)');
-        }else if(normalizedMethod === 'delivery'){
-          if(!delivery.meeting_point) missing.push('Treffpunkt');
-          if(!delivery.preferred_time) missing.push('Wunschzeit');
-        }
-      }
-      const providedMissing = Array.isArray(input?.missing) ? input.missing.map(x=>x&&x.toString().trim()).filter(Boolean) : [];
-      const mergedMissing = Array.from(new Set([...missing, ...providedMissing]));
-      const needsAttention = typeof input?.needs_attention === 'boolean'
-        ? Boolean(input.needs_attention)
-        : (requiresDetails && mergedMissing.length>0);
-      return {
-        raw,
-        contact,
-        shipping,
-        delivery,
-        meta,
-        missing: mergedMissing,
-        requires_details: requiresDetails,
-        needs_attention: needsAttention,
-      };
-    };
-
-    const normalizeFulfillmentPayload = (payload, fallbackMethod, structured)=>{
-      if(!payload || typeof payload !== 'object') return null;
-      const rawMethod = (payload.method ?? payload.id ?? fallbackMethod ?? '').toString().trim().toLowerCase();
-      const method = ['pickup','shipping','delivery'].includes(rawMethod) ? rawMethod : (fallbackMethod || 'pickup');
-      const infoLines = Array.isArray(payload.info_lines ?? payload.infoLines)
-        ? (payload.info_lines ?? payload.infoLines).map(x=>String(x))
-        : [];
-      const displayLabel = (payload.display_label ?? payload.displayLabel ?? '').toString().trim();
-      const missing = Array.isArray(payload.missing_details ?? payload.missingDetails)
-        ? (payload.missing_details ?? payload.missingDetails).map(x=>String(x).trim()).filter(Boolean)
-        : [];
-      const requiresDetails = typeof payload.requires_details === 'boolean'
-        ? Boolean(payload.requires_details)
-        : typeof payload.requiresDetails === 'boolean'
-          ? Boolean(payload.requiresDetails)
-          : ['shipping','delivery'].includes(method);
-      const detailsStructured = payload.details && typeof payload.details === 'object'
-        ? buildFulfillmentDetails(payload.details, method)
-        : structured;
-      const baseMissing = missing.length ? missing : (detailsStructured?.missing || []);
-      const needsAttention = typeof payload.needs_attention === 'boolean'
-        ? Boolean(payload.needs_attention)
-        : typeof payload.needsAttention === 'boolean'
-          ? Boolean(payload.needsAttention)
-          : (requiresDetails && baseMissing.length>0);
-      return {
-        id: method,
-        method,
-        label: (payload.label ?? '').toString(),
-        full: (payload.full ?? '').toString(),
-        note: (payload.note ?? '').toString(),
-        priceDelta: Number(payload.price_delta ?? payload.priceDelta ?? 0),
-        displaySuffix: (payload.display_suffix ?? payload.displaySuffix ?? '').toString(),
-        infoLines,
-        displayLabel,
-        requiresDetails,
-        missingDetails: baseMissing,
-        needsAttention,
-        details_structured: detailsStructured,
-      };
-    };
-
-    const fulfillmentInstructionLines = (info, detailsOverride)=>{
-      const base = Array.isArray(info.infoLines) ? info.infoLines.map(x=>String(x).trim()).filter(Boolean) : [];
-      const lines = base.slice();
-      const structured = info.details_structured
-        ? info.details_structured
-        : buildFulfillmentDetails(detailsOverride ?? info.details ?? {}, info.id || info.method);
-      const contact = structured.contact || {};
-      const shipping = structured.shipping || {};
-      const delivery = structured.delivery || {};
-      const contactParts = [];
-      if(contact.name) contactParts.push(contact.name);
-      if(contact.phone) contactParts.push(`Tel: ${contact.phone}`);
-      if(contact.email) contactParts.push(`E-Mail: ${contact.email}`);
-      const hasContact = contactParts.length>0;
-      if(hasContact){ lines.push(`👤 Kontakt: ${contactParts.join(' | ')}`); }
-
-      if(contact.consent === true){ lines.push('✅ Kontakt per Telefon & WhatsApp ist freigegeben.'); }
-      else if(contact.consent === false){ lines.push('⚠️ Bitte nur per E-Mail kontaktieren (kein Telefon/WhatsApp).'); }
-
-      if((info.id||info.method) === 'shipping'){
-        const parts = [];
-        if(shipping.address_line1) parts.push(shipping.address_line1);
-        if(shipping.address_line2) parts.push(shipping.address_line2);
-        const cityPart = [shipping.postal_code, shipping.city].filter(Boolean).join(' ').trim();
-        if(cityPart) parts.push(cityPart);
-        if(shipping.address_extra) parts.push(shipping.address_extra);
-        if(parts.length) lines.push(`🏠 Lieferadresse: ${parts.join(', ')}`);
-      }
-
-      if((info.id||info.method) === 'delivery'){
-        if(delivery.meeting_point) lines.push(`📍 Treffpunkt: ${delivery.meeting_point}`);
-        if(delivery.preferred_time) lines.push(`🕒 Wunschzeit (Mittag): ${delivery.preferred_time}`);
-      }
-
-      if(structured.requires_details){
-        if(!hasContact) lines.push('⚠️ Kein Kontakt für diese Abwicklung hinterlegt – bitte ergänzen.');
-        if((info.id||info.method)==='shipping' && (!shipping.address_line1 || !shipping.postal_code || !shipping.city)){
-          lines.push('⚠️ Es liegt noch keine vollständige Lieferadresse vor.');
-        }
-        if((info.id||info.method)==='delivery' && (!delivery.meeting_point || !delivery.preferred_time)){
-          lines.push('⚠️ Treffpunkt oder Wunschzeit fehlen bislang.');
-        }
-        if(Array.isArray(structured.missing) && structured.missing.length){
-          lines.push(`❗ Fehlende Angaben: ${structured.missing.join(', ')}`);
-        }
-      }
-
-      return lines;
-    };
-
-    // Anzeige-ID (nur Ziffern), Prefix 00 + laufend ab 100
-    const ID_CATEGORY = '00';
-    function computeDisplayId(rawId){
-      const numeric = Number(rawId);
-      if (Number.isFinite(numeric) && numeric > 0) {
-        const base = Math.trunc(100 + numeric);
-        return ID_CATEGORY + String(base).padStart(3,'0');
-      }
-      const digits = String(rawId ?? '').replace(/[^0-9]/g,'');
-      if (digits) {
-        const tail = digits.slice(-3);
-        return ID_CATEGORY + tail.padStart(3,'0');
-      }
-      return ID_CATEGORY + '000';
-    }
-    function normalizeDisplayId(rawId, provided){
-      const direct = (typeof provided === 'string') ? provided.trim() : '';
-      if (direct) return direct;
-      return computeDisplayId(rawId);
-    }
-    function displayId(value){
-      if (value && typeof value === 'object') {
-        return normalizeDisplayId(value.id ?? value.booking_id ?? null, value.display_id ?? value.displayId ?? null);
-      }
-      return normalizeDisplayId(value, null);
-    }
-
-    function injectAdminListCSS(){
-      if(document.getElementById('mmb-admin-list-css')) return;
-      const s=document.createElement('style'); s.id='mmb-admin-list-css'; s.textContent=`
-        .mmb-admin-filters{
-          display:grid;
-          grid-template-columns: repeat(4, minmax(200px, 1fr)) auto;
-          gap:.75rem; padding:1rem; background:var(--mmb-muted); border-radius:6px; align-items:center;
-        }
-        .mmb-admin-filters select,.mmb-admin-filters input{ padding:.6rem;border:1px solid var(--mmb-border);border-radius:6px;background:var(--mmb-bg);color:var(--mmb-text);font-size:.9rem; }
-        .mmb-admin-list-wrap{height:70vh;overflow:auto;margin:.75rem 0;border-radius:6px;}
-        .mmb-bookings-table{width:100%;border-collapse:collapse;background:var(--mmb-bg);border-radius:6px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.1);}
-        .mmb-bookings-table th,.mmb-bookings-table td{padding:.45rem .5rem;border-bottom:1px solid var(--mmb-border);text-align:left;vertical-align:middle;box-sizing:border-box;line-height:1.3;}
-        .mmb-bookings-table th{background:var(--mmb-muted);font-weight:600;position:sticky;top:0;z-index:2;}
-        .mmb-bookings-table tbody tr{height:56px;}
-        .mmb-bookings-table th.cell-head-box,.mmb-bookings-table td.cell--box{min-width:172px;white-space:nowrap;}
-        .mmb-bookings-table th.cell-head-date,.mmb-bookings-table td.cell--date{min-width:120px;width:120px;text-align:center;}
-        .mmb-bookings-table td.cell--date{padding:.4rem .4rem;text-align:center;white-space:normal;line-height:1.25;}
-        .mmb-bookings-table .cell-date-stack{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.15rem;min-height:100%;}
-        .mmb-fulfillment-link{background:none;border:none;padding:0;margin:0;color:var(--mmb-primary);font:inherit;cursor:pointer;text-decoration:underline;}
-        .mmb-fulfillment-link:hover,.mmb-fulfillment-link:focus{color:var(--mmb-accent);outline:none;}
-        .mmb-fulfillment-info-list{margin:.35rem 0 .25rem 1.25rem;padding:0;}
-        .mmb-fulfillment-info-list li{margin:.2rem 0;}
-        .mmb-bookings-table .cell-date-stack span{display:block;width:100%;}
-        .mmb-bookings-table th.cell-head-fulfillment,.mmb-bookings-table td.cell--fulfillment{min-width:96px;white-space:nowrap;}
-        .mmb-bookings-table th.cell-head-price,.mmb-bookings-table td.cell--total{text-align:right;width:80px;}
-        .mmb-bookings-table th.cell-head-status,.mmb-bookings-table td.cell--status{width:92px;}
-        .mmb-bookings-table td.cell--total{font-variant-numeric:tabular-nums;white-space:nowrap;}
-        .mmb-bookings-table th.cell-head-actions,.mmb-bookings-table td.cell--actions{min-width:272px;}
-        .mmb-bookings-table td.cell--actions{white-space:nowrap;}
-        .mmb-btn{background:var(--mmb-accent);color:#fff;border:none;padding:.45rem .65rem;border-radius:6px;font-size:.83rem;font-weight:500;cursor:pointer;transition:background-color .2s;}
-        .mmb-btn:hover{background:#0284c7;} .mmb-btn:disabled{opacity:.45;cursor:not-allowed;filter:saturate(0.6) contrast(0.9);}
-        .mmb-btn-small{padding:.25rem .5rem;font-size:.75rem;min-width:28px;}
-        .mmb-fulfillment-link[data-needs-attention="1"]{color:var(--mmb-busy);font-weight:600;}
-        .mmb-btn-success{background:var(--mmb-ok);} .mmb-btn-success:hover{background:#059669;}
-        .mmb-btn-danger{background:var(--mmb-busy);} .mmb-btn-danger:hover{background:#dc2626;}
-        .mmb-btn-warning{background:var(--mmb-warn);} .mmb-btn-warning:hover{background:#d97706;}
-        .mmb-btn-secondary{background:#6b7280;color:#fff;} .mmb-btn-secondary:hover{background:#4b5563;}
-        .mmb-reset{background:#e5e7eb;color:#111827;} .mmb-reset:hover{background:#d1d5db;}
-        .mmb-modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;justify-content:center;align-items:center;z-index:9999;font-family:'Poppins',sans-serif;}
-        .mmb-modal-content{background:var(--mmb-bg);color:var(--mmb-text);padding:1.5rem;border-radius:8px;max-width:640px;width:92%;max-height:85vh;overflow:auto;box-shadow:0 10px 25px rgba(0,0,0,.3);}
-        .mmb-modal h3{margin:0 0 .75rem 0;color:var(--mmb-text);}
-        .mmb-modal .mmb-field{display:flex;flex-direction:column;gap:.25rem;margin:.5rem 0;}
-        .mmb-modal .mmb-field-switch label{display:flex;align-items:center;gap:.5rem;font-weight:500;}
-        .mmb-alt-options{display:flex;flex-direction:column;gap:.35rem;}
-        .mmb-alt-options label{display:flex;align-items:center;gap:.5rem;cursor:pointer;}
-        .mmb-alt-options input[type="checkbox"]{width:16px;height:16px;}
-        .mmb-modal .mmb-field-switch input[type="checkbox"]{width:1.1rem;height:1.1rem;}
-        .mmb-modal .mmb-field-switch small{font-size:.75rem;color:var(--mmb-text-light,#6b7280);font-weight:400;display:block;margin-top:.25rem;}
-        #mmb-modal-form.mmb-email-disabled [data-email-field]{opacity:.6;}
-        .mmb-modal input,.mmb-modal select,.mmb-modal textarea{border:1px solid var(--mmb-border);background:var(--mmb-bg);color:var(--mmb-text);border-radius:6px;padding:.5rem;font-family:inherit;font-size:.9rem;}
-        .mmb-modal textarea{min-height:140px;resize:vertical;}
-        .mmb-modal-actions{display:flex;gap:.5rem;justify-content:flex-end;margin-top:1rem;}
-        .mmb-modal-btn{padding:.5rem 1rem;border:1px solid var(--mmb-border);border-radius:6px;cursor:pointer;font-size:.9rem;font-family:inherit;}
-        .mmb-modal-btn-primary{background:var(--mmb-accent);color:#fff;border-color:var(--mmb-accent);}
-        .mmb-modal-btn-secondary{background:var(--mmb-bg);color:var(--mmb-text);}
-        .mmb-status-badge{display:inline-flex;justify-content:center;align-items:center;width:6.8rem;min-width:6.8rem;height:26px;border-radius:9999px;font-weight:600;font-size:.75rem;}
-        .mmb-status-pending{background:#fef3c7;color:#92400e;}
-        .mmb-status-confirmed{background:#d1fae5;color:#065f46;}
-        .mmb-status-rejected{background:#ffe4e6;color:#9f1239;}
-        .mmb-status-cancelled{background:#fee2e2;color:#991b1b;}
-        .mmb-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;}
-        .badge-id{font-variant-numeric:tabular-nums;letter-spacing:.5px;}
-        .mmb-footer{display:flex;justify-content:center;align-items:center;height:36px;color:var(--mmb-text-light);font-size:.9rem;background:var(--mmb-muted);border-radius:6px;}
-        .mmb-text-muted{color:var(--mmb-text-light,#6b7280);}
-        .cell--actions-row{display:flex;gap:.2rem;flex-wrap:nowrap;align-items:center;}
-        .cell--actions-row .mmb-btn-small{width:40px;min-width:40px;height:30px;padding:0;display:inline-flex;align-items:center;justify-content:center;}
-      `; document.head.appendChild(s);
-    }
-
-    class AdminList{
-      constructor(options={}){
-        this.container = typeof options.container==='string'?document.querySelector(options.container):options.container;
-        if(!this.container) throw new Error('Container not found: '+options.container);
-        this.options={ locale:'de-DE', timezone:'Europe/Berlin', ...options };
-        this.state={
-          bookings:[], originalBookings:[], boxes:[],
-          loading:false,
-          error:null,
-          filters:{ status:'', box:'', id:'', name:'' }
-        };
-        this.instanceId=Math.random().toString(36).substr(2,9); MMBCore.globalState.registerInstance(this.instanceId,this);
-        this.init();
-      }
-      destroy(){ MMBCore.globalState.unregisterInstance(this.instanceId); }
-
-      async init(){ try{ this.render(); await this.loadInitialData(); this.bindUI(); this.applyFilters(); }catch(e){ console.error('AdminList init error:',e); MMBCore.Utils.showNotification('Fehler beim Initialisieren der Admin-Liste','error'); } }
-
-      async loadInitialData(){
-        this.setState({loading:true,error:null});
-        const [bookingsResult] = await Promise.allSettled([this.loadBookings(), Promise.resolve(this.loadBoxes())]);
-        if(bookingsResult.status==='rejected'){
-          console.error('Initiales Laden der Buchungsliste fehlgeschlagen:', bookingsResult.reason);
-        }
-        this.setState({loading:false});
-      }
-
-      async loadBookings(){ try{
-        const res=await AdminApi.listBookings();
-        const sourceItems = Array.isArray(res.items)
-          ? res.items
-          : (Array.isArray(res.bookings)
-            ? res.bookings
-            : (Array.isArray(res.data) ? res.data : (Array.isArray(res) ? res : [])));
-        const items=sourceItems.map(r=>{
-          const rawId = r.id ?? r.booking_id ?? null;
-          const id = rawId !== null ? String(rawId) : '';
-          const boxId = String(r.box_id ?? '');
-          const totalAmount = Number(r.total_amount ?? 0);
-          const deposit = Number(r.deposit_eur ?? 0);
-          const rawDetails = r.fulfillment_details_json ?? r.fulfillment_details ?? '';
-          const parsedDetails = parseFulfillmentDetails(rawDetails);
-          const inferredMethod = inferFulfillmentMethod(r, parsedDetails);
-          const structuredFromApi = (r.fulfillment_details_structured && typeof r.fulfillment_details_structured === 'object') ? r.fulfillment_details_structured : null;
-          const structuredDetails = buildFulfillmentDetails(structuredFromApi || parsedDetails, inferredMethod);
-          const payload = normalizeFulfillmentPayload(r.fulfillment, inferredMethod, structuredDetails);
-          const displayLabelFromApi = typeof r.fulfillment_display_label === 'string' ? r.fulfillment_display_label.trim() : '';
-          const missingFromApi = Array.isArray(r.fulfillment_missing_details) ? r.fulfillment_missing_details.map(x=>String(x).trim()).filter(Boolean) : [];
-          const needsAttentionFromApi = typeof r.fulfillment_needs_attention === 'boolean' ? Boolean(r.fulfillment_needs_attention) : null;
-          const requiresDetailsFromApi = typeof r.fulfillment_requires_details === 'boolean' ? Boolean(r.fulfillment_requires_details) : null;
-          const mergedMissing = missingFromApi.length ? missingFromApi : (payload?.missingDetails?.length ? payload.missingDetails : structuredDetails.missing);
-          const finalNeedsAttention = needsAttentionFromApi !== null ? needsAttentionFromApi : (payload?.needsAttention ?? structuredDetails.needs_attention);
-          const finalRequiresDetails = requiresDetailsFromApi !== null ? requiresDetailsFromApi : (payload?.requiresDetails ?? structuredDetails.requires_details);
-          const normalizedLabel = (()=>{
-            const direct = (r.fulfillment_label ?? '').toString();
-            if(direct.trim()) return direct.trim();
-            if(payload?.label && String(payload.label).trim()) return String(payload.label).trim();
-            const choice = FULFILLMENT_LOOKUP[inferredMethod];
-            return choice ? choice.label : '';
-          })();
-          const normalizedNote = (()=>{
-            const direct = (r.fulfillment_note ?? '').toString();
-            if(direct.trim()) return direct.trim();
-            if(payload?.note && String(payload.note).trim()) return String(payload.note).trim();
-            const choice = FULFILLMENT_LOOKUP[inferredMethod];
-            return choice ? (choice.note || '') : '';
-          })();
-          const normalizedPrice = (()=>{
-            const direct = Number(r.fulfillment_price_delta ?? NaN);
-            if(Number.isFinite(direct)) return direct;
-            if(payload && Number.isFinite(payload.priceDelta)) return payload.priceDelta;
-            return 0;
-          })();
-          const structuredPayloadDetails = payload?.details_structured || structuredDetails;
-          const apiDisplayId = typeof r.display_id === 'string' ? r.display_id.trim() : '';
-          const resolvedBoxName = (()=>{
-            const nameFromApi = typeof r.box_name === 'string' ? r.box_name.trim() : '';
-            if (nameFromApi) return nameFromApi;
-            if (BOX_MAP[boxId]) return BOX_MAP[boxId];
-            return boxId ? `Box #${boxId}` : 'Unbekannte Box';
-          })();
-          return {
-            id,
-            display_id: normalizeDisplayId(rawId, apiDisplayId),
-            box_id: boxId,
-            box_name: resolvedBoxName,
-            start_date: r.start_date,
-            end_date: r.end_date,
-            status: (r.status||'').toString(),
-            customer_name: r.customer_name||'',
-            customer_email: r.customer_email||'',
-            customer_phone: r.customer_phone||'',
-            note: r.note ?? '',
-            price_total: Number.isFinite(totalAmount)?totalAmount:0,
-            deposit_eur: Number.isFinite(deposit)?deposit:0,
-            fulfillment_method: inferredMethod,
-            fulfillment_label: normalizedLabel,
-            fulfillment_note: normalizedNote,
-            fulfillment_price_delta: Number.isFinite(normalizedPrice)?normalizedPrice:0,
-            fulfillment_display_label: displayLabelFromApi || (payload?.displayLabel || ''),
-            fulfillment_details_json: typeof rawDetails === 'string' ? rawDetails : '',
-            fulfillment_details: structuredPayloadDetails.raw || parsedDetails,
-            fulfillment_details_structured: structuredPayloadDetails,
-            fulfillment_missing_details: mergedMissing,
-            fulfillment_needs_attention: finalNeedsAttention,
-            fulfillment_requires_details: finalRequiresDetails,
-            fulfillment_payload: payload,
-            created_at: r.created_at
-          };
-        });
-        this.state.originalBookings = items;
-        this.state.error = null;
-        this.applyFilters(); // hält Filter aktiv nach jedem Reload/Statuswechsel
-      }catch(err){
-        console.error('loadBookings error:',err);
-        const errorInfo = MMBCore.Utils.describeError(err,{headline:'Buchungen konnten nicht geladen werden',context:(err&&err.context&&err.context.path)||'list_bookings.php'});
-        this.setState({
-          error:errorInfo,
-          bookings:[],
-          originalBookings:[],
-        });
-        throw err;
-      } }
-
-      async loadBoxes(){
-        this.state.boxes = [
-          {id:'1',name:BOX_MAP['1']},
-          {id:'2',name:BOX_MAP['2']},
-          {id:'3',name:BOX_MAP['3']}
-        ];
-      }
-
-      setState(ns){ this.state={...this.state,...ns}; this.render(); }
-
-      getErrorClipboardText(){
-        const info=this.state.error;
-        if(!info) return 'Keine Fehlerdaten vorhanden.';
-        try{
-          return JSON.stringify(info,null,2);
-        }catch(_){
-          return String(info);
-        }
-      }
-
-      // ---------- Focus Snapshot ----------
-      snapshotFocus(){
-        const ae = document.activeElement;
-        if(!ae || !this.container.contains(ae)) return null;
-        const id = ae.id || '';
-        let start=null,end=null;
-        try{ start=ae.selectionStart; end=ae.selectionEnd; }catch(e){}
-        return {id,start,end};
-      }
-      restoreFocus(snap){
-        if(!snap||!snap.id) return;
-        const el = document.getElementById(snap.id);
-        if(!el) return;
-        el.focus({preventScroll:true});
-        try{
-          const pos = (typeof snap.end==='number') ? snap.end : (el.value?el.value.length:0);
-          el.setSelectionRange(pos,pos);
-        }catch(e){}
-      }
-
-      // ---------- Rendering ----------
-      render(){
-        if(this.state.loading){
-          this.container.innerHTML=`<div class="mmb-widget"><div class="mmb-loading">Lade Buchungen...</div></div>`;
-          return;
-        }
-        if(this.state.error){
-          this.container.innerHTML=this.renderErrorView();
-          this.bindErrorActions();
-          return;
-        }
-        const f = this.state.filters;
-        this.container.innerHTML=`
-          <div class="mmb-widget">
-            ${this.renderFilters(f)}
-            <div class="mmb-admin-list-wrap">${this.renderTable()}</div>
-            ${this.renderFooter()}
-          </div>`;
-        this.bindTableActions();
-        const btn = document.getElementById(`btn-reset-${this.instanceId}`);
-        if(btn && !btn._bound){ btn.addEventListener('click', ()=> this.resetFilters()); btn._bound=true; }
-      }
-
-      renderErrorView(){
-        const info=this.state.error||{};
-        const headline=this.escape(info.headline||'Unbekannter Fehler');
-        const message=this.escape(info.message||'Die Buchungsliste konnte nicht geladen werden.');
-        const status=info.status!==null&&info.status!==undefined?`<div class="mmb-error-meta">HTTP-Status: ${this.escape(String(info.status))}</div>`:'';
-        const context=info.context?`<div class="mmb-error-meta">Quelle: ${this.escape(info.context)}</div>`:'';
-        const details=Array.isArray(info.items)&&info.items.length
-          ? `<div class="mmb-error-details"><ul>${info.items.map(item=>`<li>${this.escape(String(item))}</li>`).join('')}</ul></div>`
-          : '';
-        const raw=info.raw?`<div class="mmb-error-details"><strong>Serverantwort</strong><code>${this.escape(String(info.raw))}</code></div>`:'';
-        return `
-          <div class="mmb-widget">
-            <div class="mmb-error">
-              <strong>${headline}</strong><br/>${message}
-              ${status}
-              ${context}
-              ${details}
-              ${raw}
-              <div class="mmb-error-actions">
-                <button type="button" class="mmb-btn" data-act="retry-load">Erneut versuchen</button>
-                <button type="button" class="mmb-btn mmb-btn-secondary" data-act="copy-error">Fehlerdetails kopieren</button>
-              </div>
-            </div>
-          </div>`;
-      }
-
-      bindErrorActions(){
-        const retryBtn=this.container.querySelector('[data-act="retry-load"]');
-        if(retryBtn && !retryBtn._bound){
-          retryBtn._bound=true;
-          retryBtn.addEventListener('click',()=>{ this.reloadData().catch(err=>console.error('retry load failed',err)); });
-        }
-        const copyBtn=this.container.querySelector('[data-act="copy-error"]');
-        if(copyBtn && !copyBtn._bound){
-          copyBtn._bound=true;
-          copyBtn.addEventListener('click',async()=>{
-            try{
-              await navigator.clipboard.writeText(this.getErrorClipboardText());
-              MMBCore.Utils.showNotification('Fehlerdetails kopiert','info');
-            }catch(err){
-              console.error('Clipboard copy failed',err);
-              MMBCore.Utils.showNotification('Kopieren nicht möglich – siehe Konsole.','error');
-            }
-          });
-        }
-      }
-
-      async reloadData(){
-        this.setState({loading:true,error:null});
-        try{
-          await this.loadBookings();
-        }catch(err){
-          console.error('Erneutes Laden der Buchungsliste fehlgeschlagen:',err);
-        }finally{
-          this.setState({loading:false});
-        }
-      }
-
-      renderFilters(f){
-        return `
-        <div class="mmb-admin-filters">
-          <select id="filter-status-${this.instanceId}">
-            <option value="">Status: Alle</option>
-            <option value="pending"   ${f.status==='pending'?'selected':''}>Ausstehend</option>
-            <option value="confirmed" ${f.status==='confirmed'?'selected':''}>Bestätigt</option>
-            <option value="rejected"  ${f.status==='rejected'?'selected':''}>Abgelehnt</option>
-            <option value="cancelled" ${f.status==='cancelled'?'selected':''}>Storniert</option>
-          </select>
-          <select id="filter-box-${this.instanceId}">
-            <option value="">Box: Alle</option>
-            ${this.state.boxes.map(b=>`<option value="${b.id}" ${f.box===b.id?'selected':''}>${b.name}</option>`).join('')}
-          </select>
-          <input id="filter-id-${this.instanceId}" inputmode="numeric" pattern="[0-9]*" placeholder="ID (z. B. 00123)" value="${this.escape(f.id)}"/>
-          <input id="filter-name-${this.instanceId}" placeholder="Name oder E-Mail" value="${this.escape(f.name)}"/>
-          <div style="justify-self:end;">
-            <button class="mmb-btn mmb-reset" id="btn-reset-${this.instanceId}">Alle Filter löschen</button>
-          </div>
-        </div>`;
-      }
-
-      renderTable(){
-        const rows = (this.state.bookings||[]);
-        if(!rows.length){
-          return `
-            <table class="mmb-bookings-table">
-              <thead>
-                <tr><th>ID</th><th>Kunde</th><th class="cell-head-box">Box</th><th class="cell-head-date">Zeitraum</th><th class="cell-head-fulfillment">Abwicklung</th><th class="cell-head-price">Preis</th><th class="cell-head-status">Status</th><th class="cell-head-actions">Aktionen</th></tr>
-              </thead>
-              <tbody><tr><td colspan="8" style="padding:1rem;color:var(--mmb-text-light);">Keine Buchungen vorhanden</td></tr></tbody>
-            </table>`;
-        }
-        return `
-        <table class="mmb-bookings-table">
-          <thead>
-            <tr><th>ID</th><th>Kunde</th><th class="cell-head-box">Box</th><th class="cell-head-date">Zeitraum</th><th class="cell-head-fulfillment">Abwicklung</th><th class="cell-head-price">Preis</th><th class="cell-head-status">Status</th><th class="cell-head-actions">Aktionen</th></tr>
-          </thead>
-          <tbody>
-            ${rows.map(b=>this.renderRow(b)).join('')}
-          </tbody>
-        </table>`;
-      }
-
-      formatEuro(value){
-        const amount = Math.round(Number(value) || 0);
-        return `${EURO_FORMATTER.format(amount)} €`;
-      }
-
-      renderRow(b){
-        const isConfirmed = b.status==='confirmed';
-        const isRejected  = b.status==='rejected';
-        const isCancelled = b.status==='cancelled';
-        const fulfillmentInfo = this.getFulfillmentInfo(b);
-        const tooltipParts = [];
-        if(fulfillmentInfo.note){ tooltipParts.push(fulfillmentInfo.note); }
-        if(fulfillmentInfo.needsAttention && Array.isArray(fulfillmentInfo.missingDetails) && fulfillmentInfo.missingDetails.length){
-          tooltipParts.push(`Fehlende Angaben: ${fulfillmentInfo.missingDetails.join(', ')}`);
-        }
-        const tooltipText = tooltipParts.filter(Boolean).join(' • ');
-        const fulfillmentNoteAttr = tooltipText ? ` title="${this.escape(tooltipText)}"` : '';
-        const fulfillmentLabel = this.formatFulfillmentCell(b);
-        const fulfillmentButtonText = fulfillmentInfo.needsAttention ? `${fulfillmentLabel} ⚠️` : fulfillmentLabel;
-        const fulfillmentAttentionAttr = fulfillmentInfo.needsAttention ? ' data-needs-attention="1"' : '';
-        return `
-        <tr>
-          <td><span class="badge-id">${this.escape(displayId(b))}</span></td>
-          <td><div class="cell--name">${this.escape(b.customer_name)}</div><div class="cell--email" style="font-size:.75rem;color:var(--mmb-text-light);">${this.escape(b.customer_email)}</div></td>
-          <td class="cell--box">${this.escape(b.box_name)}</td>
-          <td class="cell--date">${this.renderDateCell(b)}</td>
-          <td class="cell--fulfillment"${fulfillmentNoteAttr}><button type="button" class="mmb-fulfillment-link" data-action="showFulfillmentDetails" data-id="${b.id}"${fulfillmentAttentionAttr}>${this.escape(fulfillmentButtonText)}</button></td>
-          <td class="cell--total">${this.formatEuro(b.price_total)}</td>
-          <td class="cell--status"><span class="mmb-status-badge mmb-status-${b.status}">${this.translateStatus(b.status)}</span></td>
-          <td class="cell--actions">
-            <div class="cell--actions-row">
-              <button class="mmb-btn mmb-btn-small mmb-btn-secondary"
-                      data-action="viewDetails" data-id="${b.id}"
-                      title="Details anzeigen">ℹ️</button>
-              <button class="mmb-btn mmb-btn-small mmb-btn-success"
-                      data-action="confirmBooking" data-id="${b.id}"
-                      title="${isConfirmed?'Bereits bestätigt':'Buchung bestätigen'}"
-                      ${isConfirmed ? 'disabled aria-disabled="true"' : ''}>✓</button>
-
-              <button class="mmb-btn mmb-btn-small mmb-btn-danger"
-                      data-action="declineBooking" data-id="${b.id}"
-                      title="${isRejected?'Bereits abgelehnt':'Buchung ablehnen'}"
-                      ${isRejected ? 'disabled aria-disabled="true"' : ''}>×</button>
-
-              <button class="mmb-btn mmb-btn-small mmb-btn-warning"
-                      data-action="offerAlternative" data-id="${b.id}"
-                      title="Alternative Box vorschlagen">Alt</button>
-
-              <button class="mmb-btn mmb-btn-small"
-                      data-action="editBooking" data-id="${b.id}"
-                      title="Buchung bearbeiten">✍🏼</button>
-
-              <button class="mmb-btn mmb-btn-small mmb-btn-danger"
-                      data-action="deleteBooking" data-id="${b.id}"
-                      title="Buchung endgültig löschen" aria-label="Buchung löschen">🗑️</button>
-            </div>
-          </td>
-        </tr>`;
-      }
-
-      renderDateCell(b){
-        const parse = (value)=>{
-          if(!value) return null;
-          const d=new Date(value);
-          return Number.isNaN(d.getTime())?null:d;
-        };
-        const start=parse(b.start_date);
-        const end=parse(b.end_date);
-        const fmt=(d)=>d?d.toLocaleDateString('de-DE'):'–';
-        const wrap = (content)=>`<div class="cell-date-stack">${content}</div>`;
-        if(start && end){
-          const same=start.getFullYear()===end.getFullYear() && start.getMonth()===end.getMonth() && start.getDate()===end.getDate();
-          if(same){ return wrap(`<span>${fmt(start)}</span>`); }
-          return wrap(`<span>${fmt(start)}</span><span>${fmt(end)}</span>`);
-        }
-        if(start){ return wrap(`<span>${fmt(start)}</span>`); }
-        if(end){ return wrap(`<span>${fmt(end)}</span>`); }
-        return wrap(`<span>–</span>`);
-      }
-
-      renderFooter(){
-        const shown = (this.state.bookings||[]).filter(r=>r && r.id).length;
-        const total = (this.state.originalBookings||[]).length;
-        return `<div class="mmb-footer">${shown} von ${total} Buchungen</div>`;
-      }
-
-      // ---------- Events ----------
-      bindUI(){
-        // Live-Filtern + Fokus halten
-        this.container.addEventListener('input', (e)=>{
-          const t = e.target;
-          if(!t.id) return;
-          const snap = this.snapshotFocus();
-          if(t.id===`filter-id-${this.instanceId}`){
-            this.state.filters.id = (t.value||'').replace(/[^\d]/g,''); // nur Ziffern
-            this.applyFilters(snap);
-          }
-          if(t.id===`filter-name-${this.instanceId}`){
-            this.state.filters.name = (t.value||'');
-            this.applyFilters(snap);
-          }
-        });
-        this.container.addEventListener('change', (e)=>{
-          const t = e.target;
-          if(!t.id) return;
-          const snap = this.snapshotFocus();
-          if(t.id===`filter-status-${this.instanceId}`){
-            this.state.filters.status = t.value||'';
-            this.applyFilters(snap);
-          }
-          if(t.id===`filter-box-${this.instanceId}`){
-            this.state.filters.box = t.value||'';
-            this.applyFilters(snap);
-          }
-          if(t.id===`btn-reset-${this.instanceId}`){
-            this.resetFilters();
-          }
-        });
-
-        const btn = document.getElementById(`btn-reset-${this.instanceId}`);
-        if(btn){ btn.addEventListener('click', ()=> this.resetFilters()); }
-      }
-
-      bindTableActions(){
-        this.container.querySelector('.mmb-widget')?.addEventListener('click', async (e)=>{
-          const btn = e.target.closest('button[data-action]');
-          if(!btn) return;
-          if (btn.disabled || btn.getAttribute('aria-disabled') === 'true') return;
-          e.preventDefault();
-          const id = btn.dataset.id;
-          if(btn.dataset.action==='showFulfillmentDetails'){ await this.showFulfillmentDetails(id); return; }
-          if(btn.dataset.action==='viewDetails') { await this.viewDetails(id); return; }
-          if(btn.dataset.action==='confirmBooking') await this.confirmBooking(id);
-          if(btn.dataset.action==='declineBooking') await this.declineBooking(id);
-          if(btn.dataset.action==='offerAlternative') await this.offerAlternative(id);
-          if(btn.dataset.action==='editBooking') await this.editBooking(id);
-          if(btn.dataset.action==='deleteBooking') await this.deleteBooking(id);
-        });
-      }
-
-      resetFilters(){
-        const snap = this.snapshotFocus();
-        this.state.filters = { status:'', box:'', id:'', name:'' };
-        this.applyFilters(snap);
-      }
-
-      // ---------- Filterlogik ----------
-      applyFilters(focusSnapshot=null){
-        if(this.state.error){
-          this.render();
-          return;
-        }
-        const f = this.state.filters;
-        const rows = this.state.originalBookings.filter(x=>{
-          if (f.status && x.status!==f.status) return false;
-          if (f.box && x.box_id!==f.box) return false;
-
-          if (f.id){
-            const disp = displayId(x);
-            if (!disp.startsWith(f.id)) return false;
-          }
-
-          if (f.name){
-            const q = f.name.toLowerCase();
-            const inName = (x.customer_name||'').toLowerCase().includes(q);
-            const inMail = (x.customer_email||'').toLowerCase().includes(q);
-            if (!inName && !inMail) return false;
-          }
-          return true;
-        });
-
-        this.state.bookings = rows;
-
-        this.render();
-        this.restoreFocus(focusSnapshot);
-
-        const fid = document.getElementById(`filter-id-${this.instanceId}`);
-        const fnm = document.getElementById(`filter-name-${this.instanceId}`);
-        const fs  = document.getElementById(`filter-status-${this.instanceId}`);
-        const fb  = document.getElementById(`filter-box-${this.instanceId}`);
-        if(fid && fid.value !== this.state.filters.id) fid.value = this.state.filters.id;
-        if(fnm && fnm.value !== this.state.filters.name) fnm.value = this.state.filters.name;
-        if(fs && fs.value !== this.state.filters.status) fs.value = this.state.filters.status;
-        if(fb && fb.value !== this.state.filters.box) fb.value = this.state.filters.box;
-
-        const btn = document.getElementById(`btn-reset-${this.instanceId}`);
-        if(btn && !btn._bound){ btn.addEventListener('click', ()=> this.resetFilters()); btn._bound=true; }
-      }
-
-      // ---------- Aktionen ----------
-      async confirmBooking(id){
-        const b = this.state.originalBookings.find(x=>x.id===id); if(!b) return;
-        const subject = `Deine Buchung wurde bestätigt ✅ – Buchungs-ID: ${displayId(b)}`;
-        const body = this.tplConfirm(b);
-        const html = `
-          <div class="mmb-field"><strong>Buchung:</strong> ${displayId(b)} – ${this.escape(b.customer_name)} (${this.escape(b.box_name)})</div>
-          <div class="mmb-field"><label>Betreff</label><input name="subject" value="${this.escape(subject)}"/></div>
-          <div class="mmb-field"><label>Nachricht an Kund*in</label><textarea name="message">${this.escape(body)}</textarea></div>
+        const meta = document.createElement('div');
+        meta.className = 'admin-meta';
+        meta.innerHTML = `
+          <span class="admin-meta__item"><strong data-meta="count">–</strong> Buchungen</span>
+          <span class="admin-meta__item">⏱️ <span data-meta="updated">–</span></span>
+          <span class="admin-meta__item">⚠️ Details offen: <strong data-meta="needs">0</strong></span>
         `;
-        const values = await this.openModal({ title:'Buchung bestätigen', html, confirmText:'Status auf „Bestätigt“ setzen' });
-        if(!values) return;
-        await AdminApi.updateBookingStatus({ booking_id: Number(id), status: 'confirmed', send_email: 1, subject: values.subject, message: values.message });
-        await this.loadBookings();
-        MMBCore.Utils.showNotification('Buchung wurde bestätigt');
-      }
 
-      async declineBooking(id){
-        const b = this.state.originalBookings.find(x=>x.id===id); if(!b) return;
-        const subject = `Deine Buchung wurde abgelehnt ❌ – Buchungs-ID: ${displayId(b)}`;
-        const body = this.tplReject(b);
-        const html = `
-          <div class="mmb-field"><strong>Buchung:</strong> ${displayId(b)} – ${this.escape(b.customer_name)} (${this.escape(b.box_name)})</div>
-          <div class="mmb-field"><label>Grund (intern)</label><input name="reason" placeholder="z.B. Terminkonflikt"/></div>
-          <div class="mmb-field"><label>Betreff</label><input name="subject" value="${this.escape(subject)}"/></div>
-          <div class="mmb-field"><label>Nachricht an Kund*in</label><textarea name="message">${this.escape(body)}</textarea></div>
-        `;
-        const values = await this.openModal({ title:'Buchung ablehnen', html, confirmText:'Als „Abgelehnt“ markieren' });
-        if(!values) return;
-        await AdminApi.updateBookingStatus({ booking_id: Number(id), status: 'rejected', send_email: 1, subject: values.subject, message: values.message });
-        await this.loadBookings();
-        MMBCore.Utils.showNotification('Buchung wurde abgelehnt');
-      }
+        toolbar.appendChild(actions);
+        toolbar.appendChild(meta);
 
-      async offerAlternative(id){
-        const b = this.state.originalBookings.find(x=>x.id===id); if(!b) return;
-        const alternatives = [{id:'2',name:BOX_MAP['2']},{id:'3',name:BOX_MAP['3']},{id:'1',name:BOX_MAP['1']}]
-          .filter(x => x.id !== b.box_id);
-        const altMap = Object.fromEntries(alternatives.map(a=>[a.id,a]));
-        const subject = `Konflikt bei deiner Buchung ⚠️ – Buchungs-ID: ${displayId(b)}`;
-        const initialSelection = alternatives.length ? [alternatives[0]] : [];
-        const html = `
-          <div class="mmb-field"><strong>Buchung:</strong> ${displayId(b)} – ${this.escape(b.customer_name)}</div>
-          <div class="mmb-field"><label>Alternative Box(en)</label>
-            <div class="mmb-alt-options">
-              ${alternatives.map((x,idx)=>`
-                <label><input type="checkbox" name="alternative_box_ids" value="${x.id}" ${idx===0?'checked':''}/> ${this.escape(x.name)}</label>
-              `).join('')}
-            </div>
-          </div>
-          <div class="mmb-field"><label>Betreff</label><input name="subject" value="${this.escape(subject)}"/></div>
-          <div class="mmb-field"><label>Nachricht an Kund*in</label><textarea name="message">${this.escape(this.tplAlternative(b, initialSelection))}</textarea></div>
+        const status = document.createElement('div');
+        status.className = 'admin-status';
+        status.textContent = 'Bereit.';
+
+        const tableWrapper = document.createElement('div');
+        tableWrapper.className = 'admin-table-wrapper';
+        tableWrapper.innerHTML = `
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Box</th>
+                <th>Kunde</th>
+                <th>E-Mail</th>
+                <th>Zeitraum</th>
+                <th>Status</th>
+                <th>Gesamt (€)</th>
+                <th>Erstellt</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
         `;
-        const values = await this.openModal({
-          title:'Alternative Box vorschlagen',
-          html,
-          confirmText:'Alternative senden',
-          onMount: (form)=>{
-            const boxes = Array.from(form.querySelectorAll('input[name="alternative_box_ids"]'));
-            const ta  = form.querySelector('textarea[name="message"]');
-            const sync = ()=>{
-              const checked = boxes.filter(cb=>cb.checked);
-              if(!checked.length && boxes.length){
-                boxes[0].checked = true;
-                return sync();
-              }
-              const selected = checked.map(cb=>altMap[cb.value]).filter(Boolean);
-              const fallback = selected.length ? selected : initialSelection;
-              ta.value = this.tplAlternative(b, fallback);
-            };
-            boxes.forEach(cb=>cb.addEventListener('change', sync));
-            sync();
-          }
+        const tbody = tableWrapper.querySelector('tbody');
+
+        container.appendChild(toolbar);
+        container.appendChild(status);
+        container.appendChild(tableWrapper);
+
+        refreshBtn.addEventListener('click', () => {
+          loadData();
         });
-        if(!values) return;
 
-        const rawAlt = values.alternative_box_ids;
-        const selectedIds = Array.isArray(rawAlt) ? rawAlt : (rawAlt ? [rawAlt] : []);
-        const selected = selectedIds.map(v=>altMap[v]).filter(Boolean);
-        if(!selected.length){
-          MMBCore.Utils.showNotification('Bitte wähle mindestens eine Alternative aus.', 'error');
-          return;
-        }
-
-        const payload = {
-          booking_id: Number(id),
-          status: 'rejected',
-          alternative_box_ids: selected.map(alt=>Number(alt.id)),
-          send_email: 1,
-          subject: values.subject,
-          message: values.message
-        };
-
-        const response = await AdminApi.updateBookingStatus(payload);
-        await this.loadBookings();
-
-        const mailInfo = response?.mail || null;
-        if(mailInfo && mailInfo.sent === false){
-          const err = mailInfo.error ? ` – ${mailInfo.error}` : '';
-          MMBCore.Utils.showNotification('Alternative versendet, aber E-Mail fehlgeschlagen'+err, 'error');
-        }else{
-          MMBCore.Utils.showNotification('Alternative vorgeschlagen (Status: Abgelehnt)');
-        }
-      }
-
-      async editBooking(id){
-        const b = this.state.originalBookings.find(x=>x.id===id); if(!b) return;
-        const boxOptions = [{id:'1',name:BOX_MAP['1']},{id:'2',name:BOX_MAP['2']},{id:'3',name:BOX_MAP['3']}]
-          .map(x => `<option value="${x.id}" ${x.id===b.box_id?'selected':''}>${this.escape(x.name)}</option>`).join('');
-        const currentFulfillment = (b.fulfillment_method || 'pickup').toString();
-        const fulfillmentOptions = FULFILLMENT_CHOICES
-          .map(opt => `<option value="${opt.id}" ${opt.id===currentFulfillment?'selected':''}>${this.escape(opt.label)}</option>`)
-          .join('');
-        const fulfillmentInfo = this.getFulfillmentInfo(b);
-        const fulfillmentHint = fulfillmentInfo.note ? this.escape(fulfillmentInfo.note) : 'Keine zusätzlichen Hinweise';
-        const fulfillmentInstructionLines = this.fulfillmentInstructionLines(b);
-        const fulfillmentInstructionHtml = fulfillmentInstructionLines.length
-          ? `<ul class="mmb-fulfillment-info-list">${fulfillmentInstructionLines.map(line=>'<li>'+this.escape(line)+'</li>').join('')}</ul>`
-          : '<div class="mmb-text-muted">Keine zusätzlichen Informationen hinterlegt.</div>';
-        const baseSubject = `Deine Buchung wurde aktualisiert 👷🏽 – Buchungs-ID: ${displayId(b)}`;
-        const parseAmount = (val)=>{
-          if(val===null || val===undefined) return NaN;
-          if(typeof val==='number') return val;
-          let str = String(val).trim();
-          if(!str) return NaN;
-          str = str.replace(/€/g,'').replace(/\s+/g,'');
-          if(str.includes(',')){
-            str = str.replace(/\./g,'').replace(',','.');
-          }
-          const num = Number(str);
-          if(Number.isNaN(num) && str.includes('.')){
-            const fallback = Number(str.replace(/\./g,''));
-            return Number.isNaN(fallback) ? NaN : fallback;
-          }
-          return num;
-        };
-        const body = this.tplEditInfo(b);
-        const html = `
-          <div class="mmb-grid-2">
-            <div class="mmb-field"><label>Kundename</label><input name="customer_name" value="${this.escape(b.customer_name)}"/></div>
-            <div class="mmb-field"><label>E-Mail</label><input name="customer_email" value="${this.escape(b.customer_email)}"/></div>
-          </div>
-          <div class="mmb-grid-2">
-            <div class="mmb-field"><label>Telefon</label><input name="customer_phone" value="${this.escape(b.customer_phone)}"/></div>
-            <div class="mmb-field"><label>Box</label><select name="box_id">${boxOptions}</select></div>
-          </div>
-          <div class="mmb-grid-2">
-            <div class="mmb-field"><label>Start (YYYY-MM-DD)</label><input name="start_date" value="${this.escape(b.start_date)}"/></div>
-            <div class="mmb-field"><label>Ende (YYYY-MM-DD)</label><input name="end_date" value="${this.escape(b.end_date)}"/></div>
-          </div>
-          <div class="mmb-grid-2">
-            <div class="mmb-field"><label>Status</label>
-              <select name="status">
-                <option value="pending" ${b.status==='pending'?'selected':''}>Ausstehend</option>
-                <option value="confirmed" ${b.status==='confirmed'?'selected':''}>Bestätigt</option>
-                <option value="rejected" ${b.status==='rejected'?'selected':''}>Abgelehnt</option>
-                <option value="cancelled" ${b.status==='cancelled'?'selected':''}>Storniert</option>
-              </select>
-            </div>
-            <div class="mmb-field"><label>Preis (EUR)</label><input name="total_amount" value="${this.escape(b.price_total)}"/></div>
-          </div>
-          <div class="mmb-grid-2">
-            <div class="mmb-field"><label>Abwicklung</label><select name="fulfillment_method">${fulfillmentOptions}</select><small class="mmb-text-muted">Steuert Versand-/Lieferhinweise und Preisaufschläge.</small></div>
-            <div class="mmb-field"><label>Hinweis zur Abwicklung</label><div data-fulfillment-hint class="mmb-text-muted">${fulfillmentHint}</div></div>
-          </div>
-          <div class="mmb-field"><label>Informationen zur Abwicklung</label>${fulfillmentInstructionHtml}</div>
-          <hr style="border:none;border-top:1px solid var(--mmb-border);margin:.75rem 0"/>
-          <div class="mmb-field mmb-field-switch">
-            <label><input type="checkbox" name="send_email" value="1" checked/> <span>Kund*in per E-Mail informieren</span></label>
-            <small>Wenn aktiviert, wird die aktualisierte Buchung an ${this.escape(b.customer_email)} gesendet.</small>
-          </div>
-          <div class="mmb-field" data-email-field><label>Betreff (E-Mail an Kund*in)</label><input name="subject" value="${this.escape(baseSubject)}"/></div>
-          <div class="mmb-field" data-email-field><label>Nachricht (E-Mail an Kund*in)</label><textarea name="message">${this.escape(body)}</textarea></div>
-        `;
-        const values = await this.openModal({
-          title:`Buchung bearbeiten – ${displayId(b)}`,
-          html,
-          confirmText:'Änderungen speichern',
-          onMount:(form)=>{
-            const subjectInput = form.querySelector('input[name="subject"]');
-            const messageInput = form.querySelector('textarea[name="message"]');
-            const sendSwitch = form.querySelector('input[name="send_email"]');
-            const watchFields = ['customer_name','customer_email','customer_phone','box_id','start_date','end_date','status','total_amount','fulfillment_method'];
-            let subjectDirty = false;
-            let messageDirty = false;
-
-            const collectCurrentValues = ()=>{
-              const data = {};
-              watchFields.forEach((name)=>{
-                const field = form.querySelector(`[name="${name}"]`);
-                if(!field) return;
-                data[name] = field.value;
-              });
-              return data;
-            };
-
-            const buildBookingForEmail = (vals)=>{
-              const boxId = String(vals.box_id ?? b.box_id ?? '');
-              const fulfillmentChoice = this.getFulfillmentChoice((vals.fulfillment_method ?? b.fulfillment_method ?? 'pickup').toString());
-              const parsedAmount = parseAmount(vals.total_amount ?? b.price_total);
-              return {
-                ...b,
-                customer_name: vals.customer_name ?? b.customer_name,
-                customer_email: vals.customer_email ?? b.customer_email,
-                customer_phone: vals.customer_phone ?? b.customer_phone,
-                box_id: boxId,
-                box_name: BOX_MAP[boxId] || BOX_MAP[String(b.box_id)] || b.box_name,
-                start_date: vals.start_date ?? b.start_date,
-                end_date: vals.end_date ?? b.end_date,
-                status: vals.status ?? b.status,
-                price_total: Number.isFinite(parsedAmount) ? parsedAmount : b.price_total,
-                fulfillment_method: fulfillmentChoice.id,
-                fulfillment_label: fulfillmentChoice.label,
-                fulfillment_note: fulfillmentChoice.note,
-                fulfillment_price_delta: fulfillmentChoice.priceDelta
-              };
-            };
-
-            const syncEmailFields = (force=false)=>{
-              if(!subjectInput || !messageInput) return;
-              const current = buildBookingForEmail(collectCurrentValues());
-              if(force || !subjectDirty){
-                subjectInput.value = baseSubject;
-              }
-              if(force || !messageDirty){
-                messageInput.value = this.tplEditInfo(current);
-              }
-            };
-
-            if(subjectInput){
-              subjectInput.addEventListener('input', ()=>{ subjectDirty = subjectInput.value !== baseSubject; });
-            }
-            if(messageInput){
-              messageInput.addEventListener('input', ()=>{ messageDirty = true; });
-            }
-
-            watchFields.forEach((name)=>{
-              const field = form.querySelector(`[name="${name}"]`);
-              if(!field) return;
-              const evt = field.tagName === 'SELECT' ? 'change' : 'input';
-              field.addEventListener(evt, ()=> syncEmailFields());
-            });
-
-            const fulfillmentSelect = form.querySelector('select[name="fulfillment_method"]');
-            const fulfillmentHintEl = form.querySelector('[data-fulfillment-hint]');
-            const updateFulfillmentHint = ()=>{
-              if(!fulfillmentSelect || !fulfillmentHintEl) return;
-              const choice = this.getFulfillmentChoice(fulfillmentSelect.value);
-              fulfillmentHintEl.textContent = choice.note || 'Keine zusätzlichen Hinweise';
-            };
-            if(fulfillmentSelect){
-              fulfillmentSelect.addEventListener('change', updateFulfillmentHint);
-              updateFulfillmentHint();
-            }
-
-            const applyEmailToggleState = ()=>{
-              if(!subjectInput || !messageInput || !sendSwitch) return;
-              const enabled = sendSwitch.checked;
-              subjectInput.disabled = !enabled;
-              messageInput.disabled = !enabled;
-              form.classList.toggle('mmb-email-disabled', !enabled);
-            };
-
-            if(sendSwitch){
-              applyEmailToggleState();
-              sendSwitch.addEventListener('change', ()=>{
-                applyEmailToggleState();
-                if(sendSwitch.checked){
-                  syncEmailFields();
-                }
-              });
-            }
-
-            syncEmailFields(true);
-          }
-        });
-        if(!values) return;
-
-        const nextBoxIdRaw = values.box_id ?? b.box_id;
-        const nextBoxIdNum = Number(nextBoxIdRaw);
-        const finalBoxId = Number.isFinite(nextBoxIdNum) && nextBoxIdNum > 0 ? nextBoxIdNum : Number(b.box_id);
-
-        const originalTotalRaw = parseAmount(b.price_total ?? b.total_amount);
-        const fallbackDbTotal = Number(b.price_total ?? b.total_amount);
-        const originalTotal = Number.isFinite(originalTotalRaw)
-          ? Math.round(originalTotalRaw * 100) / 100
-          : (Number.isFinite(fallbackDbTotal) ? Math.round(fallbackDbTotal * 100) / 100 : 0);
-        const normalizedTotal = (()=>{
-          const parsed = parseAmount(values.total_amount);
-          if(Number.isFinite(parsed)) return Math.round(parsed * 100) / 100;
-          return originalTotal;
-        })();
-
-        const startDate = ((values.start_date||'').trim()) || b.start_date;
-        const endDate = ((values.end_date||'').trim()) || b.end_date;
-
-        const nextFulfillmentChoice = this.getFulfillmentChoice((values.fulfillment_method ?? b.fulfillment_method ?? 'pickup').toString());
-        const sanitized = {
-          customer_name: (values.customer_name||'').trim(),
-          customer_email: (values.customer_email||'').trim(),
-          customer_phone: (values.customer_phone||'').trim(),
-          box_id: finalBoxId,
-          start_date: startDate,
-          end_date: endDate,
-          status: (values.status || b.status || '').trim(),
-          total_amount: normalizedTotal,
-          fulfillment_method: nextFulfillmentChoice.id,
-          fulfillment_label: nextFulfillmentChoice.label,
-          fulfillment_note: nextFulfillmentChoice.note || '',
-          fulfillment_price_delta: Number.isFinite(nextFulfillmentChoice.priceDelta) ? nextFulfillmentChoice.priceDelta : 0
-        };
-
-        const originalFulfillment = this.getFulfillmentInfo(b);
-        const originalNormalized = {
-          customer_name: (b.customer_name || '').trim(),
-          customer_email: (b.customer_email || '').trim(),
-          customer_phone: (b.customer_phone || '').trim(),
-          box_id: Number(b.box_id),
-          start_date: (b.start_date || '').trim(),
-          end_date: (b.end_date || '').trim(),
-          status: (b.status || '').trim(),
-          total_amount: originalTotal,
-          fulfillment_method: originalFulfillment.method,
-          fulfillment_label: originalFulfillment.label,
-          fulfillment_note: originalFulfillment.note || '',
-          fulfillment_price_delta: originalFulfillment.priceDelta
-        };
-
-        const updatesToSend = {};
-        const markIfChanged = (key, nextValue, prevValue)=>{
-          if(key === 'total_amount'){
-            const nextFinite = Number.isFinite(nextValue);
-            const prevFinite = Number.isFinite(prevValue);
-            if(nextFinite && prevFinite && Math.abs(nextValue - prevValue) < 0.01) return;
-            if(!nextFinite && !prevFinite) return;
-          }else if(key === 'box_id'){
-            if(Number(nextValue) === Number(prevValue)) return;
-          }else{
-            if(nextValue === prevValue) return;
-          }
-          updatesToSend[key] = nextValue;
-        };
-
-        markIfChanged('customer_name', sanitized.customer_name, originalNormalized.customer_name);
-        markIfChanged('customer_email', sanitized.customer_email, originalNormalized.customer_email);
-        markIfChanged('customer_phone', sanitized.customer_phone, originalNormalized.customer_phone);
-        markIfChanged('box_id', sanitized.box_id, originalNormalized.box_id);
-        markIfChanged('start_date', sanitized.start_date, originalNormalized.start_date);
-        markIfChanged('end_date', sanitized.end_date, originalNormalized.end_date);
-        markIfChanged('status', sanitized.status, originalNormalized.status);
-        markIfChanged('total_amount', sanitized.total_amount, originalNormalized.total_amount);
-
-        const fulfillmentChanged = (
-          sanitized.fulfillment_method !== originalNormalized.fulfillment_method ||
-          sanitized.fulfillment_label !== originalNormalized.fulfillment_label ||
-          sanitized.fulfillment_note !== originalNormalized.fulfillment_note ||
-          Math.abs(sanitized.fulfillment_price_delta - originalNormalized.fulfillment_price_delta) > 0.01
-        );
-        if(fulfillmentChanged){
-          updatesToSend.fulfillment_method = sanitized.fulfillment_method;
-          updatesToSend.fulfillment_label = sanitized.fulfillment_label;
-          updatesToSend.fulfillment_note = sanitized.fulfillment_note;
-          updatesToSend.fulfillment_price_delta = sanitized.fulfillment_price_delta;
-        }
-
-        const hasUpdates = Object.keys(updatesToSend).length > 0;
-        const shouldSendEmail = values.send_email === '1' || values.send_email === 'on' || values.send_email === 'true';
-        const normalizedSubject = (values.subject || baseSubject).trim();
-        const normalizedMessage = (values.message || '').trim();
-
-        if(!hasUpdates && !shouldSendEmail){
-          MMBCore.Utils.showNotification('Keine Änderungen gespeichert');
-          return;
-        }
-
-        const bookingId = Number(id);
-        let updatesApplied = false;
-        if(hasUpdates){
-          const updatePayload = { id: bookingId };
-          Object.entries(updatesToSend).forEach(([key, value])=>{
-            if(key === 'box_id'){
-              updatePayload[key] = Number(value);
-            }else if(key === 'total_amount'){
-              const numeric = Number(value);
-              updatePayload[key] = Number.isFinite(numeric) ? Math.round(numeric * 100) / 100 : value;
-            }else if(key === 'fulfillment_price_delta'){
-              const numeric = Number(value);
-              updatePayload[key] = Number.isFinite(numeric) ? Math.round(numeric * 100) / 100 : 0;
-            }else{
-              updatePayload[key] = value;
-            }
-          });
-
-          try {
-            await AdminApi.updateBooking(updatePayload);
-            updatesApplied = true;
-          } catch (err) {
-            console.error('updateBooking failed:', err);
-            const errorMessage = err && err.message ? err.message : 'Aktualisierung fehlgeschlagen';
-            MMBCore.Utils.showNotification(errorMessage, 'error');
+        async function loadData() {
+          if (state.loading) {
             return;
           }
-        }
-
-        let mailInfo = null;
-        let emailFailed = false;
-        let emailError = '';
-
-        if(shouldSendEmail){
-          const emailPayload = {
-            booking_id: bookingId,
-            send_email: 1,
-            subject: normalizedSubject,
-            message: normalizedMessage,
-          };
-          if(sanitized.status){
-            emailPayload.status = sanitized.status;
-          }
+          state.loading = true;
+          status.className = 'admin-status';
+          status.textContent = 'Lade Buchungen …';
+          tbody.innerHTML = '';
 
           try {
-            const response = await AdminApi.updateBookingStatus(emailPayload);
-            mailInfo = response && response.mail ? response.mail : null;
-            if(mailInfo && mailInfo.sent === false){
-              emailFailed = true;
-              emailError = mailInfo.error ? ` (Fehler: ${mailInfo.error})` : '';
+            const data = await portal.request('list_bookings.php');
+            if (!data || data.ok === false) {
+              throw new Error(data && data.error ? data.error : 'Buchungen konnten nicht geladen werden.');
             }
-          } catch (err) {
-            console.error('updateBookingStatus failed:', err);
-            emailFailed = true;
-            emailError = err && err.message ? ` (${err.message})` : '';
+
+            const items = Array.isArray(data.items) ? data.items : [];
+            renderRows(items);
+            updateMeta(data.meta || {}, items.length);
+
+            state.lastLoadedAt = new Date();
+            status.className = 'admin-status is-success';
+            status.textContent = `Zuletzt aktualisiert: ${formatTimestamp(state.lastLoadedAt)}`;
+          } catch (error) {
+            if (error && error.code === 'UNAUTHORIZED') {
+              return;
+            }
+            status.className = 'admin-status is-error';
+            status.textContent = error && error.message ? String(error.message) : 'Unbekannter Fehler beim Laden der Buchungen.';
+            tbody.innerHTML = '<tr><td colspan="8" class="muted">Keine Daten verfügbar.</td></tr>';
+          } finally {
+            state.loading = false;
           }
         }
 
-        if(updatesApplied || shouldSendEmail){
-          await this.loadBookings();
-        }
-
-        if(shouldSendEmail){
-          if(emailFailed){
-            const base = updatesApplied ? 'Buchung aktualisiert (E-Mail konnte nicht gesendet werden)' : 'E-Mail konnte nicht gesendet werden';
-            MMBCore.Utils.showNotification(base + emailError, 'error');
-          }else{
-            const message = updatesApplied
-              ? 'Buchung aktualisiert & Kund*in informiert'
-              : 'E-Mail an Kund*in gesendet';
-            MMBCore.Utils.showNotification(message);
+        function renderRows(items) {
+          if (!items.length) {
+            tbody.innerHTML = '<tr><td colspan="8" class="muted">Keine Buchungen vorhanden.</td></tr>';
+            return;
           }
-        }else if(updatesApplied){
-          MMBCore.Utils.showNotification('Buchung aktualisiert');
-        }
-      }
 
-      async deleteBooking(id){
-        const booking = this.state.originalBookings.find(x=>String(x.id)===String(id));
-        if(!booking) return;
+          const rows = items.map((item) => {
+            const displayId = escapeHtml(item.display_id || item.id || '–');
+            const boxName = escapeHtml(item.box_name || (item.box_id ? `Box #${item.box_id}` : '–'));
+            const customer = escapeHtml(item.customer_name || '–');
+            const email = escapeHtml(item.customer_email || '–');
+            const period = `${formatDate(item.start_date)} – ${formatDate(item.end_date)}`;
+            const statusBadge = createStatusBadge(item.status);
+            const total = formatCurrency(item.total_amount);
+            const created = formatTimestamp(item.created_at);
 
-        const formatDate = (value)=>{
-          if(!value) return '–';
-          const d = new Date(value);
-          return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString('de-DE');
-        };
-        const rangeLabel = `${formatDate(booking.start_date)} – ${formatDate(booking.end_date)}`;
-        const emailSuffix = booking.customer_email ? ` (${this.escape(booking.customer_email)})` : '';
-        const html = `
-          <p style="margin-top:0;">Soll diese Buchung wirklich endgültig gelöscht werden? Dieser Schritt kann nicht rückgängig gemacht werden.</p>
-          <div class="mmb-field"><strong>Buchung:</strong> ${this.escape(displayId(booking))}</div>
-          <div class="mmb-field"><strong>Kund*in:</strong> ${this.escape(booking.customer_name)}${emailSuffix}</div>
-          <div class="mmb-field"><strong>Zeitraum:</strong> ${this.escape(rangeLabel)}</div>
-          <div class="mmb-warning" style="margin-top:.75rem;">⚠️ Die Buchung wird vollständig entfernt. Es wird keine automatische E-Mail an die Kundschaft gesendet.</div>
-        `;
-        const confirmed = await this.openModal({
-          title: 'Buchung löschen',
-          html,
-          confirmText: 'Buchung endgültig löschen',
-          cancelText: 'Abbrechen',
-        });
-        if(confirmed === null || confirmed === undefined) return;
-
-        try {
-          await AdminApi.deleteBooking({ booking_id: Number(id) });
-        } catch (err) {
-          console.error('deleteBooking failed:', err);
-          const errorInfo = MMBCore.Utils.describeError(err, {
-            headline: 'Buchung konnte nicht gelöscht werden',
-            context: (err && err.context && err.context.path) || 'delete_booking.php',
+            return `
+              <tr>
+                <td>${displayId}</td>
+                <td class="text-ellipsis" title="${boxName}">${boxName}</td>
+                <td class="text-ellipsis" title="${customer}">${customer}</td>
+                <td class="text-ellipsis" title="${email}">${email}</td>
+                <td>${escapeHtml(period)}</td>
+                <td>${statusBadge}</td>
+                <td>${escapeHtml(total)}</td>
+                <td>${escapeHtml(created)}</td>
+              </tr>
+            `;
           });
-          MMBCore.Utils.showNotification(errorInfo.message || 'Buchung konnte nicht gelöscht werden', 'error');
-          return;
+
+          tbody.innerHTML = rows.join('');
         }
 
-        const focusSnapshot = this.snapshotFocus();
-        this.state.originalBookings = this.state.originalBookings.filter(x=>String(x.id)!==String(id));
-        this.applyFilters(focusSnapshot);
+        function updateMeta(metaData, rowCount) {
+          const countEl = meta.querySelector('[data-meta="count"]');
+          const needsEl = meta.querySelector('[data-meta="needs"]');
+          const updatedEl = meta.querySelector('[data-meta="updated"]');
 
-        let reloadFailed = false;
-        try {
-          await this.loadBookings();
-        } catch (err) {
-          reloadFailed = true;
-          console.error('Reload after delete failed:', err);
+          if (countEl) {
+            countEl.textContent = String(rowCount ?? metaData.count ?? 0);
+          }
+          if (needsEl) {
+            needsEl.textContent = String(metaData.requires_details ?? 0);
+          }
+          if (updatedEl) {
+            updatedEl.textContent = state.lastLoadedAt ? formatTimestamp(state.lastLoadedAt) : '–';
+          }
         }
 
-        if(reloadFailed){
-          MMBCore.Utils.showNotification('Buchung gelöscht, Liste konnte nicht neu geladen werden', 'error');
-        }else{
-          MMBCore.Utils.showNotification('Buchung wurde gelöscht');
+        function escapeHtml(value) {
+          if (value === null || value === undefined) {
+            return '';
+          }
+          return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
         }
-      }
 
-      // ---------- Modal & Utils ----------
-      openModal({ title, html, confirmText='OK', cancelText='Abbrechen', onMount=null }){
-        return new Promise((resolve)=>{
-          const modal = document.createElement('div');
-          modal.className = 'mmb-modal';
-          const cancelBtnHtml = cancelText ? `<button type="button" class="mmb-modal-btn mmb-modal-btn-secondary" data-cancel>${cancelText}</button>` : '';
-          const confirmBtnHtml = confirmText ? `<button type="submit" class="mmb-modal-btn mmb-modal-btn-primary">${confirmText}</button>` : '';
-          modal.innerHTML = `
-            <div class="mmb-modal-content" role="dialog" aria-modal="true">
-              <h3>${title}</h3>
-              <form id="mmb-modal-form">
-                ${html}
-                <div class="mmb-modal-actions">
-                  ${cancelBtnHtml}
-                  ${confirmBtnHtml}
-                </div>
-              </form>
-            </div>`;
-          document.body.appendChild(modal);
+        function formatDate(value) {
+          if (!value) {
+            return '–';
+          }
+          const date = new Date(value);
+          if (Number.isNaN(date.getTime())) {
+            return String(value);
+          }
+          return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        }
 
-          const form = modal.querySelector('#mmb-modal-form');
-          const cancelBtn = modal.querySelector('[data-cancel]');
-
-          if(typeof onMount==='function'){ try{ onMount(form, modal); }catch(e){} }
-
-          if(cancelBtn){ cancelBtn.addEventListener('click', ()=>{ modal.remove(); resolve(null); }); }
-          modal.addEventListener('click', (ev)=>{ if(ev.target===modal) { modal.remove(); resolve(null); }});
-          form.addEventListener('submit', (ev)=>{
-            ev.preventDefault();
-            const data = new FormData(form);
-            const values = {};
-            data.forEach((v,k)=>{
-              if(Object.prototype.hasOwnProperty.call(values,k)){
-                if(Array.isArray(values[k])) values[k].push(v);
-                else values[k] = [values[k], v];
-              }else{
-                values[k]=v;
-              }
-            });
-            modal.remove();
-            resolve(values);
+        function formatTimestamp(value) {
+          if (!value) {
+            return '–';
+          }
+          const date = new Date(value);
+          if (Number.isNaN(date.getTime())) {
+            return String(value);
+          }
+          return date.toLocaleString('de-DE', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
           });
-        });
-      }
+        }
 
-      escape(s){ return (s??'').toString().replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-      translateStatus(s){ return ({pending:'Ausstehend',confirmed:'Bestätigt',rejected:'Abgelehnt',cancelled:'Storniert'})[s]||s; }
-
-      getFulfillmentChoice(id){ return FULFILLMENT_LOOKUP[id] || FULFILLMENT_CHOICES[0]; }
-      getFulfillmentInfo(b){
-        const fallbackRaw = b.fulfillment_details || b.fulfillment_details_json || '';
-        const parsedDetails = parseFulfillmentDetails(fallbackRaw);
-        const methodFromState = (b.fulfillment_method || '').toString().trim().toLowerCase();
-        const inferredMethod = ['pickup','shipping','delivery'].includes(methodFromState)
-          ? methodFromState
-          : inferFulfillmentMethod(b, parsedDetails);
-        const choice = this.getFulfillmentChoice(inferredMethod);
-        const payload = (b.fulfillment_payload && typeof b.fulfillment_payload === 'object') ? b.fulfillment_payload : null;
-        const structured = (()=>{
-          if(payload?.details_structured && typeof payload.details_structured === 'object') return payload.details_structured;
-          if(b.fulfillment_details_structured && typeof b.fulfillment_details_structured === 'object') return b.fulfillment_details_structured;
-          return buildFulfillmentDetails(parsedDetails, inferredMethod);
-        })();
-        const displayLabel = (b.fulfillment_display_label || payload?.displayLabel || '').toString().trim();
-        const missing = Array.isArray(b.fulfillment_missing_details) && b.fulfillment_missing_details.length
-          ? b.fulfillment_missing_details.map(x=>String(x))
-          : (payload?.missingDetails && payload.missingDetails.length
-            ? payload.missingDetails.map(x=>String(x))
-            : (structured.missing || []));
-        const needsAttention = typeof b.fulfillment_needs_attention === 'boolean'
-          ? Boolean(b.fulfillment_needs_attention)
-          : (payload?.needsAttention ?? structured.needs_attention ?? false);
-        const requiresDetails = typeof b.fulfillment_requires_details === 'boolean'
-          ? Boolean(b.fulfillment_requires_details)
-          : (payload?.requiresDetails ?? structured.requires_details ?? ['shipping','delivery'].includes(inferredMethod));
-        const infoLines = (payload?.infoLines && payload.infoLines.length) ? payload.infoLines : (choice.infoLines || []);
-        const label = (b.fulfillment_label || payload?.label || choice.label || '').toString();
-        const note = (b.fulfillment_note || payload?.note || choice.note || '').toString();
-        const priceCandidates = [b.fulfillment_price_delta, payload?.priceDelta, choice.priceDelta];
-        const resolvedPrice = priceCandidates.find(value=>Number.isFinite(Number(value)));
-        return {
-          id: inferredMethod,
-          method: inferredMethod,
-          label,
-          full: (payload?.full || choice.full || '').toString(),
-          note,
-          priceDelta: Number.isFinite(Number(resolvedPrice)) ? Number(resolvedPrice) : Number(choice.priceDelta),
-          displaySuffix: (payload?.displaySuffix || choice.displaySuffix || '').toString(),
-          infoLines,
-          details: structured.raw || parsedDetails,
-          details_structured: structured,
-          displayLabel,
-          missingDetails: missing,
-          needsAttention,
-          requiresDetails,
-        };
-      }
-      formatFulfillmentCell(b){
-        const info = this.getFulfillmentInfo(b);
-        const label = info.displayLabel && info.displayLabel.trim() ? info.displayLabel : fulfillmentDisplayLabel(info);
-        return label;
-      }
-      formatEuro(amount){
-        const num = Number(amount||0);
-        const safe = Number.isFinite(num) ? num : 0;
-        return safe.toLocaleString('de-DE', {minimumFractionDigits:0, maximumFractionDigits:0}) + '€';
-      }
-      fulfillmentEmailLine(b){
-        const info = this.getFulfillmentInfo(b);
-        const label = info.displayLabel && info.displayLabel.trim() ? info.displayLabel : fulfillmentDisplayLabel(info);
-        return label;
-      }
-      fulfillmentInstructionLines(b){
-        const info = this.getFulfillmentInfo(b);
-        return fulfillmentInstructionLines(info, info.details_structured || info.details || {});
-      }
-      fulfillmentInstructionText(b){
-        const lines = this.fulfillmentInstructionLines(b);
-        return lines.length ? `• ${lines.join('\n• ')}` : '• Wir melden uns kurzfristig mit allen weiteren Details.';
-      }
-
-      async viewDetails(id){
-        const booking = this.state.originalBookings.find(x=>String(x.id)===String(id));
-        if(!booking) return;
-        const info = this.getFulfillmentInfo(booking);
-        const infoDisplay = info.displayLabel && info.displayLabel.trim() ? info.displayLabel : fulfillmentDisplayLabel(info);
-        let createdLabel = '–';
-        if(booking.created_at){
-          const created = new Date(booking.created_at);
-          if(!Number.isNaN(created.getTime())){
-            createdLabel = created.toLocaleString('de-DE', { dateStyle:'long', timeStyle:'short' });
+        function formatCurrency(value) {
+          const number = Number(value);
+          if (Number.isFinite(number)) {
+            return number.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
           }
+          return value !== undefined && value !== null ? String(value) : '–';
         }
-        const phoneHtml = booking.customer_phone ? this.escape(booking.customer_phone) : '<span class="mmb-text-muted">Keine Angabe</span>';
-        const noteHtml = booking.note
-          ? this.escape(booking.note).replace(/\n/g,'<br>')
-          : '<span class="mmb-text-muted">Keine Anmerkungen</span>';
-        const fulfillmentNoteHtml = info.note ? `<div class="mmb-text-muted" style="font-size:.85rem;">${this.escape(info.note)}</div>` : '';
-        const html = `
-          <div class="mmb-field"><strong>Kund*in</strong><div>${this.escape(booking.customer_name)}</div><div class="mmb-text-muted" style="font-size:.85rem;">${this.escape(booking.customer_email)}</div></div>
-          <div class="mmb-field"><strong>Abwicklung</strong><div>${this.escape(infoDisplay)}</div>${fulfillmentNoteHtml}</div>
-          <div class="mmb-field"><strong>Buchung erstellt</strong><div>${createdLabel}</div></div>
-          <div class="mmb-field"><strong>Telefon</strong><div>${phoneHtml}</div></div>
-          <div class="mmb-field"><strong>Anmerkungen</strong><div>${noteHtml}</div></div>
-        `;
-        await this.openModal({ title:`Buchungsdetails – ${displayId(b)}`, html, confirmText:'Schließen', cancelText:'' });
-      }
 
-      async showFulfillmentDetails(id){
-        const booking = this.state.originalBookings.find(x=>String(x.id)===String(id));
-        if(!booking) return;
-        const info = this.getFulfillmentInfo(booking);
-        const instructions = this.fulfillmentInstructionLines(booking);
-        const instructionHtml = instructions.length
-          ? `<ul>${instructions.map(line=>'<li>'+this.escape(line)+'</li>').join('')}</ul>`
-          : '<p class="mmb-text-muted">Keine zusätzlichen Informationen hinterlegt.</p>';
-        const noteHtml = info.note ? `<div class="mmb-text-muted" style="font-size:.85rem;margin-top:.25rem;">${this.escape(info.note)}</div>` : '';
-        const structured = info.details_structured || buildFulfillmentDetails(info.details || {}, info.id);
-        const contact = structured.contact || {};
-        const shipping = structured.shipping || {};
-        const delivery = structured.delivery || {};
-        const meta = structured.meta || {};
-        const missing = Array.isArray(structured.missing) ? structured.missing.filter(Boolean) : [];
-        const consentLabel = contact.consent === true
-          ? 'Ja, Telefon/WhatsApp erlaubt'
-          : contact.consent === false
-            ? 'Nein, bitte nur E-Mail'
-            : 'Nicht angegeben';
-        const contactEntries = [];
-        if(contact.name) contactEntries.push(`<div><strong>Name:</strong> ${this.escape(contact.name)}</div>`);
-        if(contact.phone) contactEntries.push(`<div><strong>Telefon:</strong> ${this.escape(contact.phone)}</div>`);
-        if(contact.email) contactEntries.push(`<div><strong>E-Mail:</strong> ${this.escape(contact.email)}</div>`);
-        contactEntries.push(`<div><strong>Kontaktfreigabe:</strong> ${this.escape(consentLabel)}</div>`);
-        const contactHtml = contactEntries.join('') || '<div class="mmb-text-muted">Keine Angaben</div>';
-        const shippingLines = [];
-        if(shipping.address_line1) shippingLines.push(this.escape(shipping.address_line1));
-        if(shipping.address_line2) shippingLines.push(this.escape(shipping.address_line2));
-        const cityLine = [shipping.postal_code, shipping.city].filter(Boolean).join(' ').trim();
-        if(cityLine) shippingLines.push(this.escape(cityLine));
-        if(shipping.address_extra) shippingLines.push(this.escape(shipping.address_extra));
-        const shippingHtml = shippingLines.length ? `<div>${shippingLines.join('<br>')}</div>` : '<div class="mmb-text-muted">Keine Angaben</div>';
-        const deliveryLines = [];
-        if(delivery.meeting_point) deliveryLines.push(`<div><strong>Treffpunkt:</strong> ${this.escape(delivery.meeting_point)}</div>`);
-        if(delivery.preferred_time) deliveryLines.push(`<div><strong>Wunschzeit:</strong> ${this.escape(delivery.preferred_time)}</div>`);
-        const deliveryHtml = deliveryLines.length ? deliveryLines.join('') : '<div class="mmb-text-muted">Keine Angaben</div>';
-        let submittedLabel = '';
-        if(meta.submitted_at){
-          const submittedDate = new Date(meta.submitted_at);
-          if(!Number.isNaN(submittedDate.getTime())){
-            submittedLabel = submittedDate.toLocaleString('de-DE', { dateStyle:'long', timeStyle:'short' });
-          } else {
-            submittedLabel = meta.submitted_at;
+        function createStatusBadge(status) {
+          const normalized = String(status || '').toLowerCase();
+          const label = normalized ? normalized.charAt(0).toUpperCase() + normalized.slice(1) : '–';
+          let cls = 'status-badge';
+          if (normalized === 'pending') {
+            cls += ' status-badge--pending';
+          } else if (normalized === 'confirmed') {
+            cls += ' status-badge--confirmed';
+          } else if (normalized === 'cancelled' || normalized === 'rejected') {
+            cls += ' status-badge--cancelled';
           }
+          return `<span class="${cls}">${escapeHtml(label)}</span>`;
         }
-        const metaParts = [];
-        if(submittedLabel){ metaParts.push(`<div><strong>Eingereicht am:</strong> ${this.escape(submittedLabel)}</div>`); }
-        if(meta.submitted_via){ metaParts.push(`<div><strong>Eingang via:</strong> ${this.escape(meta.submitted_via)}</div>`); }
-        if(meta.booking_display_id){ metaParts.push(`<div><strong>Display-ID:</strong> ${this.escape(meta.booking_display_id)}</div>`); }
-        const metaHtml = metaParts.length ? `<div class="mmb-field"><strong>Metadaten</strong>${metaParts.join('')}</div>` : '';
-        const attentionHtml = info.needsAttention && missing.length
-          ? `<div class="mmb-warning" style="margin-top:.5rem;">⚠️ Es fehlen noch: ${this.escape(missing.join(', '))}</div>`
-          : '';
-        const detailSections = [];
-        detailSections.push(`<div class="mmb-field"><strong>Kontakt</strong>${contactHtml}</div>`);
-        if(info.method === 'shipping'){
-          detailSections.push(`<div class="mmb-field"><strong>Lieferadresse</strong>${shippingHtml}</div>`);
-        }
-        if(info.method === 'delivery'){
-          detailSections.push(`<div class="mmb-field"><strong>Lieferdetails</strong>${deliveryHtml}</div>`);
-        }
-        const detailHtml = detailSections.join('');
-        const display = info.displayLabel && info.displayLabel.trim() ? info.displayLabel : fulfillmentDisplayLabel(info);
-        const html = `
-          <div class="mmb-field"><strong>Abwicklung</strong><div>${this.escape(display)}</div>${noteHtml}</div>
-          ${attentionHtml}
-          <div class="mmb-field"><strong>Informationen</strong>${instructionHtml}</div>
-          ${detailHtml}
-          ${metaHtml}
-        `;
-        await this.openModal({ title:`Abwicklung – ${displayId(b)}`, html, confirmText:'Schließen', cancelText:'' });
-      }
 
-      tplConfirm(b){
-        const range = `${new Date(b.start_date).toLocaleDateString('de-DE')} – ${new Date(b.end_date).toLocaleDateString('de-DE')}`;
-        const instructions = this.fulfillmentInstructionText(b);
-        return `Hallo ${b.customer_name},
-
-hier sind hervorragende Neuigkeiten für dich 🎉
-        Wir haben deine Buchung mit der Buchungs-ID: ${displayId(b)} bestätigt.
-
-Deine Buchung im Überblick:
-👤 Name: ${b.customer_name}
-📧 E-Mail: ${b.customer_email}
-🎵 Musikbox: ${b.box_name}
-🕰️ Zeitraum: ${range}
-🚚 Abwicklung: ${this.fulfillmentEmailLine(b)}
-💶 Gesamtkosten: ${this.formatEuro(b.price_total)}
-
-Informationen für deine gewählte Abwicklung:
-${instructions}
-
-Bitte überprüfe einmal, ob wir deine Buchung korrekt hinterlegt haben.
-
-Falls du noch offene Fragen hast, kannst du uns jederzeit kontaktieren.
-
-Viele Grüße
-Dein MietMichBox Team
-www.mietmichbox.de
-
-E-Mail: info@mietmichbox.de
-Telefon: 01742015500`;
-      }
-
-      tplReject(b){
-        const range = `${new Date(b.start_date).toLocaleDateString('de-DE')} – ${new Date(b.end_date).toLocaleDateString('de-DE')}`;
-        return `Hallo ${b.customer_name},
-
-        vielen Dank für deine Buchung (${displayId(b)}) für den Zeitraum ${range}.
-Leider können wir diese Buchung nicht annehmen, da zu deinem gewählten Zeitraum bereits alle unsere Musikboxen vermietet sind.
-
-Du kannst gerne direkt in unserem <a href="https://www.mietmichbox.de/buchungskalender" target="_blank" rel="noopener">Buchungskalender</a> eine neue Buchung zu einem anderen Zeitraum anfragen oder uns als Antwort auf diese E-Mail alternative Zeiträume nennen, sodass wir gemeinsam eine Lösung finden können. Wir helfen dir gerne schnellstmöglich weiter.
-
-Falls du noch offene Fragen hast, kannst du uns jederzeit kontaktieren.
-
-Viele Grüße
-Dein MietMichBox Team
-www.mietmichbox.de
-
-E-Mail: info@mietmichbox.de
-Telefon: 01742015500`;
-      }
-
-      tplAlternative(b, alternatives){
-        const range = `${new Date(b.start_date).toLocaleDateString('de-DE')} – ${new Date(b.end_date).toLocaleDateString('de-DE')}`;
-        const names = Array.isArray(alternatives)
-          ? alternatives.map(x=>x?.name).filter(Boolean)
-          : (alternatives && alternatives.name ? [alternatives.name] : []);
-        let altSentence;
-        if(names.length === 0){
-          altSentence = 'Wir schlagen dir als Alternative aktuell keine weitere Box vor.';
-        }else if(names.length === 1){
-          altSentence = `Wir schlagen dir als Alternative die ${names[0]} vor.`;
-        }else if(names.length === 2){
-          altSentence = `Wir schlagen dir als Alternative die ${names[0]} oder die ${names[1]} vor.`;
-        }else{
-          const list = names.slice();
-          const last = list.pop();
-          altSentence = `Wir schlagen dir als Alternative die ${list.join(', die ')} oder die ${last} vor.`;
-        }
-        return `Hallo ${b.customer_name},
-
-tut uns leid, aber unsere Musikboxen sind sehr gefragt 🔥
-
-        Für deine Buchung (${displayId(b)}) ist die Musikbox ${b.box_name} für den Zeitraum ${range} leider nicht mehr verfügbar. ${altSentence}
-
-Du kannst gerne direkt in unserem <a href="https://www.mietmichbox.de/buchungskalender" target="_blank" rel="noopener">Buchungskalender</a> eine neue Buchung mit einer anderen Musikbox oder zu einem anderen Zeitraum anfragen. Alternativ kannst du uns auch als Antwort auf diese E-Mail die alternative Musikbox oder den alternativen Zeitraum nennen, sodass wir deine Buchung aktualisieren können. Wir helfen dir gerne schnellstmöglich weiter.
-
-Falls du noch offene Fragen hast, kannst du uns jederzeit kontaktieren.
-
-Viele Grüße
-Dein MietMichBox Team
-www.mietmichbox.de
-
-E-Mail: info@mietmichbox.de
-Telefon: 01742015500`;
-      }
-
-      tplEditInfo(b){
-        const start = new Date(b.start_date);
-        const end = new Date(b.end_date);
-        const validStart = !Number.isNaN(start.getTime());
-        const validEnd = !Number.isNaN(end.getTime());
-        const range = (validStart && validEnd)
-          ? `${start.toLocaleDateString('de-DE')} – ${end.toLocaleDateString('de-DE')}`
-          : `${b.start_date} – ${b.end_date}`;
-        const price = Number(b.price_total ?? b.total_amount ?? 0);
-        const priceLabel = Number.isFinite(price)
-          ? price.toLocaleString('de-DE', {minimumFractionDigits:2, maximumFractionDigits:2})
-          : (b.price_total ?? b.total_amount ?? '0');
-        const statusLabel = this.translateStatus(b.status || 'pending');
-        const name = b.customer_name || 'Kund*in';
-        const email = b.customer_email || '–';
-        const box = b.box_name || BOX_MAP[String(b.box_id)] || '—';
-        const fulfillment = this.fulfillmentEmailLine(b);
-        const instructions = this.fulfillmentInstructionText(b);
-        return `Hallo ${name},
-
-        wir haben Details in deiner Buchung (${displayId(b)}) aktualisiert.
-
-Deine aktualisierte Buchung im Überblick:
-👤 Name: ${name}
-📧 E-Mail: ${email}
-🎵 Musikbox: ${box}
-🕰️ Zeitraum: ${range}
-🚚 Abwicklung: ${fulfillment}
-💶 Preis: ${priceLabel}€
-
-Informationen für deine gewählte Abwicklung:
-${instructions}
-
-Bitte überprüfe einmal, ob wir deine Buchung korrekt hinterlegt haben.
-
-Falls du noch offene Fragen hast, kannst du uns jederzeit kontaktieren.
-
-Viele Grüße
-Dein MietMichBox Team
-www.mietmichbox.de
-
-E-Mail: info@mietmichbox.de
-Telefon: 01742015500`;
-      }
-    }
-
-    injectAdminListCSS();
-    global.MietMichBoxAdminList={ init:(opts)=>new AdminList(opts) };
-
-  })(window);
-  </script>
-
-  <!-- ======================= INIT ======================= -->
-  <script>
-    document.addEventListener('DOMContentLoaded', async function(){
-      try {
-        await MMBAdminAuth.ensureSession();
-      } catch (error) {
-        const reason = error instanceof Error ? error : new Error(String(error));
-        console.error('Admin-Authentifizierung konnte nicht geprüft werden.', reason);
-      }
-
-      try {
-        MietMichBoxAdminList.init({ container:'#mmb-admin-list', locale:'de-DE', timezone:'Europe/Berlin' });
-      } catch (error) {
-        console.error('Admin-Buchungsliste konnte nicht initialisiert werden', error);
-        const container = document.querySelector('#mmb-admin-list');
-        if (container) {
-          container.innerHTML = '<p class="mmb-error">Die Buchungsliste konnte nicht geladen werden. Bitte versuchen Sie es erneut oder wenden Sie sich an den Support.</p>';
-        }
-      }
+        loadData();
+      },
     });
+  })();
   </script>
 </body>
 </html>

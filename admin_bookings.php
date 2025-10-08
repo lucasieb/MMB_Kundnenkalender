@@ -2,8 +2,8 @@
 // admin_bookings.php – einfache Tabelle aller Buchungen (mit Login-Schutz)
 declare(strict_types=1);
 require __DIR__.'/db.php';
-require __DIR__.'/auth.php';
-require_admin();
+require __DIR__ . '/admin_guard.php';
+admin_require_password();
 
 // HTML-Header mit UTF-8 (muss NACH dem include kommen, um den JSON-Header zu überschreiben)
 header('Content-Type: text/html; charset=utf-8');
