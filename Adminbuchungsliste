@@ -25,40 +25,40 @@
 
     body {
       margin: 0;
-      padding: 0;
+      padding: 18px 14px;
       background: var(--admin-bg);
       font-family: 'Poppins', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
       color: var(--admin-text);
-      min-height: 100vh;
     }
 
     .card {
-      max-width: 1220px;
-      min-height: 700px;
-      margin: 40px auto;
+      width: min(100%, 1120px);
+      margin: 0 auto;
       background: var(--admin-card-bg);
       border-radius: var(--admin-radius);
+      border: 1px solid var(--admin-border);
       box-shadow: var(--admin-shadow);
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      min-height: 540px;
     }
 
     .card h1 {
       margin: 0;
-      padding: 28px 32px;
+      padding: 22px 24px;
       border-bottom: 1px solid var(--admin-border);
-      font-size: 1.65rem;
+      font-size: 1.55rem;
       font-weight: 600;
       letter-spacing: 0.01em;
     }
 
     .card .content {
       flex: 1;
-      padding: 28px 32px 36px;
+      padding: 22px 24px 28px;
       display: flex;
       flex-direction: column;
-      gap: 24px;
+      gap: 22px;
       min-height: 0;
     }
 
@@ -506,6 +506,18 @@
       color: var(--admin-muted);
     }
 
+    code {
+      font-family: 'Fira Code', 'SFMono-Regular', Menlo, Consolas, monospace;
+      font-size: 0.85em;
+      background: rgba(15, 23, 42, 0.05);
+      padding: 2px 4px;
+      border-radius: 4px;
+    }
+
+    small {
+      color: var(--admin-muted);
+    }
+
     .text-ellipsis {
       max-width: 220px;
       white-space: nowrap;
@@ -514,8 +526,8 @@
     }
 
     @media (max-width: 1080px) {
-      .card {
-        margin: 28px auto;
+      body {
+        padding: 16px 12px;
       }
 
       .admin-layout {
@@ -530,13 +542,17 @@
     }
 
     @media (max-width: 720px) {
+      body {
+        padding: 14px 10px;
+      }
+
       .card {
-        margin: 16px;
         border-radius: 18px;
+        min-height: auto;
       }
 
       .card .content {
-        padding: 20px;
+        padding: 18px;
       }
 
       .admin-toolbar {
@@ -571,7 +587,7 @@
     </div>
   </div>
 
-  <script data-api-base="./">
+  <script data-api-base="auto">
   (function () {
     if (window.MMBAdminPortal) {
       return;
@@ -580,12 +596,45 @@
     const script = document.currentScript;
 
     function resolveBase() {
-      const baseAttr = script ? script.getAttribute('data-api-base') : null;
-      try {
-        return new URL(baseAttr || './', window.location.href);
-      } catch (error) {
-        return new URL('./', window.location.href);
+      const attr = script ? script.getAttribute('data-api-base') : null;
+      const normalizedAttr = attr ? attr.trim() : '';
+      const candidates = [];
+
+      if (typeof window.MMB_ADMIN_API_BASE === 'string' && window.MMB_ADMIN_API_BASE.trim() !== '') {
+        candidates.push(window.MMB_ADMIN_API_BASE.trim());
       }
+
+      if (normalizedAttr && normalizedAttr.toLowerCase() !== 'auto') {
+        candidates.push(normalizedAttr);
+      }
+
+      const host = (window.location && window.location.hostname ? window.location.hostname : '').toLowerCase();
+
+      if (host && host !== 'www.mietmichbox.de' && host.endsWith('mietmichbox.de')) {
+        candidates.push('https://www.mietmichbox.de/');
+      }
+
+      candidates.push('https://www.mietmichbox.de/');
+
+      if (host === 'localhost' || host === '127.0.0.1') {
+        candidates.push('./');
+      }
+
+      candidates.push('./');
+
+      for (let i = 0; i < candidates.length; i += 1) {
+        const candidate = candidates[i];
+        if (!candidate) {
+          continue;
+        }
+        try {
+          return new URL(candidate, window.location.href);
+        } catch (error) {
+          // ignore invalid candidate
+        }
+      }
+
+      return new URL('./', window.location.href);
     }
 
     const baseUrl = resolveBase();
@@ -670,6 +719,7 @@
         error.code = 'NO_PASSWORD';
         throw error;
       }
+    }
 
       const headers = Object.assign({ Accept: 'application/json' }, options.headers || {});
       headers['X-Admin-Password'] = password;
@@ -800,22 +850,13 @@
           button.textContent = 'Anmelden';
         }
       }
+    }
 
       form.addEventListener('submit', handleSubmit);
 
       if (input) {
         input.focus();
       }
-    }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <h1>Admin – Buchungsliste</h1>
-    <div class="content">
-      <div id="admin-app" class="admin-app"></div>
-    </div>
-  </div>
 
       return {
         setMessage,
@@ -891,6 +932,16 @@
             setPassword('');
           });
       }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Admin – Buchungsliste</h1>
+    <div class="content">
+      <div id="admin-app" class="admin-app"></div>
+    </div>
+  </div>
 
       return {
         destroy() {
@@ -921,13 +972,13 @@
   })();
   </script>
 
-  <script data-api-base="./">
+  <script data-api-base="auto">
   (function () {
     const portal = window.MMBAdminPortal;
     const host = document.getElementById('admin-app');
     if (!portal || !host) {
       if (host) {
-        host.innerHTML = '<p class="admin-details-empty">Admin-Skript konnte nicht geladen werden.</p>';
+        host.innerHTML = '<p class="admin-details-empty">Admin-Skript konnte nicht geladen werden.<br/><small>Bitte prüfe die Einbettung oder setze <code>window.MMB_ADMIN_API_BASE</code> auf die Backend-URL.</small></p>';
       }
       return;
     }
