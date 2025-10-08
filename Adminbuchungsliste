@@ -806,6 +806,16 @@
       if (input) {
         input.focus();
       }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Admin – Buchungsliste</h1>
+    <div class="content">
+      <div id="admin-app" class="admin-app"></div>
+    </div>
+  </div>
 
       return {
         setMessage,
