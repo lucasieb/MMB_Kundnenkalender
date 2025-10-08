@@ -719,6 +719,7 @@
         error.code = 'NO_PASSWORD';
         throw error;
       }
+    }
 
       const headers = Object.assign({ Accept: 'application/json' }, options.headers || {});
       headers['X-Admin-Password'] = password;
@@ -849,6 +850,7 @@
           button.textContent = 'Anmelden';
         }
       }
+    }
 
       form.addEventListener('submit', handleSubmit);
 
@@ -930,6 +932,16 @@
             setPassword('');
           });
       }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Admin – Buchungsliste</h1>
+    <div class="content">
+      <div id="admin-app" class="admin-app"></div>
+    </div>
+  </div>
 
       return {
         destroy() {
