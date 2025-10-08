@@ -5,8 +5,8 @@ require __DIR__ . '/db.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
-require __DIR__.'/auth.php';
-require_admin();
+require __DIR__ . '/admin_guard.php';
+admin_require_password();
 
 try {
   $raw = file_get_contents('php://input');
