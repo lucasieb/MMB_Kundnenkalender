@@ -2,8 +2,8 @@
 declare(strict_types=1);
 require __DIR__ . '/cors.php';        // <-- NEU: muss vor jeglicher Ausgabe stehen
 require __DIR__ . '/db.php';
-require __DIR__ . '/auth.php';        // falls genutzt
-require_admin();
+require __DIR__ . '/admin_guard.php';
+admin_require_password();
 
 $pdo = null;
 
