@@ -586,6 +586,11 @@ class Calendar{
         days: sum.days,
         base_total: sum.total,
         shipping_delta: shipping,
+        discount_amount: sum.discountAmount,
+        discount_percent_exact: sum.discountPercentExact,
+        discount_percent_display: sum.discountPercentDisplay,
+        avg_per_day: sum.avgPerDay,
+        pricing_mode: 'range',
         fulfillment_id: option.id,
         fulfillment_label: meta.shortLabel,
         fulfillment_note: meta.note,
@@ -619,6 +624,11 @@ class Calendar{
         days: 1,
         base_total: base,
         shipping_delta: shipping,
+        discount_amount: 0,
+        discount_percent_exact: 0,
+        discount_percent_display: '0',
+        avg_per_day: base,
+        pricing_mode: 'single',
         fulfillment_id: option.id,
         fulfillment_label: meta.shortLabel,
         fulfillment_note: meta.note,
@@ -933,6 +943,16 @@ class Calendar{
           contactDefaults.customer_phone = details.contact_phone || contactDefaults.customer_phone;
           payload.fulfillment_details_json = serialized;
           payload.fulfillment_details = serialized;
+        }
+
+        if(summaryInfo){
+          try {
+            const summarySerialized = JSON.stringify(summaryInfo);
+            payload.pricing_details_json = summarySerialized;
+            payload.pricing_details = summarySerialized;
+          } catch(err){
+            console.error('summary serialization failed', err);
+          }
         }
 
         const res=await sendBooking(BOOKING_URLS, payload);
