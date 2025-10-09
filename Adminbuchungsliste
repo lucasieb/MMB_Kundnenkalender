@@ -6,9 +6,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>MietMichBox – Admin Buchungsliste</title>
   <style>
-    :root{--mmb-shell-padding:32px;}
+    :root{--mmb-shell-padding:0px;}
     @media (max-width:900px){:root{--mmb-shell-padding:18px;}}
-    body{margin:0;min-height:100vh;background:#f4f4f0;font-family:'Poppins',sans-serif;color:#111827;display:flex;}
+    body{margin:0;min-height:100vh;background:#f1f1f1;font-family:'Poppins',sans-serif;color:#111827;display:flex;}
     #mmb-admin-shell{flex:1;min-height:100vh;display:flex;}
     #mmb-admin-list{flex:1;display:flex;padding:var(--mmb-shell-padding);box-sizing:border-box;}
     .mmb-error{margin-top:1.5rem;padding:1rem;border-radius:8px;background:#fee2e2;color:#b91c1c;font-weight:600;}
@@ -142,8 +142,8 @@
     function injectAdminListCSS(){
       if(document.getElementById('mmb-admin-list-css')) return;
       const s=document.createElement('style'); s.id='mmb-admin-list-css'; s.textContent=`
-        #mmb-admin-list{position:relative;min-height:0;}
-        #mmb-admin-list>.mmb-widget{flex:1;display:flex;flex-direction:column;gap:1rem;padding:1.75rem 2rem;background:rgba(255,255,255,.88);backdrop-filter:blur(18px);border-radius:18px;box-shadow:none;border:1px solid rgba(15,23,42,.08);}
+        #mmb-admin-list{position:relative;min-height:0;background:var(--mmb-bg);}
+        #mmb-admin-list>.mmb-widget{flex:1;display:flex;flex-direction:column;gap:1rem;padding:1.5rem 2rem;background:var(--mmb-bg);border-radius:0;box-shadow:none;border:none;min-height:100vh;}
         @media (max-width:900px){#mmb-admin-list>.mmb-widget{padding:1.25rem;}}
         .mmb-admin-filters{
           display:grid;
@@ -151,16 +151,28 @@
           gap:.65rem;padding:1rem 1.25rem; background:rgba(17,24,39,.04); border-radius:14px; align-items:center;
         }
         .mmb-admin-filters select,.mmb-admin-filters input{ padding:.55rem .65rem;border:1px solid var(--mmb-border);border-radius:10px;background:var(--mmb-bg);color:var(--mmb-text);font-size:.9rem;}
-        .mmb-admin-list-wrap{flex:1;min-height:0;overflow:auto;margin:0;border-radius:14px;border:1px solid rgba(15,23,42,.06);background:var(--mmb-bg);box-shadow:none;height:100%;max-height:calc(10 * 58px + 52px);}
-        .mmb-bookings-table{width:100%;border-collapse:collapse;background:var(--mmb-bg);table-layout:fixed;}
-        .mmb-bookings-table th,.mmb-bookings-table td{padding:.45rem .6rem;border-bottom:1px solid var(--mmb-border);text-align:left;vertical-align:middle;box-sizing:border-box;line-height:1.35;}
-        .mmb-bookings-table th{background:rgba(17,24,39,.05);font-weight:600;position:sticky;top:0;z-index:2;}
-        .mmb-bookings-table tbody tr{height:58px;}
-        .mmb-bookings-table th.cell-head-box,.mmb-bookings-table td.cell--box{min-width:188px;white-space:nowrap;}
-        .mmb-bookings-table th.cell-head-date,.mmb-bookings-table td.cell--date{min-width:156px;width:156px;white-space:nowrap;}
-        .mmb-bookings-table th.cell-head-fulfillment,.mmb-bookings-table td.cell--fulfillment{width:150px;min-width:140px;white-space:nowrap;}
-        .mmb-bookings-table th.cell-head-price,.mmb-bookings-table td.cell--total{width:110px;min-width:96px;white-space:nowrap;text-align:right;}
-        .mmb-bookings-table th.cell-head-status,.mmb-bookings-table td.cell--status{width:110px;}
+        .mmb-admin-list-wrap{flex:1;min-height:0;overflow:auto;margin:0;background:rgba(255,255,255,.95);box-shadow:none;height:100%;max-height:calc(10 * 52px + 48px);}
+        .mmb-bookings-table{width:100%;border-collapse:collapse;background:transparent;table-layout:fixed;}
+        .mmb-bookings-table th,.mmb-bookings-table td{padding:.4rem .55rem;border-bottom:1px solid var(--mmb-border);text-align:left;vertical-align:middle;box-sizing:border-box;line-height:1.25;}
+        .mmb-bookings-table th{background:rgba(17,24,39,.06);font-weight:600;position:sticky;top:0;z-index:2;}
+        .mmb-bookings-table tbody tr{min-height:52px;}
+        .mmb-bookings-table th.cell-head-id,.mmb-bookings-table td.cell--id{width:82px;min-width:76px;white-space:nowrap;}
+        .mmb-bookings-table th.cell-head-customer,.mmb-bookings-table td.cell--customer{min-width:220px;}
+        .mmb-bookings-table th.cell-head-box,.mmb-bookings-table td.cell--box{min-width:200px;white-space:nowrap;}
+        .mmb-bookings-table th.cell-head-date,.mmb-bookings-table td.cell--date{min-width:150px;width:150px;}
+        .mmb-bookings-table th.cell-head-fulfillment,.mmb-bookings-table td.cell--fulfillment{width:132px;min-width:120px;}
+        .mmb-bookings-table th.cell-head-price,.mmb-bookings-table td.cell--total{width:96px;min-width:88px;white-space:nowrap;text-align:right;}
+        .mmb-bookings-table th.cell-head-status,.mmb-bookings-table td.cell--status{width:96px;}
+        .mmb-bookings-table td.cell--id{font-size:.82rem;font-weight:600;}
+        .mmb-bookings-table td.cell--id .badge-id{display:inline-block;}
+        .mmb-bookings-table td.cell--customer{display:flex;flex-direction:column;gap:.15rem;}
+        .mmb-bookings-table td.cell--customer .cell--name{font-weight:500;font-size:.88rem;}
+        .mmb-bookings-table td.cell--customer .cell--email{font-size:.72rem;color:var(--mmb-text-light);word-break:break-word;}
+        .mmb-bookings-table td.cell--date{font-size:.78rem;line-height:1.25;}
+        .mmb-bookings-table td.cell--date .date-range{display:flex;flex-direction:column;gap:.15rem;align-items:flex-start;}
+        .mmb-bookings-table td.cell--date .date-range.date-range--single{justify-content:center;text-align:left;}
+        .mmb-bookings-table td.cell--date .date-range span{display:block;}
+        .mmb-bookings-table td.cell--fulfillment{white-space:nowrap;}
         .mmb-bookings-table td.cell--total{font-variant-numeric:tabular-nums;white-space:nowrap;}
         .mmb-bookings-table th.cell-head-actions,.mmb-bookings-table td.cell--actions{min-width:210px;}
         .mmb-btn{background:var(--mmb-accent);color:#fff;border:none;padding:.45rem .75rem;border-radius:10px;font-size:.83rem;font-weight:500;cursor:pointer;transition:background-color .2s;}
@@ -193,7 +205,7 @@
         .mmb-modal-btn{padding:.5rem 1rem;border:1px solid var(--mmb-border);border-radius:6px;cursor:pointer;font-size:.9rem;font-family:inherit;}
         .mmb-modal-btn-primary{background:var(--mmb-accent);color:#fff;border-color:var(--mmb-accent);}
         .mmb-modal-btn-secondary{background:var(--mmb-bg);color:var(--mmb-text);}
-        .mmb-status-badge{display:inline-flex;justify-content:center;align-items:center;width:6.8rem;min-width:6.8rem;height:26px;border-radius:9999px;font-weight:600;font-size:.75rem;}
+        .mmb-status-badge{display:inline-flex;justify-content:center;align-items:center;min-width:0;width:auto;height:22px;padding:0 .6rem;border-radius:9999px;font-weight:600;font-size:.72rem;}
         .mmb-status-pending{background:#fef3c7;color:#92400e;}
         .mmb-status-confirmed{background:#d1fae5;color:#065f46;}
         .mmb-status-rejected{background:#ffe4e6;color:#9f1239;}
@@ -266,7 +278,6 @@
           const boxId = String(r.box_id);
           const totalAmount = Number(r.total_amount ?? 0);
           const deposit = Number(r.deposit_eur ?? 0);
-          const fulfillmentPrice = Number(r.fulfillment_price_delta ?? 0);
           const pricingRaw = r.pricing_details_json ?? r.pricing_details ?? null;
           const parsedPricing = this.safeParseJson(pricingRaw);
           const normalizedPricing = this.normalizePricingDetails(parsedPricing);
@@ -274,6 +285,7 @@
           const fulfillmentDetailsRaw = r.fulfillment_details_json ?? r.fulfillment_details ?? null;
           const parsedFulfillmentDetails = this.safeParseJson(fulfillmentDetailsRaw);
           const normalizedFulfillmentDetails = this.normalizeFulfillmentDetails(parsedFulfillmentDetails, (r.fulfillment_method || '').toString());
+          const fulfillmentMeta = this.computeFulfillmentMeta(r, normalizedFulfillmentDetails);
           const fulfillmentCanonical = this.stableStringify(normalizedFulfillmentDetails || {});
           return {
             id:String(r.id),
@@ -288,10 +300,11 @@
             note:r.note ?? '',
             price_total:Number.isFinite(totalAmount)?totalAmount:0,
             deposit_eur:Number.isFinite(deposit)?deposit:0,
-            fulfillment_method:(r.fulfillment_method||'').toString(),
-            fulfillment_label:r.fulfillment_label ?? '',
-            fulfillment_note:r.fulfillment_note ?? '',
-            fulfillment_price_delta:Number.isFinite(fulfillmentPrice)?fulfillmentPrice:0,
+            fulfillment_method:fulfillmentMeta.method,
+            fulfillment_label:fulfillmentMeta.label,
+            fulfillment_note:fulfillmentMeta.note,
+            fulfillment_price_delta:fulfillmentMeta.priceDelta,
+            fulfillment_adds_to_total:fulfillmentMeta.addsToTotal,
             created_at:r.created_at,
             pricing_details: normalizedPricing,
             pricing_details_raw: pricingRaw,
@@ -381,7 +394,7 @@
           return `
             <table class="mmb-bookings-table">
               <thead>
-                <tr><th>ID</th><th>Kunde</th><th class="cell-head-box">Box</th><th class="cell-head-date">Zeitraum</th><th class="cell-head-fulfillment">Abwicklung</th><th class="cell-head-price">Preis</th><th class="cell-head-status">Status</th><th class="cell-head-actions">Aktionen</th></tr>
+                <tr><th class="cell-head-id">ID</th><th class="cell-head-customer">Kunde</th><th class="cell-head-box">Box</th><th class="cell-head-date">Zeitraum</th><th class="cell-head-fulfillment">Abwicklung</th><th class="cell-head-price">Preis</th><th class="cell-head-status">Status</th><th class="cell-head-actions">Aktionen</th></tr>
               </thead>
               <tbody><tr><td colspan="8" style="padding:1rem;color:var(--mmb-text-light);">Keine Buchungen vorhanden</td></tr></tbody>
             </table>`;
@@ -389,7 +402,7 @@
         return `
         <table class="mmb-bookings-table">
           <thead>
-            <tr><th>ID</th><th>Kunde</th><th class="cell-head-box">Box</th><th class="cell-head-date">Zeitraum</th><th class="cell-head-fulfillment">Abwicklung</th><th class="cell-head-price">Preis</th><th class="cell-head-status">Status</th><th class="cell-head-actions">Aktionen</th></tr>
+            <tr><th class="cell-head-id">ID</th><th class="cell-head-customer">Kunde</th><th class="cell-head-box">Box</th><th class="cell-head-date">Zeitraum</th><th class="cell-head-fulfillment">Abwicklung</th><th class="cell-head-price">Preis</th><th class="cell-head-status">Status</th><th class="cell-head-actions">Aktionen</th></tr>
           </thead>
           <tbody>
             ${rows.map(b=>this.renderRow(b)).join('')}
@@ -409,10 +422,11 @@
         const fulfillmentInfo = this.getFulfillmentInfo(b);
         const fulfillmentNoteAttr = fulfillmentInfo.note ? ` title="${this.escape(fulfillmentInfo.note)}"` : '';
 
+        const emailLine = b.customer_email ? `<span class="cell--email">${this.escape(b.customer_email)}</span>` : '';
         return `
         <tr>
-          <td><span class="badge-id">${displayId(b.id)}</span></td>
-          <td><div class="cell--name">${this.escape(b.customer_name)}</div><div class="cell--email" style="font-size:.75rem;color:var(--mmb-text-light);">${this.escape(b.customer_email)}</div></td>
+          <td class="cell--id"><span class="badge-id">${displayId(b.id)}</span></td>
+          <td class="cell--customer"><span class="cell--name">${this.escape(b.customer_name)}</span>${emailLine}</td>
           <td class="cell--box">${this.escape(b.box_name)}</td>
           <td class="cell--date">${this.renderDateCell(b)}</td>
           <td class="cell--fulfillment"${fulfillmentNoteAttr}>${this.escape(this.formatFulfillmentCell(b))}</td>
@@ -453,11 +467,14 @@
         const wrap=(content)=>`<span class="date-range">${content}</span>`;
         if(start && end){
           const same=start.getFullYear()===end.getFullYear() && start.getMonth()===end.getMonth() && start.getDate()===end.getDate();
-          return same ? `<span>${fmt(start)}</span>` : `<span>${fmt(start)} – ${fmt(end)}</span>`;
+          if(same){
+            return `<div class="date-range date-range--single"><span>${fmt(start)}</span></div>`;
+          }
+          return `<div class="date-range"><span>${fmt(start)}</span><span>${fmt(end)}</span></div>`;
         }
-        if(start){ return wrap(`<span>${fmt(start)}</span>`); }
-        if(end){ return wrap(`<span>${fmt(end)}</span>`); }
-        return wrap('<span>–</span>');
+        if(start){ return `<div class="date-range date-range--single"><span>${fmt(start)}</span></div>`; }
+        if(end){ return `<div class="date-range date-range--single"><span>${fmt(end)}</span></div>`; }
+        return `<div class="date-range date-range--single"><span>–</span></div>`;
       }
 
       renderFooter(){
@@ -1093,22 +1110,62 @@
       translateStatus(s){ return ({pending:'Ausstehend',confirmed:'Bestätigt',rejected:'Abgelehnt',cancelled:'Storniert'})[s]||s; }
 
       getFulfillmentChoice(id){ return FULFILLMENT_LOOKUP[id] || FULFILLMENT_CHOICES[0]; }
-      getFulfillmentInfo(b){
-        const raw = (b.fulfillment_method || '').toString().toLowerCase();
-        const choice = this.getFulfillmentChoice(raw);
-        const price = Number(b.fulfillment_price_delta ?? choice.priceDelta);
+      computeFulfillmentMeta(record, normalizedDetails){
+        const details = normalizedDetails && typeof normalizedDetails === 'object' ? normalizedDetails : {};
+        const fallbackMethod = (record.fulfillment_method ?? '').toString().toLowerCase();
+        const methodSource = details.method ?? fallbackMethod;
+        const method = (methodSource ?? '').toString().toLowerCase();
+        const choice = this.getFulfillmentChoice(method || fallbackMethod || 'pickup');
+        const label = details.label ?? record.fulfillment_label ?? choice.label;
+        const note = details.note ?? record.fulfillment_note ?? choice.note ?? '';
+        const priceCandidates = [details.price_delta, details.priceDelta, details.price, record.fulfillment_price_delta, choice.priceDelta];
+        const defaultPrice = Number(choice.priceDelta);
+        let priceDelta = Number.isFinite(defaultPrice) ? defaultPrice : 0;
+        for(const candidate of priceCandidates){
+          if(candidate === undefined || candidate === null) continue;
+          const num = Number(candidate);
+          if(Number.isFinite(num)){ priceDelta = num; break; }
+        }
+        const addsToTotalCandidate = details.adds_to_total ?? details.addsToTotal ?? record.fulfillment_adds_to_total;
+        const addsToTotal = typeof addsToTotalCandidate === 'boolean' ? addsToTotalCandidate : (choice.addsToTotal ?? true);
         return {
-          method: choice.id,
-          label: b.fulfillment_label || choice.label,
-          full: choice.full,
-          note: b.fulfillment_note || choice.note || '',
+          method: method || choice.id,
+          label: label || choice.label,
+          note,
+          priceDelta,
+          addsToTotal
+        };
+      }
+      getFulfillmentInfo(b){
+        const details = b.fulfillment_details && typeof b.fulfillment_details === 'object' ? b.fulfillment_details : {};
+        const rawMethod = details.method ?? b.fulfillment_method;
+        const raw = (rawMethod || '').toString().toLowerCase();
+        const choice = this.getFulfillmentChoice(raw);
+        const label = details.label ?? b.fulfillment_label ?? choice.label;
+        const note = details.note ?? b.fulfillment_note ?? choice.note ?? '';
+        const priceCandidates = [details.price_delta, details.priceDelta, details.price, b.fulfillment_price_delta, choice.priceDelta];
+        const defaultPrice = Number(choice.priceDelta);
+        let price = Number.isFinite(defaultPrice) ? defaultPrice : 0;
+        for(const candidate of priceCandidates){
+          if(candidate === undefined || candidate === null) continue;
+          const num = Number(candidate);
+          if(Number.isFinite(num)){ price = num; break; }
+        }
+        const addsToTotalCandidate = details.adds_to_total ?? details.addsToTotal ?? b.fulfillment_adds_to_total;
+        const addsToTotal = typeof addsToTotalCandidate === 'boolean' ? addsToTotalCandidate : (choice.addsToTotal ?? true);
+        const full = details.full ?? choice.full;
+        return {
+          method: raw || choice.id,
+          label: label || choice.label,
+          full,
+          note,
           priceDelta: Number.isFinite(price) ? price : choice.priceDelta,
-          addsToTotal: typeof choice.addsToTotal === 'boolean' ? choice.addsToTotal : (choice.id === 'delivery' ? false : true)
+          addsToTotal
         };
       }
       formatFulfillmentCell(b){
         const info = this.getFulfillmentInfo(b);
-        return info.label;
+        return info.label || info.full || '–';
       }
       formatEuro(amount){
         const num = Number(amount||0);
@@ -1887,7 +1944,29 @@
       normalizeFulfillmentDetails(details, fallbackMethod){
         if(!details || typeof details !== 'object') return null;
         const clone = JSON.parse(JSON.stringify(details));
-        if(!clone.method && fallbackMethod) clone.method = fallbackMethod;
+        const fallback = fallbackMethod ? fallbackMethod.toString().toLowerCase() : '';
+        if(clone.method){
+          clone.method = clone.method.toString().toLowerCase();
+        }else if(fallback){
+          clone.method = fallback;
+        }
+        if(clone.label !== undefined && clone.label !== null) clone.label = clone.label.toString();
+        if(clone.note !== undefined && clone.note !== null) clone.note = clone.note.toString();
+        if(clone.full !== undefined && clone.full !== null) clone.full = clone.full.toString();
+        const priceKey = clone.price_delta !== undefined ? 'price_delta' : (clone.priceDelta !== undefined ? 'priceDelta' : (clone.price !== undefined ? 'price' : null));
+        if(priceKey){
+          const num = Number(clone[priceKey]);
+          if(Number.isFinite(num)) clone.price_delta = num;
+          else delete clone[priceKey];
+        }
+        if(clone.price_delta === undefined && clone.priceDelta !== undefined){
+          const num = Number(clone.priceDelta);
+          if(Number.isFinite(num)) clone.price_delta = num;
+          delete clone.priceDelta;
+        }
+        if(clone.price !== undefined) delete clone.price;
+        if(clone.adds_to_total !== undefined){ clone.adds_to_total = !!clone.adds_to_total; }
+        if(clone.addsToTotal !== undefined){ clone.adds_to_total = !!clone.addsToTotal; delete clone.addsToTotal; }
         if(clone.contact_preferences && typeof clone.contact_preferences === 'object'){
           clone.contact_preferences = {
             phone: !!clone.contact_preferences.phone,
