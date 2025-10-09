@@ -51,6 +51,18 @@ try {
   $id = isset($data['id']) ? (int)$data['id'] : 0;
   if ($id <= 0) throw new Exception('Ungültige ID');
 
+  $columns = bookings_columns($pdo);
+  $hasColumn = function(string $field) use ($columns): bool {
+    return isset($columns[strtolower($field)]);
+  };
+
+  if (!$hasColumn('pricing_details_json') && $hasColumn('pricing_details') && array_key_exists('pricing_details_json', $data) && !array_key_exists('pricing_details', $data)) {
+    $data['pricing_details'] = $data['pricing_details_json'];
+  }
+  if (!$hasColumn('fulfillment_details_json') && $hasColumn('fulfillment_details') && array_key_exists('fulfillment_details_json', $data) && !array_key_exists('fulfillment_details', $data)) {
+    $data['fulfillment_details'] = $data['fulfillment_details_json'];
+  }
+
   // Whitelist erlaubter Felder
   $allow = ['customer_name','customer_email','customer_phone','box_id','start_date','end_date','status','total_amount','fulfillment_method','fulfillment_label','fulfillment_note','fulfillment_price_delta','note','deposit_eur','pricing_details_json','pricing_details','fulfillment_details_json','fulfillment_details'];
   $columns = bookings_columns($pdo);

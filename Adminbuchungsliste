@@ -254,6 +254,8 @@
           loading:false,
           filters:{ status:'', box:'', id:'', name:'' }
         };
+        this.activeDetailOverlayClose = null;
+        this.activeDetailOverlayBookingId = null;
         this.instanceId=Math.random().toString(36).substr(2,9); MMBCore.globalState.registerInstance(this.instanceId,this);
         this.init();
       }
@@ -459,6 +461,7 @@
         const start=parse(b.start_date);
         const end=parse(b.end_date);
         const fmt=(d)=>d?d.toLocaleDateString('de-DE'):'–';
+        const wrap=(content)=>`<span class="date-range">${content}</span>`;
         if(start && end){
           const same=start.getFullYear()===end.getFullYear() && start.getMonth()===end.getMonth() && start.getDate()===end.getDate();
           if(same){
@@ -676,6 +679,40 @@
           MMBCore.Utils.showNotification('Alternative versendet, aber E-Mail fehlgeschlagen'+err, 'error');
         }else{
           MMBCore.Utils.showNotification('Alternative vorgeschlagen (Status: Abgelehnt)');
+        }
+      }
+
+      async deleteBooking(id, booking=null, closeOverlay=null){
+        const current = booking || this.state.originalBookings.find(x=>String(x.id)===String(id));
+        if(!current){
+          MMBCore.Utils.showNotification('Buchung nicht gefunden','error');
+          return;
+        }
+        const display = displayId(current.id);
+        const html = `
+          <p>Diese Buchung wird dauerhaft entfernt und Kund*innen werden <strong>nicht</strong> informiert.</p>
+          <p><strong>Buchung:</strong> ${display} – ${this.escape(current.customer_name || 'Unbekannt')}</p>
+          <p>Möchtest du wirklich fortfahren?</p>
+        `;
+        const values = await this.openModal({
+          title:'Buchung endgültig löschen',
+          html,
+          confirmText:'Endgültig löschen',
+          cancelText:'Abbrechen'
+        });
+        if(!values) return;
+        try{
+          const response = await MMBApi.deleteBooking({ id: Number(id) });
+          const deleted = !response || response.deleted !== false;
+          if(typeof closeOverlay === 'function') closeOverlay();
+          else if(this.activeDetailOverlayClose) this.activeDetailOverlayClose();
+          const msg = deleted ? `Buchung ${display} wurde gelöscht` : `Buchung ${display} wurde nicht gefunden`;
+          const type = deleted ? 'info' : 'error';
+          MMBCore.Utils.showNotification(msg, type);
+          await this.loadBookings();
+        }catch(err){
+          console.error('deleteBooking error', err);
+          MMBCore.Utils.showNotification('Buchung konnte nicht gelöscht werden', 'error');
         }
       }
 
