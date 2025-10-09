@@ -6,27 +6,24 @@
   <title>MietMichBox – Admin Kalender</title>
   <style>
     :root{
-      --mmb-primary:#3b3b3b; --mmb-accent:#0EA5E9; --mmb-bg:#efefe6;
-      --mmb-muted:#f8f9fa; --mmb-ok:#10b981; --mmb-warn:#f59e0b;
-      --mmb-busy:#ef4444; --mmb-border:#e5e7eb; --mmb-text:#111; --mmb-text-light:#6b7280;
-      --mmb-shell-padding:32px;
+      --mmb-primary:#3b3b3b; --mmb-accent:#0EA5E9; --mmb-bg:#2f2f2f;
+      --mmb-muted:#464646; --mmb-ok:#10b981; --mmb-warn:#f59e0b;
+      --mmb-busy:#ef4444; --mmb-border:#4f4f4f; --mmb-text:#e5e7eb; --mmb-text-light:#b7b7b7;
+      --mmb-shell-padding:0px;
     }
     @media (max-width:900px){ :root{ --mmb-shell-padding:18px; } }
-    @media (prefers-color-scheme: dark){
-      :root{ --mmb-bg:#3b3b3b; --mmb-muted:#4a4a4a; --mmb-border:#555; --mmb-text:#fff; --mmb-text-light:#ccc; --mmb-primary:#fff; }
-    }
-    body{margin:0;min-height:100vh;background:#f4f4f0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--mmb-text);display:flex;}
+    body{margin:0;min-height:100vh;background:#3b3b3b;font-family:'Poppins',sans-serif;color:var(--mmb-text);display:flex;}
     #mmb-admin-shell{flex:1;min-height:100vh;display:flex;}
     #mmb-admin-cal{flex:1;display:flex;padding:var(--mmb-shell-padding);box-sizing:border-box;min-height:0;}
-    .mmb-widget{background:rgba(255,255,255,.88);border-radius:18px;box-shadow:none;border:1px solid rgba(15,23,42,.08);padding:1.75rem 2rem;flex:1;display:flex;flex-direction:column;backdrop-filter:blur(18px);}
-    @media (max-width:900px){.mmb-widget{padding:1.25rem;}}
+    #mmb-admin-cal>.mmb-widget{flex:1;display:flex;flex-direction:column;gap:1rem;padding:1.5rem 0;background:transparent;border-radius:0;box-shadow:none;border:none;min-height:100vh;}
+    @media (max-width:900px){#mmb-admin-cal>.mmb-widget{padding:1.25rem;}}
     .mmb-loading{display:flex;justify-content:center;align-items:center;height:200px;font-size:.9rem;color:var(--mmb-text-light);}
     .mmb-admin-controls{display:flex;align-items:center;gap:1rem;flex-wrap:wrap;}
     .mmb-box-buttons{display:flex;gap:.5rem;flex-wrap:wrap;}
     .mmb-box-btn{background:var(--mmb-bg);border:1px solid var(--mmb-border);color:var(--mmb-text);padding:.75rem 1rem;border-radius:4px;cursor:pointer;font-size:.875rem;font-weight:500;min-width:140px;}
     .mmb-box-btn:hover{background:var(--mmb-muted);} .mmb-box-btn--active{background:var(--mmb-accent);color:#fff;border-color:var(--mmb-accent);}
     .mmb-nav{display:flex;align-items:center;gap:1rem;margin-left:auto;}
-    .mmb-nav-btn{background:none;border:1px solid var(--mmb-border);color:var(--mmb-text);padding:.5rem .75rem;border-radius:4px;cursor:pointer;}
+    .mmb-nav-btn{background:var(--mmb-bg);border:1px solid var(--mmb-border);color:var(--mmb-text);padding:.5rem .75rem;border-radius:4px;cursor:pointer;}
     .mmb-month-title{font-weight:600;}
     .mmb-right{display:flex;align-items:center;gap:12px;margin-left:auto;}
     .mmb-block-mode{display:flex;align-items:center;gap:.5rem;background:var(--mmb-muted);padding:.5rem;border-radius:4px;}

@@ -8,7 +8,7 @@
   <style>
     :root{--mmb-shell-padding:0px;}
     @media (max-width:900px){:root{--mmb-shell-padding:18px;}}
-    body{margin:0;min-height:100vh;background:#0f172a;font-family:'Poppins',sans-serif;color:#e5e7eb;display:flex;}
+    body{margin:0;min-height:100vh;background:#3b3b3b;font-family:'Poppins',sans-serif;color:#e5e7eb;display:flex;}
     #mmb-admin-shell{flex:1;min-height:100vh;display:flex;}
     #mmb-admin-list{flex:1;display:flex;padding:var(--mmb-shell-padding);box-sizing:border-box;}
     .mmb-error{margin-top:1.5rem;padding:1rem;border-radius:8px;background:#fee2e2;color:#b91c1c;font-weight:600;}
@@ -142,7 +142,7 @@
     function injectAdminListCSS(){
       if(document.getElementById('mmb-admin-list-css')) return;
       const s=document.createElement('style'); s.id='mmb-admin-list-css'; s.textContent=`
-        #mmb-admin-list{position:relative;min-height:0;background:#0f172a;}
+        #mmb-admin-list{position:relative;min-height:0;background:#3b3b3b;}
         #mmb-admin-list>.mmb-widget{flex:1;display:flex;flex-direction:column;gap:1rem;padding:1.5rem 0;background:transparent;border-radius:0;box-shadow:none;border:none;min-height:100vh;}
         @media (max-width:900px){#mmb-admin-list>.mmb-widget{padding:1.25rem;}}
         .mmb-admin-filters{
