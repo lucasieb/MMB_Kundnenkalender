@@ -148,15 +148,15 @@
         .mmb-admin-filters{
           display:grid;
           grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
-          gap:.65rem;padding:1rem 1.25rem; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.08); border-radius:14px; align-items:center;
+          gap:.65rem;padding:1rem 1.25rem; background:#3b3b3b; border:1px solid rgba(255,255,255,.08); border-radius:14px; align-items:center;
         }
-        .mmb-admin-filters select,.mmb-admin-filters input{ padding:.55rem .65rem;border:1px solid rgba(255,255,255,.12);border-radius:10px;background:rgba(15,23,42,.85);color:#f1f5f9;font-size:.9rem;}
+        .mmb-admin-filters select,.mmb-admin-filters input{ padding:.55rem .65rem;border:1px solid rgba(255,255,255,.14);border-radius:10px;background:#3b3b3b;color:#f1f5f9;font-size:.9rem;}
         .mmb-admin-filters input::placeholder{color:rgba(226,232,240,.6);}
-        .mmb-admin-list-wrap{flex:1;min-height:0;overflow:auto;margin:0;background:rgba(15,23,42,.92);box-shadow:none;height:100%;max-height:calc(10 * 46px + 44px);border-radius:0;border:none;color:#e5e7eb;}
+        .mmb-admin-list-wrap{flex:1;min-height:0;overflow:auto;margin:0;background:#3b3b3b;box-shadow:none;height:100%;max-height:calc(10 * 46px + 44px);border-radius:0;border:none;color:#e5e7eb;}
         .mmb-bookings-table{width:100%;border-collapse:collapse;background:transparent;table-layout:fixed;color:inherit;}
         .mmb-bookings-table th,.mmb-bookings-table td{padding:.35rem .5rem;border-bottom:1px solid rgba(255,255,255,.08);text-align:left;vertical-align:middle;box-sizing:border-box;line-height:1.2;color:inherit;}
-        .mmb-bookings-table th{background:rgba(255,255,255,.08);font-weight:600;position:sticky;top:0;z-index:2;color:#f8fafc;backdrop-filter:blur(12px);}
-        .mmb-bookings-table tbody tr{min-height:46px;}
+        .mmb-bookings-table th{background:#343434;font-weight:600;position:sticky;top:0;z-index:2;color:#f8fafc;backdrop-filter:blur(12px);}
+        .mmb-bookings-table tbody tr{min-height:46px;background:#3b3b3b;}
         .mmb-bookings-table th.cell-head-id,.mmb-bookings-table td.cell--id{width:72px;min-width:64px;white-space:nowrap;}
         .mmb-bookings-table th.cell-head-customer,.mmb-bookings-table td.cell--customer{min-width:240px;}
         .mmb-bookings-table th.cell-head-box,.mmb-bookings-table td.cell--box{min-width:200px;white-space:nowrap;}
