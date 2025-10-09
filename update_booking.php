@@ -22,7 +22,7 @@ try {
   if ($id <= 0) throw new Exception('Ungültige ID');
 
   // Whitelist erlaubter Felder
-  $allow = ['customer_name','customer_email','customer_phone','box_id','start_date','end_date','status','total_amount','fulfillment_method','fulfillment_label','fulfillment_note','fulfillment_price_delta'];
+  $allow = ['customer_name','customer_email','customer_phone','box_id','start_date','end_date','status','total_amount','fulfillment_method','fulfillment_label','fulfillment_note','fulfillment_price_delta','note','deposit_eur','pricing_details_json','pricing_details','fulfillment_details_json','fulfillment_details'];
   $sets = [];
   $params = [':id'=>$id];
   foreach ($allow as $f) {
@@ -32,8 +32,17 @@ try {
     $val = $data[$f];
     if ($f === 'box_id') {
       $val = (int)$val;
-    } elseif ($f === 'total_amount' || $f === 'fulfillment_price_delta') {
+    } elseif ($f === 'total_amount' || $f === 'fulfillment_price_delta' || $f === 'deposit_eur') {
       $val = (float)$val;
+    } elseif (in_array($f, ['pricing_details_json','pricing_details','fulfillment_details_json','fulfillment_details'], true)) {
+      if (is_array($val) || is_object($val)) {
+        $val = json_encode($val, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+      }
+      if ($val !== null) {
+        $val = (string)$val;
+      }
+    } elseif ($f === 'note') {
+      $val = (string)$val;
     }
     $sets[] = "`$f` = :$f";
     $params[":$f"] = $val;
