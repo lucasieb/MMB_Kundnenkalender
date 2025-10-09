@@ -16,13 +16,50 @@ try {
 }
 header('Content-Type: application/json; charset=utf-8');
 
+function bookings_columns(PDO $pdo): array {
+  static $cache = null;
+  if ($cache !== null) {
+    return $cache;
+  }
+  $cols = [];
+  $stmt = $pdo->query('SHOW COLUMNS FROM `bookings`');
+  foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+    $cols[strtolower($row['Field'])] = true;
+  }
+  $cache = $cols;
+  return $cache;
+}
+
+function has_booking_col(PDO $pdo, string $name): bool {
+  $cols = bookings_columns($pdo);
+  return isset($cols[strtolower($name)]);
+}
+
 try {
   $data = json_decode(file_get_contents('php://input'), true) ?: [];
   $id = isset($data['id']) ? (int)$data['id'] : 0;
   if ($id <= 0) throw new Exception('Ungültige ID');
 
+  $columns = bookings_columns($pdo);
+  $hasColumn = function(string $field) use ($columns): bool {
+    return isset($columns[strtolower($field)]);
+  };
+
+  if (!$hasColumn('pricing_details_json') && $hasColumn('pricing_details') && array_key_exists('pricing_details_json', $data) && !array_key_exists('pricing_details', $data)) {
+    $data['pricing_details'] = $data['pricing_details_json'];
+  }
+  if (!$hasColumn('fulfillment_details_json') && $hasColumn('fulfillment_details') && array_key_exists('fulfillment_details_json', $data) && !array_key_exists('fulfillment_details', $data)) {
+    $data['fulfillment_details'] = $data['fulfillment_details_json'];
+  }
+
   // Whitelist erlaubter Felder
-  $allow = ['customer_name','customer_email','customer_phone','box_id','start_date','end_date','status','total_amount','fulfillment_method','fulfillment_label','fulfillment_note','fulfillment_price_delta'];
+  $allowList = ['customer_name','customer_email','customer_phone','box_id','start_date','end_date','status','total_amount','fulfillment_method','fulfillment_label','fulfillment_note','fulfillment_price_delta','note','deposit_eur','pricing_details_json','pricing_details','fulfillment_details_json','fulfillment_details'];
+  $allow = [];
+  foreach ($allowList as $field) {
+    if ($hasColumn($field)) {
+      $allow[] = $field;
+    }
+  }
   $sets = [];
   $params = [':id'=>$id];
   foreach ($allow as $f) {
@@ -32,8 +69,17 @@ try {
     $val = $data[$f];
     if ($f === 'box_id') {
       $val = (int)$val;
-    } elseif ($f === 'total_amount' || $f === 'fulfillment_price_delta') {
+    } elseif ($f === 'total_amount' || $f === 'fulfillment_price_delta' || $f === 'deposit_eur') {
       $val = (float)$val;
+    } elseif (in_array($f, ['pricing_details_json','pricing_details','fulfillment_details_json','fulfillment_details'], true)) {
+      if (is_array($val) || is_object($val)) {
+        $val = json_encode($val, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+      }
+      if ($val !== null) {
+        $val = (string)$val;
+      }
+    } elseif ($f === 'note') {
+      $val = (string)$val;
     }
     $sets[] = "`$f` = :$f";
     $params[":$f"] = $val;
