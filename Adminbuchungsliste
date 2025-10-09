@@ -6,22 +6,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>MietMichBox – Admin Buchungsliste</title>
   <style>
-    body{margin:0; padding:1rem; background:#f5f5f5; font-family:'Poppins',sans-serif;}
-    .page{max-width:1400px;margin:0 auto;}
-    .card{background:#fff;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.1);overflow:hidden;}
-    .card h1{margin:0;padding:1rem;border-bottom:1px solid #e5e7eb;background:#f8f9fa;font-size:1.25rem;}
-    .card .content{padding:1rem;}
-    .mmb-error{margin-top:1.5rem;padding:1rem;border-radius:6px;background:#fee2e2;color:#b91c1c;font-weight:600;}
+    :root{--mmb-shell-padding:32px;}
+    @media (max-width:900px){:root{--mmb-shell-padding:18px;}}
+    body{margin:0;min-height:100vh;background:#f4f4f0;font-family:'Poppins',sans-serif;color:#111827;display:flex;}
+    #mmb-admin-shell{flex:1;min-height:100vh;display:flex;}
+    #mmb-admin-list{flex:1;display:flex;padding:var(--mmb-shell-padding);box-sizing:border-box;}
+    .mmb-error{margin-top:1.5rem;padding:1rem;border-radius:8px;background:#fee2e2;color:#b91c1c;font-weight:600;}
   </style>
 </head>
 <body>
-  <div class="page">
-    <div class="card">
-      <h1>Admin – Buchungsliste</h1>
-      <div class="content">
-        <div id="mmb-admin-list"></div>
-      </div>
-    </div>
+  <div id="mmb-admin-shell">
+    <div id="mmb-admin-list"></div>
   </div>
 
   <!-- ======================= MMB CORE ======================= -->
@@ -43,7 +38,8 @@
         }
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap');
 
-        .mmb-widget{font-family:'Poppins',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,sans-serif;background:var(--mmb-bg);color:var(--mmb-text);border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.1);}
+        body.mmb-detail-open{overflow:hidden;}
+        .mmb-widget{font-family:'Poppins',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,sans-serif;background:var(--mmb-bg);color:var(--mmb-text);border-radius:18px;overflow:hidden;box-shadow:none;border:1px solid rgba(15,23,42,.06);display:flex;flex-direction:column;}
         .mmb-loading{display:flex;justify-content:center;align-items:center;height:200px;font-size:.875rem;color:var(--mmb-text-light);}
         @media (prefers-reduced-motion: reduce){.mmb-day,.mmb-btn,.mmb-nav-btn{transition:none;}}
       `;
@@ -120,6 +116,9 @@
       async updateBookingStatus(payload){
         return mmbApiPost('update_booking_status.php', payload);
       },
+      async deleteBooking(payload){
+        return mmbApiPost('delete_booking.php', payload);
+      },
     };
   </script>
 
@@ -130,9 +129,9 @@
     const BOX_MAP = { '1':'Marshall Bromley 750', '2':'Teufel Rockster Neo', '3':'Soundboks 4' };
     const EURO_FORMATTER = new Intl.NumberFormat('de-DE', {maximumFractionDigits:0});
     const FULFILLMENT_CHOICES = [
-      { id:'pickup',   label:'Abholung', full:'Abholung in Wesel', note:'', priceDelta:0 },
-      { id:'shipping', label:'Versand',  full:'Versand (deutschlandweit)', note:'inkl. Express-Hin- & Rückversand sowie Vorbereitungspauschale', priceDelta:80 },
-      { id:'delivery', label:'Lieferung', full:'Lieferung (NRW-weit)', note:'zzgl. individueller Lieferpauschale – wir melden uns mit einem Angebot', priceDelta:0 }
+      { id:'pickup',   label:'Abholung', full:'Abholung in Wesel', note:'', priceDelta:0, addsToTotal:true },
+      { id:'shipping', label:'Versand',  full:'Versand (deutschlandweit)', note:'inkl. Express-Hin- & Rückversand sowie Vorbereitungspauschale', priceDelta:80, addsToTotal:true },
+      { id:'delivery', label:'Lieferung', full:'Lieferung (NRW-weit)', note:'zzgl. individueller Lieferpauschale – wir melden uns mit einem Angebot', priceDelta:0, addsToTotal:false }
     ];
     const FULFILLMENT_LOOKUP = Object.fromEntries(FULFILLMENT_CHOICES.map(opt=>[opt.id,opt]));
 
@@ -143,32 +142,34 @@
     function injectAdminListCSS(){
       if(document.getElementById('mmb-admin-list-css')) return;
       const s=document.createElement('style'); s.id='mmb-admin-list-css'; s.textContent=`
+        #mmb-admin-list{position:relative;min-height:0;}
+        #mmb-admin-list>.mmb-widget{flex:1;display:flex;flex-direction:column;gap:1rem;padding:1.75rem 2rem;background:rgba(255,255,255,.88);backdrop-filter:blur(18px);border-radius:18px;box-shadow:none;border:1px solid rgba(15,23,42,.08);}
+        @media (max-width:900px){#mmb-admin-list>.mmb-widget{padding:1.25rem;}}
         .mmb-admin-filters{
           display:grid;
-          grid-template-columns: repeat(4, minmax(200px, 1fr)) auto;
-          gap:.75rem; padding:1rem; background:var(--mmb-muted); border-radius:6px; align-items:center;
+          grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+          gap:.65rem;padding:1rem 1.25rem; background:rgba(17,24,39,.04); border-radius:14px; align-items:center;
         }
-        .mmb-admin-filters select,.mmb-admin-filters input{ padding:.6rem;border:1px solid var(--mmb-border);border-radius:6px;background:var(--mmb-bg);color:var(--mmb-text);font-size:.9rem; }
-        .mmb-admin-list-wrap{height:70vh;overflow:auto;margin:.75rem 0;border-radius:6px;}
-        .mmb-bookings-table{width:100%;border-collapse:collapse;background:var(--mmb-bg);border-radius:6px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.1);}
-        .mmb-bookings-table th,.mmb-bookings-table td{padding:.6rem .65rem;border-bottom:1px solid var(--mmb-border);text-align:left;vertical-align:middle;box-sizing:border-box;}
-        .mmb-bookings-table th{background:var(--mmb-muted);font-weight:600;position:sticky;top:0;z-index:2;}
-        .mmb-bookings-table tbody tr{height:auto;min-height:68px;}
-        .mmb-bookings-table th.cell-head-box,.mmb-bookings-table td.cell--box{min-width:196px;white-space:nowrap;}
-        .mmb-bookings-table th.cell-head-date,.mmb-bookings-table td.cell--date{min-width:124px;width:124px;}
-        .mmb-bookings-table td.cell--date{display:grid;grid-auto-rows:min-content;gap:.18rem;white-space:normal;line-height:1.32;justify-items:center;align-content:center;text-align:center;min-height:56px;padding:.55rem .5rem;}
-        .mmb-bookings-table td.cell--date span{display:block;width:100%;}
-        .mmb-bookings-table th.cell-head-fulfillment,.mmb-bookings-table td.cell--fulfillment{min-width:118px;white-space:nowrap;}
-        .mmb-bookings-table th.cell-head-price,.mmb-bookings-table td.cell--total{text-align:right;width:96px;}
-        .mmb-bookings-table th.cell-head-status,.mmb-bookings-table td.cell--status{width:100px;}
+        .mmb-admin-filters select,.mmb-admin-filters input{ padding:.55rem .65rem;border:1px solid var(--mmb-border);border-radius:10px;background:var(--mmb-bg);color:var(--mmb-text);font-size:.9rem;}
+        .mmb-admin-list-wrap{flex:1;min-height:0;overflow:auto;margin:0;border-radius:14px;border:1px solid rgba(15,23,42,.06);background:var(--mmb-bg);box-shadow:none;height:100%;max-height:calc(10 * 58px + 52px);}
+        .mmb-bookings-table{width:100%;border-collapse:collapse;background:var(--mmb-bg);table-layout:fixed;}
+        .mmb-bookings-table th,.mmb-bookings-table td{padding:.45rem .6rem;border-bottom:1px solid var(--mmb-border);text-align:left;vertical-align:middle;box-sizing:border-box;line-height:1.35;}
+        .mmb-bookings-table th{background:rgba(17,24,39,.05);font-weight:600;position:sticky;top:0;z-index:2;}
+        .mmb-bookings-table tbody tr{height:58px;}
+        .mmb-bookings-table th.cell-head-box,.mmb-bookings-table td.cell--box{min-width:188px;white-space:nowrap;}
+        .mmb-bookings-table th.cell-head-date,.mmb-bookings-table td.cell--date{min-width:156px;width:156px;white-space:nowrap;}
+        .mmb-bookings-table th.cell-head-fulfillment,.mmb-bookings-table td.cell--fulfillment{width:150px;min-width:140px;white-space:nowrap;}
+        .mmb-bookings-table th.cell-head-price,.mmb-bookings-table td.cell--total{width:110px;min-width:96px;white-space:nowrap;text-align:right;}
+        .mmb-bookings-table th.cell-head-status,.mmb-bookings-table td.cell--status{width:110px;}
         .mmb-bookings-table td.cell--total{font-variant-numeric:tabular-nums;white-space:nowrap;}
-        .mmb-bookings-table th.cell-head-actions,.mmb-bookings-table td.cell--actions{min-width:268px;}
-        .mmb-btn{background:var(--mmb-accent);color:#fff;border:none;padding:.45rem .65rem;border-radius:6px;font-size:.83rem;font-weight:500;cursor:pointer;transition:background-color .2s;}
+        .mmb-bookings-table th.cell-head-actions,.mmb-bookings-table td.cell--actions{min-width:210px;}
+        .mmb-btn{background:var(--mmb-accent);color:#fff;border:none;padding:.45rem .75rem;border-radius:10px;font-size:.83rem;font-weight:500;cursor:pointer;transition:background-color .2s;}
         .mmb-btn:hover{background:#0284c7;} .mmb-btn:disabled{opacity:.45;cursor:not-allowed;filter:saturate(0.6) contrast(0.9);}
         .mmb-btn-small{padding:.25rem .5rem;font-size:.75rem;min-width:28px;}
         .mmb-btn-success{background:var(--mmb-ok);} .mmb-btn-success:hover{background:#059669;}
         .mmb-btn-danger{background:var(--mmb-busy);} .mmb-btn-danger:hover{background:#dc2626;}
         .mmb-btn-warning{background:var(--mmb-warn);} .mmb-btn-warning:hover{background:#d97706;}
+        .mmb-btn-danger-light{background:transparent;color:#b91c1c;border:1px solid rgba(239,68,68,.45);} .mmb-btn-danger-light:hover{background:rgba(239,68,68,.12);}
         .mmb-btn-secondary{background:#6b7280;color:#fff;} .mmb-btn-secondary:hover{background:#4b5563;}
         .mmb-reset{background:#e5e7eb;color:#111827;} .mmb-reset:hover{background:#d1d5db;}
         .mmb-modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;justify-content:center;align-items:center;z-index:9999;font-family:'Poppins',sans-serif;}
@@ -195,10 +196,38 @@
         .mmb-status-cancelled{background:#fee2e2;color:#991b1b;}
         .mmb-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;}
         .badge-id{font-variant-numeric:tabular-nums;letter-spacing:.5px;}
-        .mmb-footer{display:flex;justify-content:center;align-items:center;height:36px;color:var(--mmb-text-light);font-size:.9rem;background:var(--mmb-muted);border-radius:6px;}
+        .mmb-footer{display:flex;justify-content:flex-end;align-items:center;height:40px;color:var(--mmb-text-light);font-size:.9rem;padding:0 1rem;background:rgba(17,24,39,.04);border-radius:12px;}
         .mmb-text-muted{color:var(--mmb-text-light,#6b7280);}
         .cell--actions-row{display:flex;gap:.25rem;flex-wrap:nowrap;align-items:center;}
         .cell--actions-row .mmb-btn-small{width:44px;min-width:44px;height:32px;padding:0;display:inline-flex;align-items:center;justify-content:center;}
+        .mmb-detail-overlay{position:fixed;inset:0;background:var(--mmb-bg);display:flex;justify-content:center;align-items:stretch;z-index:10000;padding:0;overflow:auto;}
+        .mmb-detail-panel{background:var(--mmb-bg);color:var(--mmb-text);width:100%;min-height:100vh;display:flex;flex-direction:column;}
+        .mmb-detail-header{display:flex;justify-content:space-between;align-items:flex-start;padding:1.5rem 1.75rem 1rem;border-bottom:1px solid var(--mmb-border);gap:1rem;}
+        .mmb-detail-title{font-size:1.5rem;font-weight:600;margin:0;}
+        .mmb-detail-sub{margin:.25rem 0 0;font-size:.9rem;color:var(--mmb-text-light);}
+        .mmb-detail-close{background:transparent;border:none;color:var(--mmb-text-light);font-size:1.5rem;cursor:pointer;padding:.25rem .5rem;border-radius:8px;}
+        .mmb-detail-meta{display:flex;gap:.5rem;flex-wrap:wrap;justify-content:flex-end;}
+        .mmb-detail-body{flex:1;overflow:auto;padding:1.75rem 2rem;display:flex;flex-direction:column;gap:1.5rem;}
+        .mmb-detail-section{display:flex;flex-direction:column;gap:1rem;}
+        .mmb-detail-section h3{margin:0;font-size:1rem;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--mmb-text-light);}
+        .mmb-detail-grid{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));}
+        .mmb-detail-field{display:flex;flex-direction:column;gap:.35rem;}
+        .mmb-detail-field label{font-size:.78rem;font-weight:600;color:var(--mmb-text-light);text-transform:uppercase;letter-spacing:.06em;}
+        .mmb-detail-field input,.mmb-detail-field select,.mmb-detail-field textarea{border:1px solid var(--mmb-border);border-radius:10px;padding:.55rem .65rem;font-family:inherit;font-size:.92rem;background:var(--mmb-bg);color:var(--mmb-text);box-shadow:inset 0 1px 2px rgba(15,23,42,.04);}
+        .mmb-detail-field textarea{min-height:120px;resize:vertical;}
+        .mmb-detail-note{font-size:.85rem;color:var(--mmb-text-light);}
+        .mmb-detail-body [hidden]{display:none!important;}
+        form.mmb-email-disabled [data-email-field]{opacity:.6;}
+        .mmb-detail-footer{display:flex;justify-content:space-between;align-items:center;padding:1rem 1.75rem;border-top:1px solid var(--mmb-border);gap:1rem;background:rgba(17,24,39,.06);position:sticky;bottom:0;backdrop-filter:blur(12px);}
+        .mmb-detail-actions{display:flex;gap:.5rem;flex-wrap:wrap;justify-content:flex-end;}
+        .mmb-chip{display:inline-flex;align-items:center;gap:.35rem;background:rgba(17,24,39,.06);border-radius:999px;padding:.35rem .75rem;font-size:.8rem;font-weight:500;color:var(--mmb-text-light);}
+        .mmb-detail-divider{border:none;border-top:1px solid var(--mmb-border);margin:.5rem 0;}
+        .mmb-detail-checkbox{display:flex;align-items:center;gap:.5rem;font-size:.9rem;}
+        .mmb-detail-checkbox input{width:18px;height:18px;}
+        @media (max-width:900px){
+          .mmb-detail-header,.mmb-detail-footer{padding:1rem 1.25rem;}
+          .mmb-detail-body{padding:1.25rem;}
+        }
       `; document.head.appendChild(s);
     }
 
@@ -232,6 +261,14 @@
           const totalAmount = Number(r.total_amount ?? 0);
           const deposit = Number(r.deposit_eur ?? 0);
           const fulfillmentPrice = Number(r.fulfillment_price_delta ?? 0);
+          const pricingRaw = r.pricing_details_json ?? r.pricing_details ?? null;
+          const parsedPricing = this.safeParseJson(pricingRaw);
+          const normalizedPricing = this.normalizePricingDetails(parsedPricing);
+          const pricingCanonical = this.stableStringify(normalizedPricing || {});
+          const fulfillmentDetailsRaw = r.fulfillment_details_json ?? r.fulfillment_details ?? null;
+          const parsedFulfillmentDetails = this.safeParseJson(fulfillmentDetailsRaw);
+          const normalizedFulfillmentDetails = this.normalizeFulfillmentDetails(parsedFulfillmentDetails, (r.fulfillment_method || '').toString());
+          const fulfillmentCanonical = this.stableStringify(normalizedFulfillmentDetails || {});
           return {
             id:String(r.id),
             box_id:boxId,
@@ -249,7 +286,13 @@
             fulfillment_label:r.fulfillment_label ?? '',
             fulfillment_note:r.fulfillment_note ?? '',
             fulfillment_price_delta:Number.isFinite(fulfillmentPrice)?fulfillmentPrice:0,
-            created_at:r.created_at
+            created_at:r.created_at,
+            pricing_details: normalizedPricing,
+            pricing_details_raw: pricingRaw,
+            pricing_details_canonical: pricingCanonical,
+            fulfillment_details: normalizedFulfillmentDetails,
+            fulfillment_details_raw: fulfillmentDetailsRaw,
+            fulfillment_details_canonical: fulfillmentCanonical
           };
         });
         this.state.originalBookings = items;
@@ -387,10 +430,6 @@
               <button class="mmb-btn mmb-btn-small mmb-btn-warning"
                       data-action="offerAlternative" data-id="${b.id}"
                       title="Alternative Box vorschlagen">Alt</button>
-
-              <button class="mmb-btn mmb-btn-small"
-                      data-action="editBooking" data-id="${b.id}"
-                      title="Buchung bearbeiten">✍🏼</button>
             </div>
           </td>
         </tr>`;
@@ -407,8 +446,7 @@
         const fmt=(d)=>d?d.toLocaleDateString('de-DE'):'–';
         if(start && end){
           const same=start.getFullYear()===end.getFullYear() && start.getMonth()===end.getMonth() && start.getDate()===end.getDate();
-          if(same){ return `<span>${fmt(start)}</span>`; }
-          return `<span>${fmt(start)}</span><span>${fmt(end)}</span>`;
+          return same ? `<span>${fmt(start)}</span>` : `<span>${fmt(start)} – ${fmt(end)}</span>`;
         }
         if(start){ return `<span>${fmt(start)}</span>`; }
         if(end){ return `<span>${fmt(end)}</span>`; }
@@ -1023,7 +1061,8 @@
           label: b.fulfillment_label || choice.label,
           full: choice.full,
           note: b.fulfillment_note || choice.note || '',
-          priceDelta: Number.isFinite(price) ? price : choice.priceDelta
+          priceDelta: Number.isFinite(price) ? price : choice.priceDelta,
+          addsToTotal: typeof choice.addsToTotal === 'boolean' ? choice.addsToTotal : (choice.id === 'delivery' ? false : true)
         };
       }
       formatFulfillmentCell(b){
@@ -1049,27 +1088,923 @@
       async viewDetails(id){
         const booking = this.state.originalBookings.find(x=>String(x.id)===String(id));
         if(!booking) return;
-        const info = this.getFulfillmentInfo(booking);
-        let createdLabel = '–';
-        if(booking.created_at){
-          const created = new Date(booking.created_at);
-          if(!Number.isNaN(created.getTime())){
-            createdLabel = created.toLocaleString('de-DE', { dateStyle:'long', timeStyle:'short' });
+        this.openDetailOverlay(booking);
+      }
+
+      async editBooking(id){
+        await this.viewDetails(id);
+      }
+
+      openDetailOverlay(booking){
+        const overlay = document.createElement('div');
+        overlay.className = 'mmb-detail-overlay';
+        overlay.innerHTML = `<div class="mmb-detail-panel"><div class="mmb-detail-header"><div><h2 class="mmb-detail-title">Buchung ${this.escape(displayId(booking.id))}</h2></div><button type="button" class="mmb-detail-close" data-close>×</button></div><div class="mmb-detail-body"><p>Detailansicht wird geladen…</p></div></div>`;
+        document.body.appendChild(overlay);
+        document.body.classList.add('mmb-detail-open');
+        const close = ()=>{
+          if(overlay.parentNode){ overlay.remove(); }
+          document.body.classList.remove('mmb-detail-open');
+          document.removeEventListener('keydown', escHandler);
+        };
+        const escHandler = (event)=>{ if(event.key==='Escape'){ close(); } };
+        document.addEventListener('keydown', escHandler);
+        overlay.addEventListener('click',(event)=>{ if(event.target===overlay) close(); });
+        overlay.querySelectorAll('[data-close]').forEach(btn=>btn.addEventListener('click', close));
+        // Vollständige Detailansicht wird im weiteren Verlauf aufgebaut
+        this.renderDetailOverlay(booking, overlay, close);
+      }
+
+      renderDetailOverlay(booking, overlay, closeOverlay){
+        const statusLabel = this.translateStatus(booking.status || 'pending');
+        const createdLabel = this.formatDateTimeLabel(booking.created_at);
+        const rangeLabel = this.formatBookingRangeLabel(booking.start_date, booking.end_date);
+        const boxOptions = this.getBoxOptionsForDetail(booking);
+        const boxOptionsHtml = boxOptions.map(box=>`<option value="${this.escape(box.id)}" ${box.id===String(booking.box_id)?'selected':''}>${this.escape(box.name)}</option>`).join('');
+        const currentFulfillmentMethod = (booking.fulfillment_method || 'pickup').toString();
+        const fulfillmentChoice = this.getFulfillmentChoice(currentFulfillmentMethod);
+        const fulfillmentOptionsHtml = FULFILLMENT_CHOICES.map(opt=>`<option value="${opt.id}" ${opt.id===currentFulfillmentMethod?'selected':''}>${this.escape(opt.label)}</option>`).join('');
+        const pricing = this.normalizePricingDetails(booking.pricing_details);
+        const fulfillmentDetails = this.normalizeFulfillmentDetails(booking.fulfillment_details, currentFulfillmentMethod) || {};
+        const depositValue = Number.isFinite(booking.deposit_eur) ? booking.deposit_eur : (Number(pricing?.deposit) || 0);
+        const totalValue = Number.isFinite(booking.price_total) ? booking.price_total : (Number(pricing?.total) || 0);
+        const baseTotalValue = Number.isFinite(pricing?.base_total) ? pricing.base_total : totalValue;
+        const originalValue = Number.isFinite(pricing?.original) ? pricing.original : baseTotalValue;
+        const shippingDeltaValue = Number.isFinite(pricing?.shipping_delta) ? pricing.shipping_delta : (Number.isFinite(fulfillmentChoice.priceDelta) ? fulfillmentChoice.priceDelta : 0);
+        const discountAmountValue = Number.isFinite(pricing?.discount_amount) ? pricing.discount_amount : 0;
+        const discountPercentExactValue = Number.isFinite(pricing?.discount_percent_exact) ? pricing.discount_percent_exact : 0;
+        const discountPercentDisplayValue = pricing?.discount_percent_display || (discountPercentExactValue ? String(discountPercentExactValue) : '');
+        const avgPerDayValue = Number.isFinite(pricing?.avg_per_day) ? pricing.avg_per_day : null;
+        const daysValue = Number.isFinite(pricing?.days) ? pricing.days : null;
+        const baseSubject = `Deine Buchung wurde aktualisiert 👷🏽 – Buchungs-ID: ${displayId(booking.id)}`;
+        const baseMessage = this.tplEditInfo(booking);
+        const shippingAllowPhone = fulfillmentDetails.allow_contact_phone !== false;
+        const shippingAllowWhatsApp = fulfillmentDetails.allow_contact_whatsapp === true || (fulfillmentDetails.contact_preferences && fulfillmentDetails.contact_preferences.whatsapp === true);
+        const preferredTimes = ['', '11:00','11:30','12:00','12:30','13:00','13:30','14:00','14:30','15:00','15:30','16:00'];
+        const existingPreferred = (fulfillmentDetails.preferred_time || '').trim();
+        if(existingPreferred && !preferredTimes.includes(existingPreferred)){
+          preferredTimes.push(existingPreferred);
+        }
+        const preferredOptionsHtml = preferredTimes.map(time=>{
+          const label = time ? `${time} Uhr` : 'Bitte auswählen';
+          const isSelected = time === (fulfillmentDetails.preferred_time || '');
+          return `<option value="${time}" ${isSelected?'selected':''}>${this.escape(label)}</option>`;
+        }).join('');
+        const showExtended = currentFulfillmentMethod === 'shipping' || currentFulfillmentMethod === 'delivery';
+
+        overlay.innerHTML = `
+          <div class="mmb-detail-panel" role="dialog" aria-modal="true">
+            <div class="mmb-detail-header">
+              <div>
+                <h2 class="mmb-detail-title">Buchung ${this.escape(displayId(booking.id))}</h2>
+                <p class="mmb-detail-sub">${this.escape(createdLabel)}</p>
+              </div>
+              <div class="mmb-detail-meta">
+                <span class="mmb-chip">${this.escape(statusLabel)}</span>
+                <span class="mmb-chip">${this.escape(booking.box_name)}</span>
+                <span class="mmb-chip">${this.escape(rangeLabel)}</span>
+              </div>
+              <button type="button" class="mmb-detail-close" data-close aria-label="Detailansicht schließen">×</button>
+            </div>
+            <form class="mmb-detail-body" autocomplete="off">
+              <div class="mmb-detail-section">
+                <h3>Allgemein</h3>
+                <div class="mmb-detail-grid">
+                  <div class="mmb-detail-field">
+                    <label>Status</label>
+                    <select name="status">
+                      ${['pending','confirmed','rejected','cancelled'].map(st=>`<option value="${st}" ${st===(booking.status||'')?'selected':''}>${this.escape(this.translateStatus(st))}</option>`).join('')}
+                    </select>
+                  </div>
+                  <div class="mmb-detail-field">
+                    <label>Box</label>
+                    <select name="box_id">${boxOptionsHtml}</select>
+                  </div>
+                  <div class="mmb-detail-field">
+                    <label>Startdatum</label>
+                    <input name="start_date" type="date" value="${this.escape(booking.start_date||'')}">
+                  </div>
+                  <div class="mmb-detail-field">
+                    <label>Enddatum</label>
+                    <input name="end_date" type="date" value="${this.escape(booking.end_date||'')}">
+                  </div>
+                  <div class="mmb-detail-field">
+                    <label>Erstellt am</label>
+                    <input value="${this.escape(createdLabel)}" readonly disabled>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mmb-detail-section">
+                <h3>Kontakt</h3>
+                <div class="mmb-detail-grid">
+                  <div class="mmb-detail-field">
+                    <label>Name</label>
+                    <input name="customer_name" value="${this.escape(booking.customer_name||'')}">
+                  </div>
+                  <div class="mmb-detail-field">
+                    <label>E-Mail</label>
+                    <input name="customer_email" type="email" value="${this.escape(booking.customer_email||'')}">
+                  </div>
+                  <div class="mmb-detail-field">
+                    <label>Telefon</label>
+                    <input name="customer_phone" value="${this.escape(booking.customer_phone||'')}">
+                  </div>
+                </div>
+              </div>
+
+              <div class="mmb-detail-section">
+                <h3>Abwicklung</h3>
+                <div class="mmb-detail-grid">
+                  <div class="mmb-detail-field">
+                    <label>Art</label>
+                    <select name="fulfillment_method">${fulfillmentOptionsHtml}</select>
+                    <span class="mmb-detail-note" data-fulfillment-hint>${this.escape(fulfillmentChoice.note || 'Keine zusätzlichen Hinweise')}</span>
+                  </div>
+                  <div class="mmb-detail-field">
+                    <label>Interne Notiz</label>
+                    <textarea name="fulfillment_note">${this.escape(booking.fulfillment_note || '')}</textarea>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mmb-detail-section" data-fulfillment-section="extended" ${showExtended?'':'hidden'}>
+                <h3>Kontakt für Abwicklung</h3>
+                <div class="mmb-detail-grid">
+                  <div class="mmb-detail-field">
+                    <label>Ansprechpartner*in</label>
+                    <input name="fulfillment_contact_name" value="${this.escape(fulfillmentDetails.contact_name || booking.customer_name || '')}">
+                  </div>
+                  <div class="mmb-detail-field">
+                    <label>E-Mail</label>
+                    <input name="fulfillment_contact_email" type="email" value="${this.escape(fulfillmentDetails.contact_email || booking.customer_email || '')}">
+                  </div>
+                  <div class="mmb-detail-field">
+                    <label>Telefon</label>
+                    <input name="fulfillment_contact_phone" value="${this.escape(fulfillmentDetails.contact_phone || booking.customer_phone || '')}">
+                  </div>
+                </div>
+                <div class="mmb-detail-grid">
+                  <div class="mmb-detail-field">
+                    <label>Kontaktoptionen</label>
+                    <label class="mmb-detail-checkbox"><input type="checkbox" name="fulfillment_pref_phone" value="1" ${shippingAllowPhone?'checked':''}> Telefon erlaubt</label>
+                    <label class="mmb-detail-checkbox"><input type="checkbox" name="fulfillment_pref_whatsapp" value="1" ${shippingAllowWhatsApp?'checked':''}> WhatsApp erlaubt</label>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mmb-detail-section" data-fulfillment-section="shipping" ${currentFulfillmentMethod==='shipping'?'':'hidden'}>
+                <h3>Versandadresse</h3>
+                <div class="mmb-detail-grid">
+                  <div class="mmb-detail-field">
+                    <label>Straße &amp; Hausnummer</label>
+                    <input name="shipping_address_line1" value="${this.escape(fulfillmentDetails.address_line1 || '')}">
+                  </div>
+                  <div class="mmb-detail-field">
+                    <label>PLZ</label>
+                    <input name="shipping_postal_code" value="${this.escape(fulfillmentDetails.postal_code || '')}">
+                  </div>
+                  <div class="mmb-detail-field">
+                    <label>Ort</label>
+                    <input name="shipping_city" value="${this.escape(fulfillmentDetails.city || '')}">
+                  </div>
+                  <div class="mmb-detail-field">
+                    <label>Adresszusatz</label>
+                    <input name="shipping_address_extra" value="${this.escape(fulfillmentDetails.address_extra || '')}">
+                  </div>
+                </div>
+              </div>
+
+              <div class="mmb-detail-section" data-fulfillment-section="delivery" ${currentFulfillmentMethod==='delivery'?'':'hidden'}>
+                <h3>Lieferdetails</h3>
+                <div class="mmb-detail-grid">
+                  <div class="mmb-detail-field">
+                    <label>Treffpunkt oder Adresse</label>
+                    <textarea name="delivery_meeting_point">${this.escape(fulfillmentDetails.meeting_point || '')}</textarea>
+                  </div>
+                  <div class="mmb-detail-field">
+                    <label>Bevorzugte Uhrzeit</label>
+                    <select name="delivery_preferred_time">${preferredOptionsHtml}</select>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mmb-detail-section">
+                <h3>Rechnungsübersicht</h3>
+                <div class="mmb-detail-grid">
+                  <div class="mmb-detail-field">
+                    <label>Grundpreis</label>
+                    <input name="pricing_original" value="${this.escape(this.formatNumberInput(originalValue))}">
+                  </div>
+                  <div class="mmb-detail-field">
+                    <label>Zwischensumme</label>
+                    <input name="pricing_base_total" value="${this.escape(this.formatNumberInput(baseTotalValue))}">
+                  </div>
+                  <div class="mmb-detail-field">
+                    <label>Gesamtpreis</label>
+                    <input name="total_amount" value="${this.escape(this.formatNumberInput(totalValue))}">
+                  </div>
+                  <div class="mmb-detail-field">
+                    <label>Kaution</label>
+                    <input name="deposit_eur" value="${this.escape(this.formatNumberInput(depositValue))}">
+                  </div>
+                </div>
+                <div class="mmb-detail-grid">
+                  <div class="mmb-detail-field">
+                    <label>Rabatt (%)</label>
+                    <input name="pricing_discount_percent_exact" value="${this.escape(this.formatNumberInput(discountPercentExactValue))}">
+                  </div>
+                  <div class="mmb-detail-field">
+                    <label>Rabatt (Anzeige)</label>
+                    <input name="pricing_discount_percent_display" value="${this.escape(discountPercentDisplayValue)}">
+                  </div>
+                  <div class="mmb-detail-field">
+                    <label>Rabatt (Betrag)</label>
+                    <input name="pricing_discount_amount" value="${this.escape(this.formatNumberInput(discountAmountValue))}">
+                  </div>
+                  <div class="mmb-detail-field">
+                    <label>Versand/Lieferaufschlag</label>
+                    <input name="pricing_shipping_delta" value="${this.escape(this.formatNumberInput(shippingDeltaValue))}">
+                  </div>
+                  <div class="mmb-detail-field">
+                    <label>Ø Preis pro Tag</label>
+                    <input name="pricing_avg_per_day" value="${this.escape(this.formatNumberInput(avgPerDayValue))}">
+                  </div>
+                  <div class="mmb-detail-field">
+                    <label>Anzahl Tage</label>
+                    <input name="pricing_days" value="${this.escape(this.formatIntegerInput(daysValue))}">
+                  </div>
+                </div>
+                <div class="mmb-detail-note">Alle Beträge verstehen sich in Euro.</div>
+              </div>
+
+              <div class="mmb-detail-section">
+                <h3>Anmerkungen</h3>
+                <div class="mmb-detail-field">
+                  <label>Interne Notizen</label>
+                  <textarea name="note">${this.escape(booking.note || '')}</textarea>
+                </div>
+              </div>
+
+              <div class="mmb-detail-section">
+                <h3>E-Mail an Kund*in</h3>
+                <label class="mmb-detail-checkbox"><input type="checkbox" name="send_email" value="1" checked> Kund*in nach dem Speichern informieren</label>
+                <div class="mmb-detail-grid" data-email-field>
+                  <div class="mmb-detail-field">
+                    <label>Betreff</label>
+                    <input name="subject" value="${this.escape(baseSubject)}">
+                  </div>
+                  <div class="mmb-detail-field">
+                    <label>Nachricht</label>
+                    <textarea name="message">${this.escape(baseMessage)}</textarea>
+                  </div>
+                </div>
+                <div class="mmb-detail-note">Nur kundenrelevante Felder werden in der E-Mail angezeigt.</div>
+              </div>
+
+              <div class="mmb-detail-footer">
+                <button type="button" class="mmb-btn mmb-btn-secondary" data-close>Schließen</button>
+                <div class="mmb-detail-actions">
+                  <button type="button" class="mmb-btn mmb-btn-warning" data-action="offerAlternative">Alternative</button>
+                  <button type="button" class="mmb-btn mmb-btn-danger" data-action="declineBooking">Ablehnen</button>
+                  <button type="button" class="mmb-btn mmb-btn-success" data-action="confirmBooking">Bestätigen</button>
+                  <button type="button" class="mmb-btn mmb-btn-danger-light" data-action="deleteBooking">Löschen</button>
+                  <button type="submit" class="mmb-btn">Speichern</button>
+                </div>
+              </div>
+            </form>
+          </div>
+        `;
+
+        const form = overlay.querySelector('form');
+        if(!form) return;
+
+        overlay.querySelectorAll('[data-close]').forEach(btn=>btn.addEventListener('click', closeOverlay));
+
+        const idString = String(booking.id);
+        ['confirmBooking','declineBooking','offerAlternative'].forEach(action=>{
+          const btn = overlay.querySelector(`[data-action="${action}"]`);
+          if(!btn) return;
+          btn.addEventListener('click', async ()=>{
+            closeOverlay();
+            if(action==='confirmBooking') await this.confirmBooking(idString);
+            if(action==='declineBooking') await this.declineBooking(idString);
+            if(action==='offerAlternative') await this.offerAlternative(idString);
+          });
+        });
+
+        const deleteBtn = overlay.querySelector('[data-action="deleteBooking"]');
+        if(deleteBtn){
+          deleteBtn.addEventListener('click', async ()=>{
+            const confirmation = await this.openModal({
+              title:'Buchung löschen',
+              html:'<p>Möchtest du diese Buchung dauerhaft entfernen? Diese Aktion kann nicht rückgängig gemacht werden.</p>',
+              confirmText:'Ja, löschen',
+              cancelText:'Abbrechen'
+            });
+            if(confirmation === null) return;
+            const originalLabel = deleteBtn.textContent;
+            deleteBtn.textContent = 'Löschen…';
+            deleteBtn.disabled = true;
+            try{
+              await MMBApi.deleteBooking({ id: idString });
+              closeOverlay();
+              await this.loadBookings();
+              MMBCore.Utils.showNotification('Buchung gelöscht');
+            }catch(err){
+              console.error('deleteBooking failed:', err);
+              const msg = err && err.message ? ` (${err.message})` : '';
+              MMBCore.Utils.showNotification('Buchung konnte nicht gelöscht werden'+msg, 'error');
+            }finally{
+              if(deleteBtn.isConnected){
+                deleteBtn.disabled = false;
+                deleteBtn.textContent = originalLabel;
+              }
+            }
+          });
+        }
+
+        const fulfillmentSelect = form.querySelector('select[name="fulfillment_method"]');
+        const hintEl = form.querySelector('[data-fulfillment-hint]');
+        const detailSections = form.querySelectorAll('[data-fulfillment-section]');
+        const updateFulfillmentUI = ()=>{
+          if(!fulfillmentSelect) return;
+          const method = fulfillmentSelect.value;
+          detailSections.forEach(section=>{
+            const target = section.dataset.fulfillmentSection;
+            if(target==='extended'){
+              section.hidden = !(method==='shipping' || method==='delivery');
+            }else{
+              section.hidden = target !== method;
+            }
+          });
+          if(hintEl){
+            const choice = this.getFulfillmentChoice(method);
+            hintEl.textContent = choice.note || 'Keine zusätzlichen Hinweise';
+          }
+        };
+        updateFulfillmentUI();
+        if(fulfillmentSelect){ fulfillmentSelect.addEventListener('change', updateFulfillmentUI); }
+
+        const subjectInput = form.querySelector('input[name="subject"]');
+        const messageInput = form.querySelector('textarea[name="message"]');
+        const sendSwitch = form.querySelector('input[name="send_email"]');
+        const watchFields = ['customer_name','customer_email','customer_phone','box_id','start_date','end_date','status','total_amount','fulfillment_method'];
+        let subjectDirty = false;
+        let messageDirty = false;
+
+        const collectCurrentValues = ()=>{
+          const data={};
+          watchFields.forEach(name=>{
+            const field=form.querySelector(`[name="${name}"]`);
+            if(!field) return;
+            data[name] = field.value;
+          });
+          return data;
+        };
+
+        const buildBookingForEmail = (vals)=>{
+          const boxId = String(vals.box_id ?? booking.box_id ?? '');
+          const fulfillmentChoiceLocal = this.getFulfillmentChoice((vals.fulfillment_method ?? booking.fulfillment_method ?? 'pickup').toString());
+          const parsedAmount = this.parseAmount(vals.total_amount ?? booking.price_total);
+          return {
+            ...booking,
+            customer_name: vals.customer_name ?? booking.customer_name,
+            customer_email: vals.customer_email ?? booking.customer_email,
+            customer_phone: vals.customer_phone ?? booking.customer_phone,
+            box_id: boxId,
+            box_name: BOX_MAP[boxId] || BOX_MAP[String(booking.box_id)] || booking.box_name,
+            start_date: vals.start_date ?? booking.start_date,
+            end_date: vals.end_date ?? booking.end_date,
+            status: vals.status ?? booking.status,
+            price_total: Number.isFinite(parsedAmount) ? parsedAmount : booking.price_total,
+            fulfillment_method: fulfillmentChoiceLocal.id,
+            fulfillment_label: fulfillmentChoiceLocal.label,
+            fulfillment_note: fulfillmentChoiceLocal.note,
+            fulfillment_price_delta: fulfillmentChoiceLocal.priceDelta
+          };
+        };
+
+        const syncEmailFields = (force=false)=>{
+          if(!subjectInput || !messageInput) return;
+          const current = buildBookingForEmail(collectCurrentValues());
+          if(force || !subjectDirty){
+            subjectInput.value = baseSubject;
+          }
+          if(force || !messageDirty){
+            messageInput.value = this.tplEditInfo(current);
+          }
+        };
+
+        if(subjectInput){ subjectInput.addEventListener('input', ()=>{ subjectDirty = subjectInput.value !== baseSubject; }); }
+        if(messageInput){ messageInput.addEventListener('input', ()=>{ messageDirty = true; }); }
+
+        watchFields.forEach(name=>{
+          const field=form.querySelector(`[name="${name}"]`);
+          if(!field) return;
+          const evt = field.tagName === 'SELECT' ? 'change' : 'input';
+          field.addEventListener(evt, ()=> syncEmailFields());
+        });
+
+        const applyEmailToggleState = ()=>{
+          if(!subjectInput || !messageInput || !sendSwitch) return;
+          const enabled = !!sendSwitch.checked;
+          subjectInput.disabled = !enabled;
+          messageInput.disabled = !enabled;
+          form.classList.toggle('mmb-email-disabled', !enabled);
+        };
+
+        if(sendSwitch){
+          applyEmailToggleState();
+          sendSwitch.addEventListener('change', ()=>{
+            applyEmailToggleState();
+            if(sendSwitch.checked){ syncEmailFields(); }
+          });
+        }
+
+        syncEmailFields(true);
+
+        form.addEventListener('submit', async (event)=>{
+          event.preventDefault();
+          await this.handleDetailSubmit(form, booking, closeOverlay, { baseSubject });
+        });
+      }
+
+      async handleDetailSubmit(form, booking, closeOverlay, meta={}){
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const originalLabel = submitBtn ? submitBtn.textContent : '';
+        if(submitBtn){ submitBtn.disabled = true; submitBtn.textContent = 'Speichern…'; }
+        try{
+          const getField = (name)=>form.querySelector(`[name="${name}"]`);
+          const getValue = (name)=>{
+            const el = getField(name);
+            if(!el) return '';
+            if(el.type === 'checkbox') return el.checked;
+            return el.value ?? '';
+          };
+
+          const nextBoxIdRaw = getValue('box_id') || booking.box_id;
+          const nextBoxIdNum = Number(nextBoxIdRaw);
+          const finalBoxId = Number.isFinite(nextBoxIdNum) && nextBoxIdNum > 0 ? nextBoxIdNum : Number(booking.box_id);
+
+          const totalParsed = this.parseAmount(getValue('total_amount'));
+          const normalizedTotal = Number.isFinite(totalParsed)
+            ? this.roundCurrency(totalParsed)
+            : (Number.isFinite(booking.price_total) ? this.roundCurrency(booking.price_total) : 0);
+
+          const depositParsed = this.parseAmount(getValue('deposit_eur'));
+          const normalizedDeposit = Number.isFinite(depositParsed)
+            ? this.roundCurrency(depositParsed)
+            : (Number.isFinite(booking.deposit_eur) ? this.roundCurrency(booking.deposit_eur) : 0);
+
+          const startDate = (getValue('start_date') || booking.start_date || '').trim();
+          const endDate = (getValue('end_date') || booking.end_date || '').trim();
+          const statusValue = (getValue('status') || booking.status || '').trim();
+
+          const nextFulfillmentMethod = (getValue('fulfillment_method') || booking.fulfillment_method || 'pickup').toString();
+          const nextFulfillmentChoice = this.getFulfillmentChoice(nextFulfillmentMethod);
+          const fulfillmentNoteValue = (getValue('fulfillment_note') || booking.fulfillment_note || '').trim();
+          const shippingDeltaParsed = this.parseAmount(getValue('pricing_shipping_delta'));
+          const fulfillmentPriceDelta = Number.isFinite(shippingDeltaParsed)
+            ? this.roundCurrency(shippingDeltaParsed)
+            : (Number.isFinite(nextFulfillmentChoice.priceDelta) ? this.roundCurrency(nextFulfillmentChoice.priceDelta) : 0);
+
+          const sanitized = {
+            customer_name: (getValue('customer_name') || booking.customer_name || '').trim(),
+            customer_email: (getValue('customer_email') || booking.customer_email || '').trim(),
+            customer_phone: (getValue('customer_phone') || booking.customer_phone || '').trim(),
+            box_id: finalBoxId,
+            start_date: startDate,
+            end_date: endDate,
+            status: statusValue,
+            total_amount: normalizedTotal,
+            fulfillment_method: nextFulfillmentChoice.id,
+            fulfillment_label: nextFulfillmentChoice.label,
+            fulfillment_note: fulfillmentNoteValue,
+            fulfillment_price_delta: fulfillmentPriceDelta,
+            note: (getValue('note') || booking.note || '').trim(),
+            deposit_eur: normalizedDeposit
+          };
+
+          const originalFulfillment = this.getFulfillmentInfo(booking);
+          const originalNormalized = {
+            customer_name: (booking.customer_name || '').trim(),
+            customer_email: (booking.customer_email || '').trim(),
+            customer_phone: (booking.customer_phone || '').trim(),
+            box_id: Number(booking.box_id),
+            start_date: (booking.start_date || '').trim(),
+            end_date: (booking.end_date || '').trim(),
+            status: (booking.status || '').trim(),
+            total_amount: Number.isFinite(booking.price_total) ? this.roundCurrency(booking.price_total) : 0,
+            fulfillment_method: originalFulfillment.method,
+            fulfillment_label: originalFulfillment.label,
+            fulfillment_note: originalFulfillment.note || '',
+            fulfillment_price_delta: this.roundCurrency(originalFulfillment.priceDelta || 0),
+            note: (booking.note || '').trim(),
+            deposit_eur: Number.isFinite(booking.deposit_eur) ? this.roundCurrency(booking.deposit_eur) : 0
+          };
+
+          const updatesToSend = {};
+          const markIfChanged = (key, nextValue, prevValue)=>{
+            if(key==='total_amount' || key==='deposit_eur' || key==='fulfillment_price_delta'){
+              const nextFinite = Number.isFinite(nextValue);
+              const prevFinite = Number.isFinite(prevValue);
+              if(nextFinite && prevFinite && Math.abs(nextValue - prevValue) < 0.01) return;
+              if(!nextFinite && !prevFinite) return;
+            }else if(key==='box_id'){
+              if(Number(nextValue) === Number(prevValue)) return;
+            }else{
+              if(nextValue === prevValue) return;
+            }
+            updatesToSend[key] = nextValue;
+          };
+
+          markIfChanged('customer_name', sanitized.customer_name, originalNormalized.customer_name);
+          markIfChanged('customer_email', sanitized.customer_email, originalNormalized.customer_email);
+          markIfChanged('customer_phone', sanitized.customer_phone, originalNormalized.customer_phone);
+          markIfChanged('box_id', sanitized.box_id, originalNormalized.box_id);
+          markIfChanged('start_date', sanitized.start_date, originalNormalized.start_date);
+          markIfChanged('end_date', sanitized.end_date, originalNormalized.end_date);
+          markIfChanged('status', sanitized.status, originalNormalized.status);
+          markIfChanged('total_amount', sanitized.total_amount, originalNormalized.total_amount);
+          markIfChanged('note', sanitized.note, originalNormalized.note);
+          markIfChanged('deposit_eur', sanitized.deposit_eur, originalNormalized.deposit_eur);
+
+          const fulfillmentChanged = (
+            sanitized.fulfillment_method !== originalNormalized.fulfillment_method ||
+            sanitized.fulfillment_label !== originalNormalized.fulfillment_label ||
+            sanitized.fulfillment_note !== originalNormalized.fulfillment_note ||
+            Math.abs(sanitized.fulfillment_price_delta - originalNormalized.fulfillment_price_delta) > 0.01
+          );
+          if(fulfillmentChanged){
+            updatesToSend.fulfillment_method = sanitized.fulfillment_method;
+            updatesToSend.fulfillment_label = sanitized.fulfillment_label;
+            updatesToSend.fulfillment_note = sanitized.fulfillment_note;
+            updatesToSend.fulfillment_price_delta = sanitized.fulfillment_price_delta;
+          }
+
+          const pricingPayload = this.buildPricingDetailsPayload(form, booking, sanitized, nextFulfillmentChoice);
+          const pricingCanonical = this.stableStringify(pricingPayload || {});
+          const originalPricingCanonical = booking.pricing_details_canonical || this.stableStringify({});
+          if(pricingCanonical !== originalPricingCanonical){
+            updatesToSend.pricing_details_json = pricingPayload && Object.keys(pricingPayload).length ? pricingPayload : null;
+          }
+
+          const fulfillmentDetailsPayload = this.buildFulfillmentDetailsPayload(form, nextFulfillmentChoice.id, booking.fulfillment_details);
+          const nextFulfillmentCanonical = this.stableStringify(fulfillmentDetailsPayload || {});
+          const originalFulfillmentCanonical = booking.fulfillment_details_canonical || this.stableStringify({});
+          if(nextFulfillmentCanonical !== originalFulfillmentCanonical){
+            updatesToSend.fulfillment_details_json = fulfillmentDetailsPayload && Object.keys(fulfillmentDetailsPayload).length ? fulfillmentDetailsPayload : null;
+          }
+
+          const hasUpdates = Object.keys(updatesToSend).length > 0;
+          const sendSwitch = getField('send_email');
+          const shouldSendEmail = !!(sendSwitch && sendSwitch.checked);
+          const subjectValue = (getValue('subject') || '').trim();
+          const messageValue = (getValue('message') || '').trim();
+
+          if(!hasUpdates && !shouldSendEmail){
+            MMBCore.Utils.showNotification('Keine Änderungen gespeichert');
+            return;
+          }
+
+          const bookingId = Number(booking.id);
+          let updatesApplied = false;
+          if(hasUpdates){
+            const payload = { id: bookingId };
+            Object.entries(updatesToSend).forEach(([key,value])=>{
+              if(value === undefined) return;
+              if(key === 'box_id'){
+                payload[key] = Number(value);
+                return;
+              }
+              if(key === 'total_amount' || key === 'deposit_eur' || key === 'fulfillment_price_delta'){
+                const numeric = Number(value);
+                payload[key] = Number.isFinite(numeric) ? this.roundCurrency(numeric) : value;
+                return;
+              }
+              if((key === 'pricing_details_json' || key === 'fulfillment_details_json') && value === null){
+                payload[key] = null;
+                return;
+              }
+              payload[key] = value;
+            });
+            try{
+              await MMBApi.updateBooking(payload);
+              updatesApplied = true;
+            }catch(err){
+              console.error('updateBooking failed:', err);
+              const message = err && err.message ? err.message : 'Aktualisierung fehlgeschlagen';
+              MMBCore.Utils.showNotification(message, 'error');
+              return;
+            }
+          }
+
+          let emailFailed = false;
+          let emailError = '';
+          if(shouldSendEmail){
+            try{
+              const emailPayload = {
+                booking_id: bookingId,
+                send_email: 1,
+                subject: subjectValue || meta.baseSubject || '',
+                message: messageValue || ''
+              };
+              if(sanitized.status){ emailPayload.status = sanitized.status; }
+              const response = await MMBApi.updateBookingStatus(emailPayload);
+              const mailInfo = response && response.mail ? response.mail : null;
+              if(mailInfo && mailInfo.sent === false){
+                emailFailed = true;
+                emailError = mailInfo.error ? ` (Fehler: ${mailInfo.error})` : '';
+              }
+            }catch(err){
+              console.error('updateBookingStatus failed:', err);
+              emailFailed = true;
+              emailError = err && err.message ? ` (${err.message})` : '';
+            }
+          }
+
+          closeOverlay();
+          await this.loadBookings();
+
+          if(shouldSendEmail){
+            if(emailFailed){
+              const base = updatesApplied ? 'Buchung aktualisiert (E-Mail konnte nicht gesendet werden)' : 'E-Mail konnte nicht gesendet werden';
+              MMBCore.Utils.showNotification(base + emailError, 'error');
+            }else{
+              const msg = updatesApplied ? 'Buchung aktualisiert & Kund*in informiert' : 'E-Mail an Kund*in gesendet';
+              MMBCore.Utils.showNotification(msg);
+            }
+          }else if(updatesApplied){
+            MMBCore.Utils.showNotification('Buchung aktualisiert');
+          }
+        }finally{
+          if(submitBtn){ submitBtn.disabled = false; submitBtn.textContent = originalLabel; }
+        }
+      }
+
+      getBoxOptionsForDetail(booking){
+        const seen = new Set();
+        const options = [];
+        (this.state.boxes||[]).forEach(box=>{
+          const id = String(box.id);
+          if(seen.has(id)) return;
+          seen.add(id);
+          options.push({id,name:box.name});
+        });
+        const currentId = String(booking.box_id);
+        if(currentId && !seen.has(currentId)){
+          options.push({id:currentId,name:booking.box_name || BOX_MAP[currentId] || `Box #${currentId}`});
+        }
+        if(!options.length){
+          Object.entries(BOX_MAP).forEach(([id,name])=>options.push({id,name}));
+        }
+        return options;
+      }
+
+      formatDateTimeLabel(value){
+        if(!value) return '–';
+        const date = new Date(value);
+        if(Number.isNaN(date.getTime())) return String(value);
+        return date.toLocaleString('de-DE', { dateStyle:'long', timeStyle:'short' });
+      }
+
+      formatBookingRangeLabel(start,end){
+        const parse=(val)=>{ if(!val) return null; const d=new Date(val); return Number.isNaN(d.getTime())?null:d; };
+        const s=parse(start); const e=parse(end);
+        if(s && e){
+          const sLabel=s.toLocaleDateString('de-DE');
+          const eLabel=e.toLocaleDateString('de-DE');
+          return sLabel===eLabel ? sLabel : `${sLabel} – ${eLabel}`;
+        }
+        if(s) return s.toLocaleDateString('de-DE');
+        if(e) return e.toLocaleDateString('de-DE');
+        return '–';
+      }
+
+      formatNumberInput(value, decimals=2){
+        const num = Number(value);
+        if(!Number.isFinite(num)) return '';
+        return (Math.round(num * Math.pow(10,decimals))/Math.pow(10,decimals)).toFixed(decimals).replace('.', ',');
+      }
+
+      formatIntegerInput(value){
+        const num = Number(value);
+        if(!Number.isFinite(num)) return '';
+        return String(Math.round(num));
+      }
+
+      roundCurrency(value, decimals=2){
+        const num = Number(value);
+        if(!Number.isFinite(num)) return 0;
+        const factor = Math.pow(10,decimals);
+        return Math.round(num*factor)/factor;
+      }
+
+      parseAmount(value){
+        if(value === null || value === undefined) return NaN;
+        if(typeof value === 'number') return value;
+        let str = String(value).trim();
+        if(!str) return NaN;
+        str = str.replace(/€/g,'').replace(/\s+/g,'');
+        str = str.replace(',', '.');
+        const num = Number(str);
+        if(Number.isNaN(num) && str.includes('.')){
+          const fallback = Number(str.replace(/\./g,''));
+          return Number.isNaN(fallback)?NaN:fallback;
+        }
+        return num;
+      }
+
+      safeParseJson(value){
+        if(!value) return null;
+        if(typeof value === 'object') return value;
+        try{ return JSON.parse(value); }catch(e){ return null; }
+      }
+
+      normalizePricingDetails(data){
+        if(!data || typeof data !== 'object') return null;
+        const result = {};
+        const numericFields = ['total','deposit','original','base_total','shipping_delta','discount_amount','discount_percent_exact','avg_per_day','fulfillment_price_delta'];
+        numericFields.forEach(field=>{
+          if(data[field] === undefined || data[field] === null) return;
+          const num = Number(data[field]);
+          if(Number.isFinite(num)) result[field] = num;
+        });
+        if(data.discount_percent_display !== undefined) result.discount_percent_display = String(data.discount_percent_display);
+        if(data.days !== undefined){
+          const daysNum = Number(data.days);
+          if(Number.isFinite(daysNum)) result.days = daysNum;
+        }
+        if(data.pricing_mode) result.pricing_mode = data.pricing_mode;
+        if(data.fulfillment_id) result.fulfillment_id = data.fulfillment_id;
+        if(data.fulfillment_label) result.fulfillment_label = data.fulfillment_label;
+        if(data.fulfillment_note) result.fulfillment_note = data.fulfillment_note;
+        if(data.fulfillment_adds_to_total !== undefined) result.fulfillment_adds_to_total = !!data.fulfillment_adds_to_total;
+        return Object.keys(result).length ? result : null;
+      }
+
+      normalizeFulfillmentDetails(details, fallbackMethod){
+        if(!details || typeof details !== 'object') return null;
+        const clone = JSON.parse(JSON.stringify(details));
+        if(!clone.method && fallbackMethod) clone.method = fallbackMethod;
+        if(clone.contact_preferences && typeof clone.contact_preferences === 'object'){
+          clone.contact_preferences = {
+            phone: !!clone.contact_preferences.phone,
+            whatsapp: !!clone.contact_preferences.whatsapp
+          };
+        }
+        if(clone.allow_contact_phone === undefined){
+          clone.allow_contact_phone = clone.contact_preferences ? !!clone.contact_preferences.phone : true;
+        }else{
+          clone.allow_contact_phone = clone.allow_contact_phone !== false;
+        }
+        if(clone.allow_contact_whatsapp === undefined){
+          clone.allow_contact_whatsapp = clone.contact_preferences ? !!clone.contact_preferences.whatsapp : false;
+        }else{
+          clone.allow_contact_whatsapp = !!clone.allow_contact_whatsapp;
+        }
+        return clone;
+      }
+
+      stableStringify(value){
+        const normalize=(input)=>{
+          if(input === null || typeof input !== 'object') return input;
+          if(Array.isArray(input)) return input.map(item=>normalize(item));
+          const sortedKeys = Object.keys(input).sort();
+          const out={};
+          sortedKeys.forEach(key=>{ out[key] = normalize(input[key]); });
+          return out;
+        };
+        try{ return JSON.stringify(normalize(value)); }catch(e){ return ''; }
+      }
+
+      buildPricingDetailsPayload(form, booking, sanitized, fulfillmentChoice){
+        const getValue = (name)=>{
+          const el = form.querySelector(`[name="${name}"]`);
+          return el ? (el.value ?? '') : '';
+        };
+        const parseAmountField = (name)=>{
+          const val = getValue(name);
+          const parsed = this.parseAmount(val);
+          return Number.isFinite(parsed) ? this.roundCurrency(parsed) : NaN;
+        };
+
+        const payload = {};
+        const total = parseAmountField('total_amount');
+        if(Number.isFinite(total)) payload.total = total; else payload.total = sanitized.total_amount;
+
+        const baseTotal = parseAmountField('pricing_base_total');
+        if(Number.isFinite(baseTotal)) payload.base_total = baseTotal;
+
+        const original = parseAmountField('pricing_original');
+        if(Number.isFinite(original)) payload.original = original;
+
+        const shippingDelta = parseAmountField('pricing_shipping_delta');
+        if(Number.isFinite(shippingDelta)) payload.shipping_delta = shippingDelta; else payload.shipping_delta = sanitized.fulfillment_price_delta;
+
+        const discountExact = parseAmountField('pricing_discount_percent_exact');
+        if(Number.isFinite(discountExact)) payload.discount_percent_exact = discountExact;
+
+        const discountAmount = parseAmountField('pricing_discount_amount');
+        if(Number.isFinite(discountAmount)) payload.discount_amount = discountAmount;
+
+        const avgPerDay = parseAmountField('pricing_avg_per_day');
+        if(Number.isFinite(avgPerDay)) payload.avg_per_day = avgPerDay;
+
+        const discountDisplay = getValue('pricing_discount_percent_display').trim();
+        if(discountDisplay !== '') payload.discount_percent_display = discountDisplay;
+
+        const daysRaw = getValue('pricing_days').trim();
+        if(daysRaw !== ''){
+          const daysNum = Number(daysRaw);
+          if(Number.isFinite(daysNum)) payload.days = Math.round(daysNum);
+        }
+
+        payload.deposit = sanitized.deposit_eur;
+        payload.fulfillment_id = sanitized.fulfillment_method;
+        payload.fulfillment_label = sanitized.fulfillment_label;
+        payload.fulfillment_note = sanitized.fulfillment_note;
+        payload.fulfillment_price_delta = sanitized.fulfillment_price_delta;
+        payload.fulfillment_adds_to_total = fulfillmentChoice.addsToTotal !== false;
+
+        if(payload.total === undefined) payload.total = sanitized.total_amount;
+        if(payload.shipping_delta === undefined) payload.shipping_delta = sanitized.fulfillment_price_delta;
+        if(payload.discount_percent_display === undefined && payload.discount_percent_exact !== undefined){
+          payload.discount_percent_display = String(payload.discount_percent_exact);
+        }
+        if(!payload.pricing_mode){
+          if(Number.isFinite(payload.days) && payload.days > 1){
+            payload.pricing_mode = 'range';
+          }else if(Number.isFinite(payload.days) && payload.days === 1){
+            payload.pricing_mode = 'single';
+          }else if(booking.pricing_details && booking.pricing_details.pricing_mode){
+            payload.pricing_mode = booking.pricing_details.pricing_mode;
           }
         }
-        const phoneHtml = booking.customer_phone ? this.escape(booking.customer_phone) : '<span class="mmb-text-muted">Keine Angabe</span>';
-        const noteHtml = booking.note
-          ? this.escape(booking.note).replace(/\n/g,'<br>')
-          : '<span class="mmb-text-muted">Keine Anmerkungen</span>';
-        const fulfillmentNoteHtml = info.note ? `<div class="mmb-text-muted" style="font-size:.85rem;">${this.escape(info.note)}</div>` : '';
-        const html = `
-          <div class="mmb-field"><strong>Kund*in</strong><div>${this.escape(booking.customer_name)}</div><div class="mmb-text-muted" style="font-size:.85rem;">${this.escape(booking.customer_email)}</div></div>
-          <div class="mmb-field"><strong>Abwicklung</strong><div>${this.escape(info.label)}</div>${fulfillmentNoteHtml}</div>
-          <div class="mmb-field"><strong>Buchung erstellt</strong><div>${createdLabel}</div></div>
-          <div class="mmb-field"><strong>Telefon</strong><div>${phoneHtml}</div></div>
-          <div class="mmb-field"><strong>Anmerkungen</strong><div>${noteHtml}</div></div>
-        `;
-        await this.openModal({ title:`Buchungsdetails – ${displayId(id)}`, html, confirmText:'Schließen', cancelText:'' });
+
+        return payload;
+      }
+
+      buildFulfillmentDetailsPayload(form, method, existing){
+        if(method !== 'shipping' && method !== 'delivery'){
+          return null;
+        }
+        const getValue = (name)=>{
+          const el = form.querySelector(`[name="${name}"]`);
+          return el ? (el.value ?? '').toString().trim() : '';
+        };
+        const getChecked = (name)=>{
+          const el = form.querySelector(`[name="${name}"]`);
+          return el ? !!el.checked : false;
+        };
+
+        const payload = {
+          method,
+          submitted_via: (existing && typeof existing === 'object' && existing.submitted_via)
+            ? existing.submitted_via
+            : 'admin_panel'
+        };
+
+        const contactName = getValue('fulfillment_contact_name');
+        const contactEmail = getValue('fulfillment_contact_email');
+        const contactPhone = getValue('fulfillment_contact_phone');
+        if(contactName) payload.contact_name = contactName;
+        if(contactEmail) payload.contact_email = contactEmail;
+        if(contactPhone) payload.contact_phone = contactPhone;
+
+        const allowPhone = getChecked('fulfillment_pref_phone');
+        const allowWhatsApp = getChecked('fulfillment_pref_whatsapp');
+        payload.allow_contact_phone = allowPhone;
+        payload.allow_contact_whatsapp = allowWhatsApp;
+        payload.contact_preferences = { phone: allowPhone, whatsapp: allowWhatsApp };
+
+        if(method === 'shipping'){
+          const line1 = getValue('shipping_address_line1');
+          const postal = getValue('shipping_postal_code');
+          const city = getValue('shipping_city');
+          const extra = getValue('shipping_address_extra');
+          if(line1) payload.address_line1 = line1;
+          if(postal) payload.postal_code = postal;
+          if(city) payload.city = city;
+          if(extra) payload.address_extra = extra;
+        }
+
+        if(method === 'delivery'){
+          const meeting = getValue('delivery_meeting_point');
+          const preferred = getValue('delivery_preferred_time');
+          if(meeting) payload.meeting_point = meeting;
+          if(preferred) payload.preferred_time = preferred;
+        }
+
+        Object.keys(payload).forEach(key=>{
+          const value = payload[key];
+          if(value === '' || value === null || (typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0)){
+            delete payload[key];
+          }
+        });
+
+        const meaningfulKeys = Object.keys(payload).filter(key=>!['method','submitted_via'].includes(key));
+        return meaningfulKeys.length ? payload : null;
       }
 
       tplConfirm(b){

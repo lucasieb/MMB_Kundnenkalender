@@ -316,6 +316,34 @@ try {
   $phone  = trim((string)($in['customer_phone'] ?? ''));
   $note   = trim((string)($in['note']           ?? ''));
 
+  $pricingDetailsJson = null;
+  if (array_key_exists('pricing_details_json', $in)) {
+    $pricingRaw = $in['pricing_details_json'];
+  } elseif (array_key_exists('pricing_details', $in)) {
+    $pricingRaw = $in['pricing_details'];
+  } else {
+    $pricingRaw = null;
+  }
+  if (is_array($pricingRaw)) {
+    $pricingDetailsJson = json_encode($pricingRaw, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+  } elseif (is_string($pricingRaw) && trim($pricingRaw) !== '') {
+    $pricingDetailsJson = $pricingRaw;
+  }
+
+  $fulfillmentDetailsJson = null;
+  if (array_key_exists('fulfillment_details_json', $in)) {
+    $fulfillmentRaw = $in['fulfillment_details_json'];
+  } elseif (array_key_exists('fulfillment_details', $in)) {
+    $fulfillmentRaw = $in['fulfillment_details'];
+  } else {
+    $fulfillmentRaw = null;
+  }
+  if (is_array($fulfillmentRaw)) {
+    $fulfillmentDetailsJson = json_encode($fulfillmentRaw, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+  } elseif (is_string($fulfillmentRaw) && trim($fulfillmentRaw) !== '') {
+    $fulfillmentDetailsJson = $fulfillmentRaw;
+  }
+
   $fulfillment = normalize_fulfillment_from_request($in);
   $fulfillmentMethod = $fulfillment['method'];
   $fulfillmentLabel  = $fulfillment['label'];
@@ -382,6 +410,14 @@ try {
   if (has_col($pdo,'note'))           { $fields[]='note';           $place[]=':note';           $params[':note']=$note; }
   if (has_col($pdo,'total_amount'))   { $fields[]='total_amount';   $place[]=':total_amount';   $params[':total_amount']=$total; }
   if (has_col($pdo,'deposit_eur'))    { $fields[]='deposit_eur';    $place[]=':deposit_eur';    $params[':deposit_eur']=$deposit; }
+  if ($pricingDetailsJson !== null) {
+    if (has_col($pdo,'pricing_details_json')) { $fields[]='pricing_details_json'; $place[]=':pricing_details_json'; $params[':pricing_details_json']=$pricingDetailsJson; }
+    elseif (has_col($pdo,'pricing_details')) { $fields[]='pricing_details'; $place[]=':pricing_details'; $params[':pricing_details']=$pricingDetailsJson; }
+  }
+  if ($fulfillmentDetailsJson !== null) {
+    if (has_col($pdo,'fulfillment_details_json')) { $fields[]='fulfillment_details_json'; $place[]=':fulfillment_details_json'; $params[':fulfillment_details_json']=$fulfillmentDetailsJson; }
+    elseif (has_col($pdo,'fulfillment_details')) { $fields[]='fulfillment_details'; $place[]=':fulfillment_details'; $params[':fulfillment_details']=$fulfillmentDetailsJson; }
+  }
   if (has_col($pdo,'fulfillment_method')) { $fields[]='fulfillment_method'; $place[]=':fulfillment_method'; $params[':fulfillment_method']=$fulfillmentMethod; }
   if (has_col($pdo,'fulfillment_label'))  { $fields[]='fulfillment_label';  $place[]=':fulfillment_label';  $params[':fulfillment_label']=$fulfillmentLabel; }
   if (has_col($pdo,'fulfillment_note'))   { $fields[]='fulfillment_note';   $place[]=':fulfillment_note';   $params[':fulfillment_note']=$fulfillmentNote; }

@@ -11,13 +11,13 @@ $status = isset($_GET['status']) ? trim((string)$_GET['status']) : null;
 $from   = isset($_GET['from']) ? trim((string)$_GET['from']) : null;
 $to     = isset($_GET['to']) ? trim((string)$_GET['to']) : null;
 
-$sql = "SELECT * FROM bookings WHERE 1=1";
+$sql = "SELECT b.*, bx.name AS box_name FROM bookings b LEFT JOIN boxes bx ON bx.id = b.box_id WHERE 1=1";
 $params = [];
-if ($box_id) { $sql .= " AND box_id=?"; $params[] = $box_id; }
-if ($status) { $sql .= " AND status=?"; $params[] = $status; }
-if ($from)   { $sql .= " AND end_date >= ?"; $params[] = $from; }
-if ($to)     { $sql .= " AND start_date <= ?"; $params[] = $to; }
-$sql .= " ORDER BY created_at DESC LIMIT 500";
+if ($box_id) { $sql .= " AND b.box_id=?"; $params[] = $box_id; }
+if ($status) { $sql .= " AND b.status=?"; $params[] = $status; }
+if ($from)   { $sql .= " AND b.end_date >= ?"; $params[] = $from; }
+if ($to)     { $sql .= " AND b.start_date <= ?"; $params[] = $to; }
+$sql .= " ORDER BY b.created_at DESC, b.id DESC LIMIT 500";
 
 $stmt = pdo()->prepare($sql);
 $stmt->execute($params);
