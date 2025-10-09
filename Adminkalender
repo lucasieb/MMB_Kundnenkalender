@@ -6,22 +6,19 @@
   <title>MietMichBox – Admin Kalender</title>
   <style>
     :root{
-      --mmb-primary:#3b3b3b; --mmb-accent:#0EA5E9; --mmb-bg:#efefe6;
-      --mmb-muted:#f8f9fa; --mmb-ok:#10b981; --mmb-warn:#f59e0b;
-      --mmb-busy:#ef4444; --mmb-border:#e5e7eb; --mmb-text:#111; --mmb-text-light:#6b7280;
+      --mmb-primary:#3b3b3b; --mmb-accent:#0EA5E9; --mmb-bg:#f9fafc;
+      --mmb-muted:#f1f5f9; --mmb-ok:#10b981; --mmb-warn:#f59e0b;
+      --mmb-busy:#ef4444; --mmb-border:#dbe1ea; --mmb-text:#111; --mmb-text-light:#6b7280;
     }
     @media (prefers-color-scheme: dark){
       :root{ --mmb-bg:#3b3b3b; --mmb-muted:#4a4a4a; --mmb-border:#555; --mmb-text:#fff; --mmb-text-light:#ccc; --mmb-primary:#fff; }
     }
-    body{margin:0;min-height:100vh;background:#e7e4d6;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--mmb-text);display:flex;}
-    .page{flex:1;display:flex;flex-direction:column;min-height:100vh;}
-    .page-header{padding:1.75rem 2.5rem 1.25rem;}
-    .page-header h1{margin:0;font-size:1.8rem;font-weight:600;color:#111;}
-    .page-main{flex:1;display:flex;padding:0 2.5rem 2.5rem;}
+    body{margin:0;min-height:100vh;background:#eef1f5;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--mmb-text);display:flex;}
+    #mmb-admin-root{flex:1;display:flex;}
     #mmb-admin-cal{flex:1;display:flex;}
-    .mmb-widget{background:var(--mmb-bg);border-radius:18px;box-shadow:0 24px 60px rgba(15,23,42,.14);padding:1.5rem;flex:1;display:flex;flex-direction:column;backdrop-filter:blur(18px);}
+    .mmb-widget{background:var(--mmb-bg);border-radius:0;box-shadow:none;padding:2.5rem clamp(1.5rem,3vw,3rem);flex:1;display:flex;flex-direction:column;gap:1.5rem;min-height:100vh;}
     .mmb-loading{display:flex;justify-content:center;align-items:center;height:200px;font-size:.9rem;color:var(--mmb-text-light);}
-    .mmb-admin-controls{display:flex;align-items:center;gap:1rem;margin-bottom:1rem;flex-wrap:wrap;}
+    .mmb-admin-controls{display:flex;align-items:center;gap:1rem;flex-wrap:wrap;}
     .mmb-box-buttons{display:flex;gap:.5rem;flex-wrap:wrap;}
     .mmb-box-btn{background:var(--mmb-bg);border:1px solid var(--mmb-border);color:var(--mmb-text);padding:.75rem 1rem;border-radius:4px;cursor:pointer;font-size:.875rem;font-weight:500;min-width:140px;}
     .mmb-box-btn:hover{background:var(--mmb-muted);} .mmb-box-btn--active{background:var(--mmb-accent);color:#fff;border-color:var(--mmb-accent);}
@@ -50,11 +47,8 @@
   </style>
 </head>
 <body>
-  <div class="page">
-    <header class="page-header"><h1>Admin – Kalender</h1></header>
-    <main class="page-main">
-      <div id="mmb-admin-cal"></div>
-    </main>
+  <div id="mmb-admin-root">
+    <div id="mmb-admin-cal"></div>
   </div>
 
   <script src="https://firebrick-squirrel-568721.hostingersite.com/admin_auth.js" data-api-base="https://firebrick-squirrel-568721.hostingersite.com/"></script>
