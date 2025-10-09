@@ -9,15 +9,17 @@
       --mmb-primary:#3b3b3b; --mmb-accent:#0EA5E9; --mmb-bg:#efefe6;
       --mmb-muted:#f8f9fa; --mmb-ok:#10b981; --mmb-warn:#f59e0b;
       --mmb-busy:#ef4444; --mmb-border:#e5e7eb; --mmb-text:#111; --mmb-text-light:#6b7280;
+      --mmb-shell-padding:32px;
     }
+    @media (max-width:900px){ :root{ --mmb-shell-padding:18px; } }
     @media (prefers-color-scheme: dark){
       :root{ --mmb-bg:#3b3b3b; --mmb-muted:#4a4a4a; --mmb-border:#555; --mmb-text:#fff; --mmb-text-light:#ccc; --mmb-primary:#fff; }
     }
-    body{margin:0; padding:1rem; background:#f5f5f5; font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; color:var(--mmb-text);}
-    .card{background:#fff;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.1);overflow:hidden;max-width:1200px;margin:0 auto;}
-    .card h1{margin:0;padding:1rem;border-bottom:1px solid #e5e7eb;background:#fff;color:#111;font-size:1.25rem;} /* schwarz auf weiß */
-    .card .content{padding:1rem;}
-    .mmb-widget{background:var(--mmb-bg);border-radius:6px;box-shadow:0 1px 3px rgba(0,0,0,.08);}
+    body{margin:0;min-height:100vh;background:#f4f4f0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--mmb-text);display:flex;}
+    #mmb-admin-shell{flex:1;min-height:100vh;display:flex;}
+    #mmb-admin-cal{flex:1;display:flex;padding:var(--mmb-shell-padding);box-sizing:border-box;min-height:0;}
+    .mmb-widget{background:rgba(255,255,255,.88);border-radius:18px;box-shadow:none;border:1px solid rgba(15,23,42,.08);padding:1.75rem 2rem;flex:1;display:flex;flex-direction:column;backdrop-filter:blur(18px);}
+    @media (max-width:900px){.mmb-widget{padding:1.25rem;}}
     .mmb-loading{display:flex;justify-content:center;align-items:center;height:200px;font-size:.9rem;color:var(--mmb-text-light);}
     .mmb-admin-controls{display:flex;align-items:center;gap:1rem;margin-bottom:1rem;flex-wrap:wrap;}
     .mmb-box-buttons{display:flex;gap:.5rem;flex-wrap:wrap;}
@@ -48,11 +50,8 @@
   </style>
 </head>
 <body>
-  <div class="card">
-    <h1>Admin – Kalender</h1>
-    <div class="content">
-      <div id="mmb-admin-cal"></div>
-    </div>
+  <div id="mmb-admin-shell">
+    <div id="mmb-admin-cal"></div>
   </div>
 
   <script src="https://firebrick-squirrel-568721.hostingersite.com/admin_auth.js" data-api-base="https://firebrick-squirrel-568721.hostingersite.com/"></script>
