@@ -17,22 +17,33 @@ try {
 header('Content-Type: application/json; charset=utf-8');
 
 function bookings_columns(PDO $pdo): array {
-  static $cache = null;
-  if ($cache !== null) {
-    return $cache;
+  static $cols = null;
+  if ($cols !== null) {
+    return $cols;
   }
   $cols = [];
   $stmt = $pdo->query('SHOW COLUMNS FROM `bookings`');
   foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
     $cols[strtolower($row['Field'])] = true;
   }
-  $cache = $cols;
-  return $cache;
+  return $cols;
 }
 
-function has_booking_col(PDO $pdo, string $name): bool {
-  $cols = bookings_columns($pdo);
-  return isset($cols[strtolower($name)]);
+function resolve_booking_column(array $columns, string $field): ?string {
+  $map = [
+    'pricing_details_json' => ['pricing_details_json', 'pricing_details'],
+    'pricing_details' => ['pricing_details_json', 'pricing_details'],
+    'fulfillment_details_json' => ['fulfillment_details_json', 'fulfillment_details'],
+    'fulfillment_details' => ['fulfillment_details_json', 'fulfillment_details'],
+  ];
+  $fieldLower = strtolower($field);
+  $candidates = $map[$fieldLower] ?? [$field];
+  foreach ($candidates as $candidate) {
+    if (isset($columns[strtolower($candidate)])) {
+      return $candidate;
+    }
+  }
+  return null;
 }
 
 try {
@@ -53,17 +64,17 @@ try {
   }
 
   // Whitelist erlaubter Felder
-  $allowList = ['customer_name','customer_email','customer_phone','box_id','start_date','end_date','status','total_amount','fulfillment_method','fulfillment_label','fulfillment_note','fulfillment_price_delta','note','deposit_eur','pricing_details_json','pricing_details','fulfillment_details_json','fulfillment_details'];
-  $allow = [];
-  foreach ($allowList as $field) {
-    if ($hasColumn($field)) {
-      $allow[] = $field;
-    }
-  }
+  $allow = ['customer_name','customer_email','customer_phone','box_id','start_date','end_date','status','total_amount','fulfillment_method','fulfillment_label','fulfillment_note','fulfillment_price_delta','note','deposit_eur','pricing_details_json','pricing_details','fulfillment_details_json','fulfillment_details'];
+  $columns = bookings_columns($pdo);
+  $processed = [];
   $sets = [];
   $params = [':id'=>$id];
   foreach ($allow as $f) {
     if (!array_key_exists($f, $data)) {
+      continue;
+    }
+    $columnName = resolve_booking_column($columns, $f);
+    if ($columnName === null || isset($processed[$columnName])) {
       continue;
     }
     $val = $data[$f];
@@ -81,8 +92,10 @@ try {
     } elseif ($f === 'note') {
       $val = (string)$val;
     }
-    $sets[] = "`$f` = :$f";
-    $params[":$f"] = $val;
+    $paramKey = ':' . $columnName;
+    $sets[] = "`$columnName` = $paramKey";
+    $params[$paramKey] = $val;
+    $processed[$columnName] = true;
   }
   if (!$sets) throw new Exception('Keine Änderungen übergeben');
 
