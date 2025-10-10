@@ -42,12 +42,26 @@ function decode_json_field($value): ?array {
   return is_array($decoded) ? $decoded : null;
 }
 
-function encode_json_field(?array $value): ?string {
-  if ($value === null) {
+/**
+ * @param string|null $json
+ */
+function guess_method_from_string(?string $json): ?string {
+  if (!is_string($json)) {
     return null;
   }
-  $json = json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-  return $json === false ? null : $json;
+  $json = strtolower($json);
+  foreach (['shipping','lieferung', 'delivery', 'versand', 'pickup', 'abholung'] as $needle) {
+    if (strpos($json, $needle) === false) {
+      continue;
+    }
+    if (preg_match('/"(?:fulfillment_(?:method|id|choice)|method|id)"\s*:\s*"([^"]+)"/i', $json, $m)) {
+      return $m[1];
+    }
+    if (preg_match('/"(shipping|delivery|pickup|versand|lieferung|abholung)"/', $json, $m)) {
+      return $m[1];
+    }
+  }
+  return null;
 }
 
 function normalize_fulfillment_method($value): ?string {
@@ -68,50 +82,66 @@ function normalize_fulfillment_method($value): ?string {
     case 'shipping':
     case 'versand':
     case 'lieferungperversand':
+    case 'shipment':
       return 'shipping';
     case 'delivery':
     case 'lieferung':
+    case 'lieferdienst':
       return 'delivery';
   }
   return null;
 }
 
-function coalesce_numeric($value): ?float {
-  if ($value === null || $value === '') {
-    return null;
+/**
+ * @param array<string,mixed>|null $details
+ * @return list<string|null>
+ */
+function collect_method_candidates(?array $details): array {
+  if ($details === null) {
+    return [];
   }
-  if (is_numeric($value)) {
-    return (float)$value;
+  $keys = ['method','fulfillment_method','fulfillment_id','id','choice','selected'];
+  $out = [];
+  foreach ($keys as $key) {
+    if (array_key_exists($key, $details)) {
+      $out[] = $details[$key];
+    }
   }
-  return null;
+  return $out;
 }
 
 foreach ($rows as &$row) {
-  $fulfillmentDetails = null;
-  if (array_key_exists('fulfillment_details_json', $row)) {
-    $fulfillmentDetails = decode_json_field($row['fulfillment_details_json']);
-  }
-  if ($fulfillmentDetails === null && array_key_exists('fulfillment_details', $row)) {
-    $fulfillmentDetails = decode_json_field($row['fulfillment_details']);
-  }
-
-  $pricingDetails = null;
-  if (array_key_exists('pricing_details_json', $row)) {
-    $pricingDetails = decode_json_field($row['pricing_details_json']);
-  }
-  if ($pricingDetails === null && array_key_exists('pricing_details', $row)) {
-    $pricingDetails = decode_json_field($row['pricing_details']);
+  $rawFulfillmentJson = null;
+  if (array_key_exists('fulfillment_details_json', $row) && is_string($row['fulfillment_details_json'])) {
+    $rawFulfillmentJson = $row['fulfillment_details_json'];
+  } elseif (array_key_exists('fulfillment_details', $row) && is_string($row['fulfillment_details'])) {
+    $rawFulfillmentJson = $row['fulfillment_details'];
   }
 
-  $methodCandidates = [
-    $row['fulfillment_method'] ?? null,
-    $fulfillmentDetails['method'] ?? null,
-    $pricingDetails['fulfillment_method'] ?? null,
-    $pricingDetails['fulfillment_id'] ?? null,
-    $pricingDetails['fulfillment_choice'] ?? null,
-    $row['fulfillment'] ?? null,
-    $row['fulfillment_type'] ?? null,
-  ];
+  $fulfillmentDetails = decode_json_field($rawFulfillmentJson);
+
+  $rawPricingJson = null;
+  if (array_key_exists('pricing_details_json', $row) && is_string($row['pricing_details_json'])) {
+    $rawPricingJson = $row['pricing_details_json'];
+  } elseif (array_key_exists('pricing_details', $row) && is_string($row['pricing_details'])) {
+    $rawPricingJson = $row['pricing_details'];
+  }
+
+  $pricingDetails = decode_json_field($rawPricingJson);
+
+  $methodCandidates = array_merge(
+    [
+      $row['fulfillment_method'] ?? null,
+      $row['fulfillment'] ?? null,
+      $row['fulfillment_type'] ?? null,
+    ],
+    collect_method_candidates($fulfillmentDetails),
+    collect_method_candidates($pricingDetails),
+    [
+      guess_method_from_string($rawFulfillmentJson),
+      guess_method_from_string($rawPricingJson),
+    ]
+  );
 
   $method = null;
   foreach ($methodCandidates as $candidate) {
@@ -126,69 +156,92 @@ foreach ($rows as &$row) {
   }
 
   $row['fulfillment_method'] = $method;
+  $row['resolved_fulfillment_method'] = $method;
 
-  if ($fulfillmentDetails !== null) {
-    $fulfillmentDetails['method'] = $method;
-    if (!isset($row['fulfillment_label']) || trim((string)$row['fulfillment_label']) === '') {
-      if (isset($fulfillmentDetails['label'])) {
-        $row['fulfillment_label'] = (string)$fulfillmentDetails['label'];
-      }
+  if (!isset($row['fulfillment_label']) || trim((string)$row['fulfillment_label']) === '') {
+    $candidates = [];
+    if ($fulfillmentDetails !== null && isset($fulfillmentDetails['label'])) {
+      $candidates[] = (string)$fulfillmentDetails['label'];
     }
-    if (!isset($row['fulfillment_note']) || trim((string)$row['fulfillment_note']) === '') {
-      if (isset($fulfillmentDetails['note'])) {
-        $row['fulfillment_note'] = (string)$fulfillmentDetails['note'];
-      }
+    if ($pricingDetails !== null && isset($pricingDetails['fulfillment_label'])) {
+      $candidates[] = (string)$pricingDetails['fulfillment_label'];
     }
-    if (!isset($row['fulfillment_adds_to_total'])) {
-      if (isset($fulfillmentDetails['adds_to_total'])) {
-        $row['fulfillment_adds_to_total'] = (bool)$fulfillmentDetails['adds_to_total'];
+    foreach ($candidates as $label) {
+      $label = trim($label);
+      if ($label !== '') {
+        $row['fulfillment_label'] = $label;
+        break;
       }
-    }
-    if (!isset($row['fulfillment_price_delta']) || $row['fulfillment_price_delta'] === null) {
-      $price = $fulfillmentDetails['price_delta'] ?? $fulfillmentDetails['priceDelta'] ?? null;
-      $num = coalesce_numeric($price);
-      if ($num !== null) {
-        $row['fulfillment_price_delta'] = $num;
-      }
-    }
-    $row['fulfillment_details'] = $fulfillmentDetails;
-    $encoded = encode_json_field($fulfillmentDetails);
-    if ($encoded !== null) {
-      $row['fulfillment_details_json'] = $encoded;
     }
   }
 
+  if (!isset($row['fulfillment_note']) || trim((string)$row['fulfillment_note']) === '') {
+    $candidates = [];
+    if ($fulfillmentDetails !== null && isset($fulfillmentDetails['note'])) {
+      $candidates[] = (string)$fulfillmentDetails['note'];
+    }
+    if ($pricingDetails !== null && isset($pricingDetails['fulfillment_note'])) {
+      $candidates[] = (string)$pricingDetails['fulfillment_note'];
+    }
+    foreach ($candidates as $note) {
+      $note = trim($note);
+      if ($note !== '') {
+        $row['fulfillment_note'] = $note;
+        break;
+      }
+    }
+  }
+
+  if (!isset($row['fulfillment_price_delta']) || $row['fulfillment_price_delta'] === null || $row['fulfillment_price_delta'] === '') {
+    $candidates = [];
+    if ($fulfillmentDetails !== null) {
+      $candidates[] = $fulfillmentDetails['price_delta'] ?? null;
+      $candidates[] = $fulfillmentDetails['priceDelta'] ?? null;
+    }
+    if ($pricingDetails !== null) {
+      $candidates[] = $pricingDetails['fulfillment_price_delta'] ?? null;
+      $candidates[] = $pricingDetails['shipping_delta'] ?? null;
+    }
+    foreach ($candidates as $candidate) {
+      if ($candidate === null || $candidate === '') {
+        continue;
+      }
+      if (is_numeric($candidate)) {
+        $row['fulfillment_price_delta'] = (float)$candidate;
+        break;
+      }
+    }
+  }
+
+  if (!isset($row['fulfillment_adds_to_total'])) {
+    $candidates = [];
+    if ($fulfillmentDetails !== null && array_key_exists('adds_to_total', $fulfillmentDetails)) {
+      $candidates[] = $fulfillmentDetails['adds_to_total'];
+    }
+    if ($pricingDetails !== null && array_key_exists('fulfillment_adds_to_total', $pricingDetails)) {
+      $candidates[] = $pricingDetails['fulfillment_adds_to_total'];
+    }
+    foreach ($candidates as $candidate) {
+      if (is_bool($candidate)) {
+        $row['fulfillment_adds_to_total'] = $candidate;
+        break;
+      }
+      if ($candidate === '1' || $candidate === 1) {
+        $row['fulfillment_adds_to_total'] = true;
+        break;
+      }
+      if ($candidate === '0' || $candidate === 0) {
+        $row['fulfillment_adds_to_total'] = false;
+        break;
+      }
+    }
+  }
+
+  if ($fulfillmentDetails !== null) {
+    $row['resolved_fulfillment_details'] = $fulfillmentDetails;
+  }
   if ($pricingDetails !== null) {
-    if (!isset($pricingDetails['fulfillment_id']) || $pricingDetails['fulfillment_id'] === '' || $pricingDetails['fulfillment_id'] === null) {
-      $pricingDetails['fulfillment_id'] = $method;
-    }
-    if (!isset($row['fulfillment_label']) || trim((string)$row['fulfillment_label']) === '') {
-      if (isset($pricingDetails['fulfillment_label'])) {
-        $row['fulfillment_label'] = (string)$pricingDetails['fulfillment_label'];
-      }
-    }
-    if (!isset($row['fulfillment_note']) || trim((string)$row['fulfillment_note']) === '') {
-      if (isset($pricingDetails['fulfillment_note'])) {
-        $row['fulfillment_note'] = (string)$pricingDetails['fulfillment_note'];
-      }
-    }
-    if (!isset($row['fulfillment_adds_to_total'])) {
-      if (isset($pricingDetails['fulfillment_adds_to_total'])) {
-        $row['fulfillment_adds_to_total'] = (bool)$pricingDetails['fulfillment_adds_to_total'];
-      }
-    }
-    if (!isset($row['fulfillment_price_delta']) || $row['fulfillment_price_delta'] === null) {
-      $price = $pricingDetails['fulfillment_price_delta'] ?? $pricingDetails['shipping_delta'] ?? null;
-      $num = coalesce_numeric($price);
-      if ($num !== null) {
-        $row['fulfillment_price_delta'] = $num;
-      }
-    }
-    $row['pricing_details'] = $pricingDetails;
-    $encodedPricing = encode_json_field($pricingDetails);
-    if ($encodedPricing !== null) {
-      $row['pricing_details_json'] = $encodedPricing;
-    }
+    $row['resolved_pricing_details'] = $pricingDetails;
   }
 }
 unset($row);
