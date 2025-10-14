@@ -449,6 +449,7 @@ function booking_mail_context(array $data): array {
     'range'       => $range,
     'fulfillment' => $fulfillmentLine,
     'fulfillment_info' => $fulfillmentInfo,
+    'fulfillment_details' => $fulfillmentDetails,
   ];
 }
 
@@ -504,11 +505,91 @@ function build_internal_submission_mail(array $data): array {
   $totalDisp = $ctx['totalDisp'];
   $fulfillment = $ctx['fulfillment'];
   $displayId = $data['display_id'];
+  $fulfillmentInfo = $ctx['fulfillment_info'];
+  $fulfillmentDetails = $ctx['fulfillment_details'];
 
   $linkUrl   = 'https://mietmichbox.de/buchungsverwaltung';
   $subject   = "👋🏼 Neue Buchungsanfrage 👷🏽 – Buchungs-ID: {$displayId}";
 
-  $text = <<<TXT
+  $extraTextLines = [];
+  $extraHtmlLines = [];
+  $method = is_array($fulfillmentInfo) ? ($fulfillmentInfo['method'] ?? null) : null;
+
+  if (in_array($method, ['shipping', 'delivery'], true) && is_array($fulfillmentDetails)) {
+    $escHtml = static function (string $value): string {
+      return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    };
+
+    $contactName = trim((string)($fulfillmentDetails['contact_name'] ?? ''));
+    $contactEmail = trim((string)($fulfillmentDetails['contact_email'] ?? ''));
+    $contactPhone = trim((string)($fulfillmentDetails['contact_phone'] ?? ''));
+    if ($contactName !== '') {
+      $extraTextLines[] = "👥 Kontaktname: {$contactName}";
+      $extraHtmlLines[] = '👥 Kontaktname: ' . $escHtml($contactName);
+    }
+    if ($contactEmail !== '') {
+      $extraTextLines[] = "✉️ Kontakt-E-Mail: {$contactEmail}";
+      $extraHtmlLines[] = '✉️ Kontakt-E-Mail: ' . $escHtml($contactEmail);
+    }
+    if ($contactPhone !== '') {
+      $extraTextLines[] = "📞 Kontakt-Telefon: {$contactPhone}";
+      $extraHtmlLines[] = '📞 Kontakt-Telefon: ' . $escHtml($contactPhone);
+    }
+
+    $allowedChannels = [];
+    $allowPhone = $fulfillmentDetails['allow_contact_phone'] ?? ($fulfillmentDetails['contact_preferences']['phone'] ?? null);
+    $allowWhatsapp = $fulfillmentDetails['allow_contact_whatsapp'] ?? ($fulfillmentDetails['contact_preferences']['whatsapp'] ?? null);
+    if ($allowPhone) {
+      $allowedChannels[] = 'Telefon';
+    }
+    if ($allowWhatsapp) {
+      $allowedChannels[] = 'WhatsApp';
+    }
+    if ($allowedChannels) {
+      $channels = implode(', ', $allowedChannels);
+      $extraTextLines[] = "☎️ Kontaktwege: {$channels}";
+      $extraHtmlLines[] = '☎️ Kontaktwege: ' . $escHtml($channels);
+    }
+
+    if ($method === 'shipping') {
+      $addressParts = [];
+      $addressLine = trim((string)($fulfillmentDetails['address_line1'] ?? ''));
+      $postalCode = trim((string)($fulfillmentDetails['postal_code'] ?? ''));
+      $city = trim((string)($fulfillmentDetails['city'] ?? ''));
+      $addressExtra = trim((string)($fulfillmentDetails['address_extra'] ?? ''));
+      if ($addressLine !== '') {
+        $addressParts[] = $addressLine;
+      }
+      $postalCity = trim($postalCode . ' ' . $city);
+      if ($postalCity !== '') {
+        $addressParts[] = $postalCity;
+      }
+      if ($addressExtra !== '') {
+        $addressParts[] = $addressExtra;
+      }
+      if ($addressParts) {
+        $addressLineText = implode(', ', $addressParts);
+        $extraTextLines[] = "📦 Lieferadresse: {$addressLineText}";
+        $extraHtmlLines[] = '📦 Lieferadresse: ' . $escHtml($addressLineText);
+      }
+    }
+
+    if ($method === 'delivery') {
+      $meetingPoint = trim((string)($fulfillmentDetails['meeting_point'] ?? ''));
+      $preferredTime = trim((string)($fulfillmentDetails['preferred_time'] ?? ''));
+      if ($meetingPoint !== '') {
+        $extraTextLines[] = "📍 Treffpunkt: {$meetingPoint}";
+        $extraHtmlLines[] = '📍 Treffpunkt: ' . $escHtml($meetingPoint);
+      }
+      if ($preferredTime !== '') {
+        $timeDisp = $preferredTime . ' Uhr';
+        $extraTextLines[] = "⏰ Wunschzeit: {$timeDisp}";
+        $extraHtmlLines[] = '⏰ Wunschzeit: ' . $escHtml($timeDisp);
+      }
+    }
+  }
+
+  $textBase = <<<TXT
 Hallo MietMichBox Team,
 
 eine neue Buchungsanfrage ist eingegangen. Der Status steht bislang auf Ausstehend. ⚠️
@@ -520,11 +601,15 @@ Buchung im Überblick:
 🕰️ Zeitraum: {$range}
 🚚 Abwicklung: {$fulfillment}
 💶 Gesamtkosten: {$totalDisp}
-
-Buchung in der Buchungsverwaltung einsehen: {$linkUrl}
 TXT;
 
-  $html = <<<HTML
+  $text = $textBase . "\n";
+  if ($extraTextLines) {
+    $text .= "\nZusätzliche Angaben:\n" . implode("\n", $extraTextLines) . "\n";
+  }
+  $text .= "\nBuchung in der Buchungsverwaltung einsehen: {$linkUrl}";
+
+  $htmlBase = <<<HTML
 <p>Hallo MietMichBox Team,</p>
 <p>eine neue Buchungsanfrage ist eingegangen. Der Status steht bislang auf Ausstehend.</p>
 <p>Buchung im Überblick:<br>
@@ -534,8 +619,13 @@ TXT;
 🕰️ Zeitraum: {$range}<br>
 🚚 Abwicklung: {$fulfillment}<br>
 💶 Gesamtkosten: {$totalDisp}</p>
-<p>Buchung in der <a href="{$linkUrl}">Buchungsverwaltung</a> einsehen.</p>
 HTML;
+
+  $html = $htmlBase;
+  if ($extraHtmlLines) {
+    $html .= '<p>Zusätzliche Angaben:<br>' . implode('<br>', $extraHtmlLines) . '</p>';
+  }
+  $html .= "<p>Buchung in der <a href=\"{$linkUrl}\">Buchungsverwaltung</a> einsehen.</p>";
 
   return [
     'subject' => $subject,
