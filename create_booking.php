@@ -653,13 +653,19 @@ function send_mail_via_available(string $email, string $name, array $mailData): 
     }
   } elseif (function_exists('sendMail')) {
     $sent = (bool)sendMail($email, $mailData['subject'], $mailData['text'], $name);
+    if (!$sent && function_exists('get_last_mail_error')) {
+      $lastError = trim((string)get_last_mail_error());
+      if ($lastError !== '') {
+        $info['error'] = $lastError;
+      }
+    }
   } else {
     $info['error'] = 'no mail function';
     return $info;
   }
 
   $info['sent'] = $sent;
-  if (!$sent) {
+  if (!$sent && !isset($info['error'])) {
     $info['error'] = 'Mailer lieferte false zurück';
   }
   return $info;
@@ -892,6 +898,14 @@ try {
     }
   }
 
+  $customerMailSent = (bool)($mailInfo['sent'] ?? false);
+  $internalMailSent = (bool)($internalMailInfo['sent'] ?? false);
+  $mailDeliveryOk = $customerMailSent && $internalMailSent;
+  $mailWarning = null;
+  if (!$mailDeliveryOk) {
+    $mailWarning = 'Buchung gespeichert, aber mindestens eine E-Mail konnte nicht zugestellt werden.';
+  }
+
   json_response([
     'ok'=>true,
     'booking'=>[
@@ -910,7 +924,9 @@ try {
       'fulfillment_details_json'=>$fulfillmentDetailsJson,
     ],
     'mail'=>$mailInfo,
-    'internal_mail'=>$internalMailInfo
+    'internal_mail'=>$internalMailInfo,
+    'mail_delivery_ok'=>$mailDeliveryOk,
+    'mail_warning'=>$mailWarning
   ]);
 
 } catch (Throwable $e) {

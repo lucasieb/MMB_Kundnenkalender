@@ -964,7 +964,20 @@ class Calendar{
         const res=await sendBooking(BOOKING_URLS, payload);
         const bookingInfo = res?.booking || null;
         const dispId = bookingInfo?.display_id ? String(bookingInfo.display_id) : '–';
-        this.modal('Buchungsanfrage gesendet',`Danke! Deine Anfrage ist eingegangen.\n\nBuchungs-ID: ${dispId}`);
+        const mailOk = res?.mail_delivery_ok !== false;
+        const customerMailOk = res?.mail?.sent === true;
+        const internalMailOk = res?.internal_mail?.sent === true;
+        if(mailOk){
+          this.modal('Buchungsanfrage gesendet',`Danke! Deine Anfrage ist eingegangen.\n\nBuchungs-ID: ${dispId}`);
+        }else{
+          const customerErr = res?.mail?.error ? `Kundenmail: ${res.mail.error}` : 'Kundenmail fehlgeschlagen';
+          const internalErr = res?.internal_mail?.error ? `Interne Mail: ${res.internal_mail.error}` : 'Interne Mail fehlgeschlagen';
+          const warningText = res?.mail_warning || 'Buchung gespeichert, aber E-Mail-Versand fehlgeschlagen.';
+          this.modal(
+            'Buchung gespeichert – Mail prüfen',
+            `${warningText}\n\nBuchungs-ID: ${dispId}\n${customerMailOk ? 'Kundenmail: OK' : customerErr}\n${internalMailOk ? 'Interne Mail: OK' : internalErr}`
+          );
+        }
         e.target.reset(); this.state.sel={start:null,end:null}; this.avgCache=null; this.state.summary=null; this.state.fulfillment=FULFILLMENT_OPTIONS[0]; this.hideFulfillmentInfo();
         this.renderCalendar(); this.renderSide(); this.updateVisuals();
       }catch(err){

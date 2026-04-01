@@ -1,67 +1,112 @@
 <?php
-// mailer.php – PHPMailer ohne Composer (Original-Flow, nur UTF-8 + Base64 ergänzt)
+// mailer.php – zentraler SMTP-Mailer (neu aufgesetzt)
 
 require __DIR__ . '/lib/PHPMailer/PHPMailer.php';
 require __DIR__ . '/lib/PHPMailer/SMTP.php';
 require __DIR__ . '/lib/PHPMailer/Exception.php';
 
-use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
+use PHPMailer\PHPMailer\PHPMailer;
 
-$config = require __DIR__ . '/config.mail.php';
+/** @var array<string,mixed> $MAIL_CONFIG */
+$MAIL_CONFIG = require __DIR__ . '/config.mail.php';
+/** @var string $LAST_MAIL_ERROR */
+$LAST_MAIL_ERROR = '';
 
 /**
- * sendMail
- * @param string $to      Empfängeradresse
- * @param string $subject Betreff (kann Umlaute/Emojis enthalten)
- * @param string $body    Text (Plain mit \n oder schon HTML-Snippets)
- * @param string $toName  Anzeigename des Empfängers (optional)
- * @return bool
+ * Liefert den letzten Mail-Fehlertext (für API-Antworten / Debug).
+ */
+function get_last_mail_error(): string
+{
+    global $LAST_MAIL_ERROR;
+    return $LAST_MAIL_ERROR;
+}
+
+/**
+ * Setzt den letzten Mail-Fehler zentral.
+ */
+function set_last_mail_error(string $message): void
+{
+    global $LAST_MAIL_ERROR;
+    $LAST_MAIL_ERROR = trim($message);
+}
+
+/**
+ * Prüft Pflichtfelder in der Mail-Konfiguration.
+ * @return array<int,string>
+ */
+function validate_mail_config(array $config): array
+{
+    $required = ['host', 'port', 'encryption', 'username', 'password', 'from_email', 'from_name'];
+    $missing = [];
+    foreach ($required as $key) {
+        if (!array_key_exists($key, $config) || trim((string)$config[$key]) === '') {
+            $missing[] = $key;
+        }
+    }
+    return $missing;
+}
+
+/**
+ * Baut PHPMailer aus der zentralen Konfiguration.
+ */
+function build_mailer(): PHPMailer
+{
+    global $MAIL_CONFIG;
+
+    $missing = validate_mail_config($MAIL_CONFIG);
+    if (!empty($missing)) {
+        throw new RuntimeException('Mail-Konfiguration unvollständig: ' . implode(', ', $missing));
+    }
+
+    $mailer = new PHPMailer(true);
+    $mailer->isSMTP();
+    $mailer->Host       = (string)$MAIL_CONFIG['host'];
+    $mailer->Port       = (int)$MAIL_CONFIG['port'];
+    $mailer->SMTPAuth   = true;
+    $mailer->SMTPSecure = (string)$MAIL_CONFIG['encryption']; // tls oder ssl
+    $mailer->Username   = (string)$MAIL_CONFIG['username'];
+    $mailer->Password   = (string)$MAIL_CONFIG['password'];
+    $mailer->Timeout    = 20;
+
+    $mailer->CharSet  = 'UTF-8';
+    $mailer->Encoding = 'base64';
+    $mailer->isHTML(true);
+
+    $mailer->setFrom((string)$MAIL_CONFIG['from_email'], (string)$MAIL_CONFIG['from_name']);
+    if (!empty($MAIL_CONFIG['reply_to'])) {
+        $mailer->addReplyTo((string)$MAIL_CONFIG['reply_to'], (string)$MAIL_CONFIG['from_name']);
+    }
+
+    return $mailer;
+}
+
+/**
+ * Einfache Kompatibilitätsfunktion für bestehende Aufrufer.
  */
 function sendMail(string $to, string $subject, string $body, string $toName = ''): bool
 {
-    global $config;
-
-    $mail = new PHPMailer(true);
+    set_last_mail_error('');
 
     try {
-        // $mail->SMTPDebug = 0; // bei Bedarf 2 für Debug
-
-        // SMTP-Server
-        $mail->isSMTP();
-        $mail->Host       = $config['host'];        // z.B. smtp.ionos.de
-        $mail->Port       = $config['port'];        // z.B. 587
-        $mail->SMTPAuth   = true;
-        $mail->SMTPSecure = $config['encryption'];  // 'tls' (STARTTLS) oder 'ssl'
-        $mail->Username   = $config['username'];    // volle Mailadresse
-        $mail->Password   = $config['password'];
-
-        // Absender (bei IONOS meist identisch mit Username)
-        $mail->setFrom($config['from_email'], $config['from_name']);
-        if (!empty($config['reply_to'])) {
-            $mail->addReplyTo($config['reply_to'], $config['from_name']);
-        }
-
-        // Empfänger
-        $mail->addAddress($to, $toName);
-
-        // **Einzige inhaltliche Ergänzung gegenüber deinem Original:**
-        $mail->CharSet  = 'UTF-8';   // Umlaute & Emojis
-        $mail->Encoding = 'base64';  // sicherer Transport (verhindert Zeichensatz-Korruption)
-
-        // Inhalt
-        $mail->isHTML(true);
-        // Dein Body kann Plaintext sein – wir konvertieren nur Zeilenumbrüche.
-        // (Wenn schon HTML drin ist, funktioniert nl2br trotzdem unkritisch.)
-        $mail->Subject = $subject;
-        $mail->Body    = nl2br($body, false);
-        $mail->AltBody = $body;
-
-        $mail->send();
+        $mailer = build_mailer();
+        $mailer->addAddress($to, $toName);
+        $mailer->Subject = $subject;
+        $mailer->Body    = nl2br($body, false);
+        $mailer->AltBody = $body;
+        $mailer->send();
         return true;
-
     } catch (Exception $e) {
-        error_log('Mail error: ' . $mail->ErrorInfo);
+        $error = $e->getMessage();
+        if (isset($mailer) && trim((string)$mailer->ErrorInfo) !== '') {
+            $error = $mailer->ErrorInfo;
+        }
+        set_last_mail_error($error);
+        error_log('Mail error: ' . $error);
+        return false;
+    } catch (Throwable $e) {
+        set_last_mail_error($e->getMessage());
+        error_log('Mail setup error: ' . $e->getMessage());
         return false;
     }
 }
