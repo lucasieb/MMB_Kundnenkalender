@@ -653,13 +653,19 @@ function send_mail_via_available(string $email, string $name, array $mailData): 
     }
   } elseif (function_exists('sendMail')) {
     $sent = (bool)sendMail($email, $mailData['subject'], $mailData['text'], $name);
+    if (!$sent && function_exists('get_last_mail_error')) {
+      $lastError = trim((string)get_last_mail_error());
+      if ($lastError !== '') {
+        $info['error'] = $lastError;
+      }
+    }
   } else {
     $info['error'] = 'no mail function';
     return $info;
   }
 
   $info['sent'] = $sent;
-  if (!$sent) {
+  if (!$sent && !isset($info['error'])) {
     $info['error'] = 'Mailer lieferte false zurück';
   }
   return $info;
