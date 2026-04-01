@@ -636,56 +636,32 @@ HTML;
 
 function send_mail_via_available(string $email, string $name, array $mailData): array {
   $info = ['sent' => false, 'subject' => $mailData['subject']];
-  $attemptErrors = [];
-  $attemptOrder = [];
 
-  // Primär den lokalen PHPMailer-Wrapper verwenden (sendMail aus mailer.php).
-  // In manchen Umgebungen existiert zusätzlich eine globale send_mail()-Funktion
-  // mit anderem Verhalten/Signatur, die wir nur als Fallback nutzen wollen.
-  if (function_exists('sendMail')) {
-    $attemptOrder[] = 'sendMail';
-  }
   if (function_exists('send_mail')) {
-    $attemptOrder[] = 'send_mail';
-  }
-
-  if (!$attemptOrder) {
+    $html = $mailData['html'];
+    $text = $mailData['text'];
+    try {
+      $ref = new ReflectionFunction('send_mail');
+      $paramCount = $ref->getNumberOfParameters();
+    } catch (Throwable $re) {
+      $paramCount = 0;
+    }
+    if ($paramCount >= 5) {
+      $sent = (bool)send_mail($email, $name, $mailData['subject'], $html, $text);
+    } else {
+      $sent = (bool)send_mail($email, $name, $mailData['subject'], $html);
+    }
+  } elseif (function_exists('sendMail')) {
+    $sent = (bool)sendMail($email, $mailData['subject'], $mailData['text'], $name);
+  } else {
     $info['error'] = 'no mail function';
     return $info;
   }
 
-  foreach ($attemptOrder as $fn) {
-    try {
-      if ($fn === 'sendMail') {
-        $sent = (bool)sendMail($email, $mailData['subject'], $mailData['text'], $name);
-      } else {
-        $html = $mailData['html'];
-        $text = $mailData['text'];
-        $ref = new ReflectionFunction('send_mail');
-        $paramCount = $ref->getNumberOfParameters();
-        if ($paramCount >= 5) {
-          $sent = (bool)send_mail($email, $name, $mailData['subject'], $html, $text);
-        } else {
-          $sent = (bool)send_mail($email, $name, $mailData['subject'], $html);
-        }
-      }
-    } catch (Throwable $mailEx) {
-      $sent = false;
-      $attemptErrors[] = $fn . ': ' . $mailEx->getMessage();
-      continue;
-    }
-
-    if ($sent) {
-      $info['sent'] = true;
-      $info['transport'] = $fn;
-      return $info;
-    }
-
-    $attemptErrors[] = $fn . ': false';
+  $info['sent'] = $sent;
+  if (!$sent) {
+    $info['error'] = 'Mailer lieferte false zurück';
   }
-
-  $info['error'] = 'Mailer lieferte false zurück';
-  $info['attempts'] = $attemptErrors;
   return $info;
 }
 
