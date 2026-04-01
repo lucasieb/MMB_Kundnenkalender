@@ -652,14 +652,25 @@ function send_mail_via_available(string $email, string $name, array $mailData): 
       $sent = (bool)send_mail($email, $name, $mailData['subject'], $html);
     }
   } elseif (function_exists('sendMail')) {
-    $sent = (bool)sendMail($email, $mailData['subject'], $mailData['text'], $name);
+    if (function_exists('sendMailDetailed')) {
+      $detail = sendMailDetailed($email, $mailData['subject'], $mailData['text'], $name);
+      $sent = (bool)($detail['sent'] ?? false);
+      if (!$sent && !empty($detail['error'])) {
+        $info['error'] = (string)$detail['error'];
+      }
+      if (!empty($detail['attempts']) && is_array($detail['attempts'])) {
+        $info['attempts'] = $detail['attempts'];
+      }
+    } else {
+      $sent = (bool)sendMail($email, $mailData['subject'], $mailData['text'], $name);
+    }
   } else {
     $info['error'] = 'no mail function';
     return $info;
   }
 
   $info['sent'] = $sent;
-  if (!$sent) {
+  if (!$sent && !isset($info['error'])) {
     $info['error'] = 'Mailer lieferte false zurück';
   }
   return $info;
