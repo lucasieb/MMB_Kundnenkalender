@@ -17,7 +17,7 @@ return [
 
   // Login-Daten (UNBEDINGT prüfen/aktualisieren)
   'username'   => get_optional_env('SMTP_USERNAME', 'info@mietmichbox.de'),
-  'password'   => get_optional_env('SMTP_PASSWORD', ''),           // <- HIER SMTP-Passwort eintragen
+  'password'   => get_optional_env('SMTP_PASSWORD', 'MMB2025.de'),           // <- HIER SMTP-Passwort eintragen
 
   // Mail-Absender
   'from_email' => get_optional_env('SMTP_FROM_EMAIL', 'info@mietmichbox.de'),
