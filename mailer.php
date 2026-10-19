@@ -61,13 +61,37 @@ function build_mailer(): PHPMailer
 
     $mailer = new PHPMailer(true);
     $mailer->isSMTP();
-    $mailer->Host       = (string)$MAIL_CONFIG['host'];
+    $host = trim((string)$MAIL_CONFIG['host']);
+    $forceIpv4 = !empty($MAIL_CONFIG['force_ipv4']);
+    if ($forceIpv4 && filter_var($host, FILTER_VALIDATE_IP) === false) {
+        $resolved = gethostbyname($host);
+        if ($resolved !== $host && filter_var($resolved, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+            $host = $resolved;
+        }
+    }
+    $mailer->Host       = $host;
     $mailer->Port       = (int)$MAIL_CONFIG['port'];
     $mailer->SMTPAuth   = true;
-    $mailer->SMTPSecure = (string)$MAIL_CONFIG['encryption']; // tls oder ssl
+    $encryption = strtolower(trim((string)$MAIL_CONFIG['encryption']));
+    $requireTls = !empty($MAIL_CONFIG['require_tls']);
+    $allowedEncryption = ['ssl', 'tls', 'starttls', '', 'none'];
+    if (!in_array($encryption, $allowedEncryption, true)) {
+        throw new RuntimeException('Ungültige SMTP_ENCRYPTION-Konfiguration: ' . $encryption . '. Erlaubt: tls, starttls, ssl, none');
+    }
+    if ($encryption === 'ssl') {
+        $mailer->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
+    } elseif ($encryption === 'tls' || $encryption === 'starttls') {
+        $mailer->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+    } else {
+        if ($requireTls) {
+            throw new RuntimeException('TLS ist erforderlich (SMTP_REQUIRE_TLS=1), aber SMTP_ENCRYPTION ist leer/none.');
+        }
+        $mailer->SMTPSecure = '';
+    }
     $mailer->Username   = (string)$MAIL_CONFIG['username'];
     $mailer->Password   = (string)$MAIL_CONFIG['password'];
-    $mailer->Timeout    = 20;
+    $mailer->Timeout    = max(5, (int)($MAIL_CONFIG['timeout'] ?? 20));
+    $mailer->SMTPAutoTLS = true;
 
     $mailer->CharSet  = 'UTF-8';
     $mailer->Encoding = 'base64';
