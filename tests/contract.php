@@ -100,7 +100,7 @@ try {
     [$status]=request('create_booking.php',['box_id'=>1,'start_date'=>'2027-01-12']);
     check($status===422 && (int)$db->query('SELECT COUNT(*) FROM bookings')->fetchColumn()===4,'Invalid request inserted');
     [$status,$list]=request('list_bookings.php');
-    check($status===200 && $list['ok']===true && count($list['bookings'])===4,'Authenticated list failed');
+    check($status===200 && $list['ok']===true && count($list['items'] ?? [])===4,'Authenticated list failed');
     [$status,$updated]=request('update_booking.php',[
         'id'=>1,'pricing_details'=>['total'=>123],'fulfillment_details'=>['method'=>'pickup','contact_phone'=>'1234']
     ],true);
