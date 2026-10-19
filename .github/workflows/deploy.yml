@@ -1,26 +1,35 @@
 name: Deploy via SFTP to Hostinger
-
 on:
   push:
-    branches: [ "public_html" ]     # ggf. "main", je nachdem, von wo du deployst
+    branches: [main]
   workflow_dispatch: {}
-
+permissions:
+  contents: read
+concurrency:
+  group: hostinger-production
+  cancel-in-progress: false
 jobs:
   deploy:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Remove unnecessary files before deploy
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_sqlite
+          coverage: none
+      - name: Validate release before upload
         run: |
-          rm -rf .git
-          rm -rf .github
-          rm -rf node_modules
-          find . -name "*.map" -type f -delete
-          find . -name ".DS_Store" -type f -delete
-
+          find . -name '*.php' -not -path './.git/*' -print0 | xargs -0 -n1 php -l
+          php tests/contract.php
+      - name: Prepare runtime files and revision marker
+        run: |
+          php -r 'file_put_contents("deployment.json", json_encode(["commit" => getenv("GITHUB_SHA"), "branch" => getenv("GITHUB_REF_NAME"), "run_id" => getenv("GITHUB_RUN_ID")], JSON_PRETTY_PRINT) . PHP_EOL);'
+          rm -rf .git .github tests node_modules
+          rm -f .env.dist .env .env.local admin_users.php admin_users.example.php php-error.log DEPLOYMENT.md .gitignore
+          find . -name '*.map' -type f -delete
+          find . -name '.DS_Store' -type f -delete
       - name: Deploy to Hostinger via SFTP
         uses: wlixcc/SFTP-Deploy-Action@v1.2.4
         with:
@@ -28,7 +37,15 @@ jobs:
           port: ${{ secrets.PORT }}
           username: ${{ secrets.USER }}
           ssh_private_key: ${{ secrets.SSH_PRIVATE_KEY }}
-          local_path: "./"   # <-- nutzt jetzt dein gesamtes Repo
-          remote_path: "domains/firebrick-squirrel-568721.hostingersite.com/public_html/"
+          local_path: './'
+          remote_path: 'domains/firebrick-squirrel-568721.hostingersite.com/public_html/'
           sftp_only: true
           delete_remote_files: false
+      - name: Verify published revision and database health
+        env:
+          EXPECTED_COMMIT: ${{ github.sha }}
+        run: |
+          curl --fail --silent --show-error --retry 3 "https://firebrick-squirrel-568721.hostingersite.com/deployment.json?revision=$EXPECTED_COMMIT" -o /tmp/mmb-deployment.json
+          php -r '$data = json_decode(file_get_contents("/tmp/mmb-deployment.json"), true); if (($data["commit"] ?? "") !== getenv("EXPECTED_COMMIT")) { fwrite(STDERR, "Published revision mismatch\n"); exit(1); }'
+          curl --fail --silent --show-error --retry 3 'https://firebrick-squirrel-568721.hostingersite.com/ping.php' -o /tmp/mmb-ping.json
+          php -r '$data = json_decode(file_get_contents("/tmp/mmb-ping.json"), true); if (($data["ok"] ?? false) !== true) { fwrite(STDERR, "Database health check failed\n"); exit(1); }'

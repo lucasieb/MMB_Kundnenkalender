@@ -2,1532 +2,2271 @@
 <html lang="de">
 <head>
   <meta charset="utf-8"/>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>MietMichBox – Admin Buchungsliste</title>
   <style>
-    :root {
-      --admin-bg: #f5f5f5;
-      --admin-card-bg: #ffffff;
-      --admin-border: #e5e7eb;
-      --admin-text: #111827;
-      --admin-muted: #6b7280;
-      --admin-accent: #0ea5e9;
-      --admin-accent-strong: #0284c7;
-      --admin-error: #dc2626;
-      --admin-success: #16a34a;
-      --admin-radius: 14px;
-      --admin-shadow: 0 20px 45px rgba(15, 23, 42, 0.08);
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      margin: 0;
-      padding: 18px 14px;
-      background: var(--admin-bg);
-      font-family: 'Poppins', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-      color: var(--admin-text);
-    }
-
-    .card {
-      width: min(100%, 1120px);
-      margin: 0 auto;
-      background: var(--admin-card-bg);
-      border-radius: var(--admin-radius);
-      border: 1px solid var(--admin-border);
-      box-shadow: var(--admin-shadow);
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      min-height: 540px;
-    }
-
-    .card h1 {
-      margin: 0;
-      padding: 22px 24px;
-      border-bottom: 1px solid var(--admin-border);
-      font-size: 1.55rem;
-      font-weight: 600;
-      letter-spacing: 0.01em;
-    }
-
-    .card .content {
-      flex: 1;
-      padding: 22px 24px 28px;
-      display: flex;
-      flex-direction: column;
-      gap: 22px;
-      min-height: 0;
-    }
-
-    .admin-shell {
-      position: relative;
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      min-height: 0;
-    }
-
-    .admin-shell__login,
-    .admin-shell__content {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      min-height: 0;
-    }
-
-    .admin-shell__content {
-      display: none;
-    }
-
-    .admin-shell--authenticated .admin-shell__login {
-      display: none;
-    }
-
-    .admin-shell--authenticated .admin-shell__content {
-      display: flex;
-    }
-
-    .admin-login-form {
-      margin: auto;
-      max-width: 360px;
-      width: 100%;
-      padding: 32px 28px;
-      border: 1px solid var(--admin-border);
-      border-radius: 18px;
-      background: #fff;
-      box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
-      display: flex;
-      flex-direction: column;
-      gap: 18px;
-      text-align: center;
-    }
-
-    .admin-login-form__heading h2 {
-      margin: 0 0 8px 0;
-      font-size: 1.35rem;
-      font-weight: 600;
-      color: var(--admin-text);
-    }
-
-    .admin-login-form__heading p {
-      margin: 0;
-      font-size: 0.95rem;
-      color: var(--admin-muted);
-    }
-
-    .admin-login-form__field {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 6px;
-      text-align: left;
-      font-size: 0.95rem;
-      color: var(--admin-text);
-    }
-
-    .admin-login-form__field input {
-      width: 100%;
-      padding: 12px 14px;
-      border-radius: 10px;
-      border: 1px solid var(--admin-border);
-      font-size: 1rem;
-      font-family: inherit;
-      transition: border-color 0.2s ease, box-shadow 0.2s ease;
-    }
-
-    .admin-login-form__field input:focus {
-      outline: none;
-      border-color: var(--admin-accent);
-      box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.18);
-    }
-
-    .admin-login-form button {
-      border: none;
-      border-radius: 999px;
-      background: var(--admin-accent);
-      color: #fff;
-      font-size: 1rem;
-      font-weight: 600;
-      padding: 12px 0;
-      cursor: pointer;
-      transition: background 0.2s ease, transform 0.2s ease;
-    }
-
-    .admin-login-form button:hover:not(:disabled) {
-      background: var(--admin-accent-strong);
-      transform: translateY(-1px);
-    }
-
-    .admin-login-form button:disabled {
-      opacity: 0.6;
-      cursor: wait;
-    }
-
-    .admin-login-form__message {
-      min-height: 1.2rem;
-      font-size: 0.9rem;
-      color: var(--admin-muted);
-    }
-
-    .admin-login-form__message.is-error {
-      color: var(--admin-error);
-    }
-
-    .admin-login-form__message.is-success {
-      color: var(--admin-success);
-    }
-
-    .admin-toolbar {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .admin-toolbar__actions {
-      display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
-
-    .admin-btn {
-      background: #fff;
-      border: 1px solid var(--admin-border);
-      border-radius: 999px;
-      padding: 10px 18px;
-      font-size: 0.95rem;
-      font-weight: 600;
-      cursor: pointer;
-      color: var(--admin-text);
-      transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
-    }
-
-    .admin-btn:hover {
-      background: var(--admin-accent);
-      color: #fff;
-      box-shadow: 0 12px 24px rgba(14, 165, 233, 0.18);
-    }
-
-    .admin-meta {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 16px;
-      color: var(--admin-muted);
-      font-size: 0.9rem;
-    }
-
-    .admin-meta__item {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .admin-meta__item strong {
-      color: var(--admin-text);
-      font-weight: 600;
-    }
-
-    .admin-status {
-      font-size: 0.95rem;
-      padding: 12px 16px;
-      border-radius: 10px;
-      background: #f8fafc;
-      color: var(--admin-muted);
-      border: 1px solid rgba(15, 23, 42, 0.05);
-    }
-
-    .admin-status.is-error {
-      color: var(--admin-error);
-      background: rgba(220, 38, 38, 0.08);
-      border-color: rgba(220, 38, 38, 0.12);
-    }
-
-    .admin-status.is-success {
-      color: var(--admin-success);
-      background: rgba(22, 163, 74, 0.08);
-      border-color: rgba(22, 163, 74, 0.12);
-    }
-
-    .admin-layout {
-      display: flex;
-      gap: 20px;
-      align-items: stretch;
-      min-height: 440px;
-    }
-
-    .admin-layout__list,
-    .admin-layout__details {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      background: #fff;
-      border: 1px solid var(--admin-border);
-      border-radius: 18px;
-      overflow: hidden;
-      min-width: 0;
-    }
-
-    .admin-layout__list {
-      flex: 1.45;
-    }
-
-    .admin-table-wrapper {
-      flex: 1;
-      overflow: auto;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.92rem;
-    }
-
-    thead {
-      background: #f8fafc;
-      font-size: 0.78rem;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      color: var(--admin-muted);
-    }
-
-    th,
-    td {
-      padding: 12px 16px;
-      border-bottom: 1px solid var(--admin-border);
-      vertical-align: top;
-      text-align: left;
-    }
-
-    tbody tr {
-      transition: background 0.18s ease;
-      cursor: pointer;
-    }
-
-    tbody tr:hover {
-      background: rgba(14, 165, 233, 0.06);
-    }
-
-    tbody tr.is-selected {
-      background: rgba(14, 165, 233, 0.12);
-    }
-
-    tbody tr.is-needs-attention td:first-child::before {
-      content: '⚠️';
-      margin-right: 6px;
-    }
-
-    .admin-table__customer span {
-      display: block;
-      line-height: 1.35;
-    }
-
-    .admin-table__customer span:last-child {
-      color: var(--admin-muted);
-      font-size: 0.84rem;
-    }
-
-    .admin-table__info-btn {
-      border: 1px solid var(--admin-border);
-      border-radius: 999px;
-      padding: 8px 14px;
-      font-size: 0.85rem;
-      font-weight: 600;
-      background: #fff;
-      cursor: pointer;
-      transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
-    }
-
-    .admin-table__info-btn:hover {
-      background: var(--admin-accent);
-      color: #fff;
-      box-shadow: 0 8px 18px rgba(14, 165, 233, 0.2);
-    }
-
-    .status-badge {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 4px 10px;
-      border-radius: 999px;
-      font-weight: 600;
-      font-size: 0.82rem;
-      text-transform: capitalize;
-    }
-
-    .status-badge--pending {
-      background: rgba(245, 158, 11, 0.16);
-      color: #92400e;
-    }
-
-    .status-badge--confirmed {
-      background: rgba(22, 163, 74, 0.18);
-      color: #166534;
-    }
-
-    .status-badge--cancelled,
-    .status-badge--rejected {
-      background: rgba(75, 85, 99, 0.18);
-      color: #1f2937;
-    }
-
-    .admin-details-header {
-      padding: 20px 24px 0;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .admin-details-header h2 {
-      margin: 0;
-      font-size: 1.25rem;
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-
-    .admin-details-header p {
-      margin: 0;
-      color: var(--admin-muted);
-      font-size: 0.9rem;
-    }
-
-    .admin-details-body {
-      flex: 1;
-      padding: 16px 24px 24px;
-      overflow: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-    }
-
-    .admin-details-empty {
-      margin: auto;
-      text-align: center;
-      color: var(--admin-muted);
-      line-height: 1.6;
-    }
-
-    .detail-section {
-      background: #f8fafc;
-      border-radius: 14px;
-      padding: 18px 20px;
-      border: 1px solid rgba(15, 23, 42, 0.05);
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .detail-section h3 {
-      margin: 0;
-      font-size: 1rem;
-      font-weight: 600;
-    }
-
-    .detail-grid {
-      display: grid;
-      gap: 10px 16px;
-      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    }
-
-    .detail-item {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      font-size: 0.9rem;
-    }
-
-    .detail-item dt {
-      font-weight: 600;
-      color: var(--admin-muted);
-    }
-
-    .detail-item dd {
-      margin: 0;
-      color: var(--admin-text);
-      line-height: 1.45;
-      white-space: pre-line;
-      word-break: break-word;
-    }
-
-    .detail-price-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.9rem;
-    }
-
-    .detail-price-table tbody tr td {
-      padding: 8px 0;
-      border-bottom: 1px solid rgba(15, 23, 42, 0.06);
-    }
-
-    .detail-price-table tbody tr:last-child td {
-      border-bottom: none;
-    }
-
-    .detail-price-table td:first-child {
-      color: var(--admin-muted);
-    }
-
-    .detail-price-table td:last-child {
-      text-align: right;
-      font-weight: 600;
-    }
-
-    .detail-price-table tfoot td {
-      padding-top: 10px;
-      font-weight: 700;
-      border-top: 2px solid rgba(15, 23, 42, 0.08);
-    }
-
-    .admin-details-note {
-      background: rgba(14, 165, 233, 0.12);
-      border-radius: 10px;
-      padding: 12px 14px;
-      font-size: 0.9rem;
-      line-height: 1.5;
-    }
-
-    .admin-details-note strong {
-      display: block;
-      font-size: 0.82rem;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      color: var(--admin-muted);
-      margin-bottom: 6px;
-    }
-
-    .muted {
-      color: var(--admin-muted);
-    }
-
-    code {
-      font-family: 'Fira Code', 'SFMono-Regular', Menlo, Consolas, monospace;
-      font-size: 0.85em;
-      background: rgba(15, 23, 42, 0.05);
-      padding: 2px 4px;
-      border-radius: 4px;
-    }
-
-    small {
-      color: var(--admin-muted);
-    }
-
-    .text-ellipsis {
-      max-width: 220px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    @media (max-width: 1080px) {
-      body {
-        padding: 16px 12px;
-      }
-
-      .admin-layout {
-        flex-direction: column;
-      }
-
-      .admin-layout__list,
-      .admin-layout__details {
-        flex: 1;
-        min-height: 360px;
-      }
-    }
-
-    @media (max-width: 720px) {
-      body {
-        padding: 14px 10px;
-      }
-
-      .card {
-        border-radius: 18px;
-        min-height: auto;
-      }
-
-      .card .content {
-        padding: 18px;
-      }
-
-      .admin-toolbar {
-        flex-direction: column;
-        align-items: stretch;
-      }
-
-      .admin-meta {
-        flex-direction: column;
-        gap: 8px;
-      }
-
-      table {
-        font-size: 0.85rem;
-      }
-
-      .detail-grid {
-        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-      }
-    }
+    :root{--mmb-shell-padding:0px;}
+    @media (max-width:900px){:root{--mmb-shell-padding:18px;}}
+    body{margin:0;min-height:100vh;background:#3b3b3b;font-family:'Poppins',sans-serif;color:#e5e7eb;display:flex;}
+    #mmb-admin-shell{flex:1;min-height:100vh;display:flex;}
+    #mmb-admin-list{flex:1;display:flex;padding:var(--mmb-shell-padding);box-sizing:border-box;}
+    .mmb-error{margin-top:1.5rem;padding:1rem;border-radius:8px;background:#fee2e2;color:#b91c1c;font-weight:600;}
   </style>
 </head>
 <body>
-  <div class="card">
-    <h1>Admin – Buchungsliste</h1>
-    <div class="content">
-      <div id="admin-app" class="admin-app">
-        <noscript>
-          <p class="admin-details-empty">JavaScript ist deaktiviert. Bitte JavaScript aktivieren, um die Buchungsübersicht zu sehen.</p>
-        </noscript>
-      </div>
-    </div>
+  <div id="mmb-admin-shell">
+    <div id="mmb-admin-list"></div>
   </div>
 
-  <script data-api-base="auto">
-  (function () {
-    if (window.MMBAdminPortal) {
-      return;
-    }
+  <!-- ======================= MMB CORE ======================= -->
+  <script src="https://firebrick-squirrel-568721.hostingersite.com/admin_auth.js" data-api-base="https://firebrick-squirrel-568721.hostingersite.com/"></script>
+  <script>
+  (function(global){'use strict';
 
-    const script = document.currentScript;
-
-    function resolveBase() {
-      const attr = script ? script.getAttribute('data-api-base') : null;
-      const normalizedAttr = attr ? attr.trim() : '';
-      const candidates = [];
-
-      if (typeof window.MMB_ADMIN_API_BASE === 'string' && window.MMB_ADMIN_API_BASE.trim() !== '') {
-        candidates.push(window.MMB_ADMIN_API_BASE.trim());
-      }
-
-      if (normalizedAttr && normalizedAttr.toLowerCase() !== 'auto') {
-        candidates.push(normalizedAttr);
-      }
-
-      const host = (window.location && window.location.hostname ? window.location.hostname : '').toLowerCase();
-
-      if (host && host !== 'www.mietmichbox.de' && host.endsWith('mietmichbox.de')) {
-        candidates.push('https://www.mietmichbox.de/');
-      }
-
-      candidates.push('https://www.mietmichbox.de/');
-
-      if (host === 'localhost' || host === '127.0.0.1') {
-        candidates.push('./');
-      }
-
-      candidates.push('./');
-
-      for (let i = 0; i < candidates.length; i += 1) {
-        const candidate = candidates[i];
-        if (!candidate) {
-          continue;
+    function injectBaseCSS(){
+      if (document.getElementById('mmb-core-css')) return;
+      const style=document.createElement('style'); style.id='mmb-core-css';
+      style.textContent=`
+        :root{
+          --mmb-primary:#3b3b3b; --mmb-accent:#0EA5E9; --mmb-bg:#efefe6;
+          --mmb-muted:#f8f9fa; --mmb-ok:#10b981; --mmb-warn:#f59e0b;
+          --mmb-busy:#ef4444; --mmb-border:#e5e7eb; --mmb-text:#3b3b3b; --mmb-text-light:#6b7280;
         }
-        try {
-          return new URL(candidate, window.location.href);
-        } catch (error) {
-          // ignore invalid candidate
+        @media (prefers-color-scheme: dark){
+          :root{ --mmb-bg:#3b3b3b; --mmb-muted:#4a4a4a; --mmb-border:#555; --mmb-text:#fff; --mmb-text-light:#ccc; --mmb-primary:#fff; }
         }
-      }
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap');
 
-      return new URL('./', window.location.href);
-    }
-
-    const baseUrl = resolveBase();
-    const STORAGE_KEY = 'mmb-admin-password';
-    const unauthorizedListeners = new Set();
-
-    let storedPassword = '';
-    try {
-      storedPassword = sessionStorage.getItem(STORAGE_KEY) || '';
-    } catch (_) {
-      storedPassword = '';
-    }
-
-    function setPassword(value) {
-      storedPassword = typeof value === 'string' ? value : '';
-      try {
-        if (storedPassword) {
-          sessionStorage.setItem(STORAGE_KEY, storedPassword);
-        } else {
-          sessionStorage.removeItem(STORAGE_KEY);
-        }
-      } catch (_) {
-        /* ignore storage errors */
-      }
-    }
-
-    function getPassword() {
-      return storedPassword;
-    }
-
-    async function validatePassword(candidate) {
-      if (!candidate) {
-        return false;
-      }
-
-      const response = await fetch(new URL('admin_validate_password.php', baseUrl).href, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify({ password: candidate }),
-        mode: 'cors',
-        credentials: 'omit',
-      });
-
-      if (response.status === 401) {
-        return false;
-      }
-
-      if (!response.ok) {
-        throw new Error('Serverfehler beim Prüfen des Passworts.');
-      }
-
-      const payload = await response.json().catch(() => ({}));
-      return !!payload.ok;
-    }
-
-    function normalizeBody(body, headers) {
-      if (
-        !body ||
-        typeof body === 'string' ||
-        body instanceof String ||
-        body instanceof FormData ||
-        body instanceof Blob ||
-        (typeof ArrayBuffer !== 'undefined' && (body instanceof ArrayBuffer || body instanceof Uint8Array))
-      ) {
-        return body;
-      }
-
-      if (!headers['Content-Type']) {
-        headers['Content-Type'] = 'application/json';
-      }
-
-      return JSON.stringify(body);
-    }
-
-    async function request(path, options = {}) {
-      const password = getPassword();
-      if (!password) {
-        const error = new Error('Kein Passwort gesetzt');
-        error.code = 'NO_PASSWORD';
-        throw error;
-      }
-    }
-
-      const headers = Object.assign({ Accept: 'application/json' }, options.headers || {});
-      headers['X-Admin-Password'] = password;
-
-      const payload = normalizeBody(options.body, headers);
-
-      const response = await fetch(new URL(path, baseUrl).href, {
-        method: options.method || 'GET',
-        headers,
-        body: payload,
-        mode: options.mode || 'cors',
-        credentials: 'omit',
-      });
-
-      if (response.status === 401) {
-        setPassword('');
-        unauthorizedListeners.forEach((listener) => {
-          try {
-            listener();
-          } catch (_) {
-            /* ignore */
-          }
-        });
-        const error = new Error('Passwort ungültig');
-        error.code = 'UNAUTHORIZED';
-        throw error;
-      }
-
-      if (!response.ok) {
-        const text = await response.text();
-        const error = new Error('Serverfehler');
-        error.code = 'HTTP_ERROR';
-        error.status = response.status;
-        error.body = text;
-        throw error;
-      }
-
-      const text = await response.text();
-      if (!text) {
-        return null;
-      }
-
-      try {
-        return JSON.parse(text);
-      } catch (_) {
-        return text;
-      }
-    }
-
-    function onUnauthorized(listener) {
-      if (typeof listener === 'function') {
-        unauthorizedListeners.add(listener);
-      }
-      return () => unauthorizedListeners.delete(listener);
-    }
-
-    function renderLogin(container, options) {
-      container.innerHTML = '';
-      const form = document.createElement('form');
-      form.className = 'admin-login-form';
-      form.innerHTML = `
-        <div class="admin-login-form__heading">
-          <h2>${options.title || 'Admin-Zugang'}</h2>
-          <p>${options.description || 'Bitte gib das Passwort ein, um fortzufahren.'}</p>
-        </div>
-        <label class="admin-login-form__field">
-          <span>Passwort</span>
-          <input type="password" name="password" autocomplete="current-password" required />
-        </label>
-        <button type="submit">Anmelden</button>
-        <p class="admin-login-form__message" aria-live="assertive"></p>
+        body.mmb-detail-open{overflow:hidden;}
+        .mmb-widget{font-family:'Poppins',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,sans-serif;background:var(--mmb-bg);color:var(--mmb-text);border-radius:18px;overflow:hidden;box-shadow:none;border:1px solid rgba(15,23,42,.06);display:flex;flex-direction:column;}
+        .mmb-loading{display:flex;justify-content:center;align-items:center;height:200px;font-size:.875rem;color:var(--mmb-text-light);}
+        @media (prefers-reduced-motion: reduce){.mmb-day,.mmb-btn,.mmb-nav-btn{transition:none;}}
       `;
-      container.appendChild(form);
-
-      const input = form.querySelector('input[name="password"]');
-      const button = form.querySelector('button[type="submit"]');
-      const message = form.querySelector('.admin-login-form__message');
-
-      function setMessage(text, type) {
-        if (!message) {
-          return;
-        }
-        message.textContent = text || '';
-        message.classList.remove('is-error', 'is-success');
-        if (type === 'error') {
-          message.classList.add('is-error');
-        } else if (type === 'success') {
-          message.classList.add('is-success');
-        }
-      }
-
-      async function handleSubmit(event) {
-        event.preventDefault();
-        if (!input || !button) {
-          return;
-        }
-
-        const value = input.value.trim();
-        if (!value) {
-          setMessage('Bitte Passwort eingeben.', 'error');
-          input.focus();
-          return;
-        }
-
-        button.disabled = true;
-        button.textContent = 'Prüfe Passwort …';
-        setMessage('', null);
-
-        try {
-          const ok = await validatePassword(value);
-          if (!ok) {
-            setMessage('Passwort ist ungültig.', 'error');
-            button.disabled = false;
-            button.textContent = 'Anmelden';
-            input.focus();
-            input.select();
-            return;
-          }
-
-          setPassword(value);
-          setMessage('Erfolgreich angemeldet.', 'success');
-          if (typeof options.onSuccess === 'function') {
-            await options.onSuccess();
-          }
-        } catch (error) {
-          setMessage(error && error.message ? String(error.message) : 'Unbekannter Fehler.', 'error');
-          button.disabled = false;
-          button.textContent = 'Anmelden';
-        }
-      }
+      document.head.appendChild(style);
     }
 
-      form.addEventListener('submit', handleSubmit);
+    class EventEmitter{constructor(){this.events={};} on(e,l){(this.events[e]??=[]).push(l);} off(e,l){if(!this.events[e])return; this.events[e]=this.events[e].filter(x=>x!==l);} emit(e,d){(this.events[e]||[]).forEach(l=>l(d));}}
 
-      if (input) {
-        input.focus();
+    class GlobalState{
+      constructor(){ this.instances=new Map(); this.sharedState={availability:{}, bookings:[], customerBookings:new Map()};}
+      registerInstance(id,inst){this.instances.set(id,inst);} unregisterInstance(id){this.instances.delete(id);}
+      updateAvailability(boxId,dateString,availability,source='admin'){
+        const key=`${boxId}_${dateString}`; this.sharedState.availability[key]=availability;
+        if(source==='customer'&&availability.available===0){ this.sharedState.customerBookings.set(key,true); }
+        else if(source==='admin'&&availability.available>0){ this.sharedState.customerBookings.delete(key); }
+        MMBCore.events.emit('availability:changed',{boxId,dateString,availability,source});
       }
-
-      return {
-        setMessage,
-        focus() {
-          if (input) {
-            input.focus();
-            input.select();
-          }
-        },
-      };
+      getAvailability(boxId,dateString){ return this.sharedState.availability[`${boxId}_${dateString}`]; }
+      isCustomerBooked(boxId,dateString){ return this.sharedState.customerBookings.has(`${boxId}_${dateString}`); }
     }
 
-    function mount(host, options = {}) {
-      if (!host) {
-        throw new Error('Container fehlt.');
-      }
-
-      const shell = document.createElement('div');
-      shell.className = 'admin-shell';
-      const loginHost = document.createElement('div');
-      loginHost.className = 'admin-shell__login';
-      const contentHost = document.createElement('div');
-      contentHost.className = 'admin-shell__content';
-
-      shell.appendChild(loginHost);
-      shell.appendChild(contentHost);
-
-      host.innerHTML = '';
-      host.appendChild(shell);
-
-      let cleanupUnauthorized = null;
-
-      async function showApp() {
-        shell.classList.add('admin-shell--authenticated');
-        contentHost.innerHTML = '';
-        if (typeof options.renderApp === 'function') {
-          await options.renderApp(contentHost);
-        }
-      }
-
-      function showLogin(message) {
-        shell.classList.remove('admin-shell--authenticated');
-        contentHost.innerHTML = '';
-        const login = renderLogin(loginHost, {
-          title: options.loginTitle,
-          description: options.loginDescription,
-          async onSuccess() {
-            await showApp();
-          },
-        });
-        if (message) {
-          login.setMessage(message, 'error');
-        }
-      }
-
-      cleanupUnauthorized = onUnauthorized(() => {
-        showLogin('Bitte Passwort erneut eingeben.');
-      });
-
-      showLogin();
-
-      const existing = getPassword();
-      if (existing) {
-        validatePassword(existing)
-          .then((ok) => {
-            if (ok) {
-              showApp();
-            } else {
-              setPassword('');
-            }
-          })
-          .catch(() => {
-            setPassword('');
-          });
-      }
-    }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <h1>Admin – Buchungsliste</h1>
-    <div class="content">
-      <div id="admin-app" class="admin-app"></div>
-    </div>
-  </div>
-
-      return {
-        destroy() {
-          if (cleanupUnauthorized) {
-            cleanupUnauthorized();
-            cleanupUnauthorized = null;
-          }
-        },
-        refresh() {
-          if (shell.classList.contains('admin-shell--authenticated')) {
-            showApp();
-          }
-        },
-      };
-    }
-
-    window.MMBAdminPortal = {
-      mount,
-      request,
-      validatePassword,
-      getPassword,
-      setPassword,
-      onUnauthorized,
-      getApiBase() {
-        return baseUrl.href;
-      },
+    const Utils={
+      MONTH_NAMES:['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'],
+      DAY_NAMES:['Mo','Di','Mi','Do','Fr','Sa','So'],
+      formatDate(d){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),da=String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${da}`;},
+      formatMonthYear(d){return `${this.MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;},
+      formatDateRange(s,e){return `${s.toLocaleDateString('de-DE')} - ${e.toLocaleDateString('de-DE')}`;},
+      generateCalendarDays(cur){const y=cur.getFullYear(),m=cur.getMonth(),first=new Date(y,m,1),last=new Date(y,m+1,0); const start=(first.getDay()===0?6:first.getDay()-1); const days=[]; const prevLast=new Date(y,m,0);
+        for(let i=start-1;i>=0;i--){days.push({date:new Date(y,m-1,prevLast.getDate()-i),otherMonth:true});}
+        for(let d=1; d<=last.getDate(); d++){days.push({date:new Date(y,m,d),otherMonth:false});}
+        const total=Math.ceil(days.length/7)*7; for(let d=1; d<=total-days.length; d++){days.push({date:new Date(y,m+1,d),otherMonth:true});}
+        return days;},
+      showNotification(msg,type='info'){const ex=document.querySelector(`.mmb-${type}-notification`); if(ex) ex.remove(); const el=document.createElement('div'); el.className=`mmb-${type}-notification`; const bg=type==='error'?'var(--mmb-busy)':'var(--mmb-ok)';
+        el.style.cssText=`position:fixed;top:20px;right:20px;background:${bg};color:#fff;padding:1rem;border-radius:4px;box-shadow:0 4px 6px rgba(0,0,0,.1);z-index:1000;max-width:300px;`; el.textContent=msg; document.body.appendChild(el); setTimeout(()=>el.remove(),5000);}
     };
-  })();
+
+    injectBaseCSS(); const events=new EventEmitter(), globalState=new GlobalState();
+    global.MMBCore={events,globalState,Utils,version:'1.0.0'};
+  })(window);
   </script>
 
-  <script data-api-base="auto">
-  (function () {
-    const portal = window.MMBAdminPortal;
-    const host = document.getElementById('admin-app');
-    if (!portal || !host) {
-      if (host) {
-        host.innerHTML = '<p class="admin-details-empty">Admin-Skript konnte nicht geladen werden.<br/><small>Bitte prüfe die Einbettung oder setze <code>window.MMB_ADMIN_API_BASE</code> auf die Backend-URL.</small></p>';
-      }
-      return;
+  <!-- ======================= MMB API ======================= -->
+  <script>
+    const MMB_API_BASE = MMBAdminAuth.getApiBase();
+
+    async function mmbApiGet(path){
+      const res=await fetch(MMB_API_BASE+path,{credentials:'include'});
+      const text=await res.text(); let data;
+      try{ data=JSON.parse(text);}catch{ data={ok:false,error:'Keine JSON-Antwort',raw:text};}
+      if(!res.ok||!data.ok) throw new Error(data.error||('HTTP '+res.status+'\n'+(data.raw||'')));
+      return data;
+    }
+    async function mmbApiPost(path,body){
+      const res=await fetch(MMB_API_BASE+path,{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(body||{})});
+      const text=await res.text(); let data;
+      try{ data=JSON.parse(text);}catch{ data={ok:false,error:'Keine JSON-Antwort',raw:text};}
+      if(!res.ok||!data.ok) throw new Error(data.error||('HTTP '+res.status+'\n'+(data.raw||'')));
+      return data;
     }
 
-    const state = {
-      lastLoadedAt: null,
-      loading: false,
-      bookings: [],
-      selectedId: null,
+    const MMBApi={
+      async listBookings(params = {}) {
+        const q=new URLSearchParams();
+        if(params.box_id) q.set('box_id', params.box_id);
+        if(params.status) q.set('status', params.status);
+        if(params.from) q.set('from', params.from);
+        if(params.to) q.set('to', params.to);
+        return mmbApiGet('list_bookings.php'+(q.toString()?`?${q}`:''));
+      },
+      async updateBooking(payload){
+        return mmbApiPost('update_booking.php', payload);
+      },
+      // FIX: richtiger Endpoint + richtige Keys
+      async updateBookingStatus(payload){
+        return mmbApiPost('update_booking_status.php', payload);
+      },
+      async deleteBooking(payload){
+        return mmbApiPost('delete_booking.php', payload);
+      },
     };
+  </script>
 
-    portal.mount(host, {
-      loginTitle: 'Admin-Zugang',
-      loginDescription: 'Bitte gib das Passwort ein, um die Buchungsübersicht zu sehen.',
-      renderApp: async function renderApp(container) {
-        container.innerHTML = '';
+  <!-- ======================= ADMIN – LISTE ======================= -->
+  <script>
+  (function(global){'use strict';
 
-        const toolbar = document.createElement('div');
-        toolbar.className = 'admin-toolbar';
+    const BOX_MAP = { '1':'Marshall Bromley 750', '2':'Teufel Rockster Neo', '3':'Soundboks 4' };
+    const EURO_FORMATTER = new Intl.NumberFormat('de-DE', {maximumFractionDigits:0});
+    const FULFILLMENT_CHOICES = [
+      { id:'pickup',   label:'Abholung', full:'Abholung in Wesel', note:'', priceDelta:0, addsToTotal:true },
+      { id:'shipping', label:'Versand',  full:'Versand (deutschlandweit)', note:'inkl. Express-Hin- & Rückversand sowie Vorbereitungspauschale', priceDelta:80, addsToTotal:true },
+      { id:'delivery', label:'Lieferung', full:'Lieferung (NRW-weit)', note:'zzgl. individueller Lieferpauschale – wir melden uns mit einem Angebot', priceDelta:0, addsToTotal:false }
+    ];
+    const FULFILLMENT_LOOKUP = Object.fromEntries(FULFILLMENT_CHOICES.map(opt=>[opt.id,opt]));
 
-        const actions = document.createElement('div');
-        actions.className = 'admin-toolbar__actions';
-        const refreshBtn = document.createElement('button');
-        refreshBtn.className = 'admin-btn';
-        refreshBtn.type = 'button';
-        refreshBtn.textContent = 'Aktualisieren';
-        actions.appendChild(refreshBtn);
+    // Anzeige-ID (nur Ziffern), Prefix 00 + laufend ab 100
+    const ID_CATEGORY = '00';
+    function displayId(rawId){ const num = 100 + (Number(rawId)||0); return ID_CATEGORY + String(num).padStart(3,'0'); }
 
-        const meta = document.createElement('div');
-        meta.className = 'admin-meta';
-        meta.innerHTML = `
-          <span class="admin-meta__item"><strong data-meta="count">–</strong> Buchungen</span>
-          <span class="admin-meta__item">⏱️ <span data-meta="updated">–</span></span>
-          <span class="admin-meta__item">⚠️ Details offen: <strong data-meta="needs">0</strong></span>
-        `;
+    function injectAdminListCSS(){
+      if(document.getElementById('mmb-admin-list-css')) return;
+      const s=document.createElement('style'); s.id='mmb-admin-list-css'; s.textContent=`
+        #mmb-admin-list{position:relative;min-height:0;background:#3b3b3b;}
+        #mmb-admin-list>.mmb-widget{flex:1;display:flex;flex-direction:column;gap:1rem;padding:1.5rem 0;background:transparent;border-radius:0;box-shadow:none;border:none;min-height:100vh;}
+        @media (max-width:900px){#mmb-admin-list>.mmb-widget{padding:1.25rem;}}
+        .mmb-admin-filters{
+          display:grid;
+          grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+          gap:.65rem;padding:1rem 1.25rem; background:#3b3b3b; border:1px solid rgba(255,255,255,.08); border-radius:14px; align-items:center;
+        }
+        .mmb-admin-filters select,.mmb-admin-filters input{ padding:.55rem .65rem;border:1px solid rgba(255,255,255,.14);border-radius:10px;background:#3b3b3b;color:#f1f5f9;font-size:.9rem;}
+        .mmb-admin-filters input::placeholder{color:rgba(226,232,240,.6);}
+        .mmb-admin-list-wrap{flex:1;min-height:0;overflow:auto;margin:0;background:#3b3b3b;box-shadow:none;height:100%;max-height:calc(10 * 46px + 44px);border-radius:0;border:none;color:#e5e7eb;}
+        .mmb-bookings-table{width:100%;border-collapse:collapse;background:transparent;table-layout:fixed;color:inherit;}
+        .mmb-bookings-table th,.mmb-bookings-table td{padding:.35rem .5rem;border-bottom:1px solid rgba(255,255,255,.08);text-align:left;vertical-align:middle;box-sizing:border-box;line-height:1.2;color:inherit;}
+        .mmb-bookings-table th{background:#343434;font-weight:600;position:sticky;top:0;z-index:2;color:#f8fafc;backdrop-filter:blur(12px);}
+        .mmb-bookings-table tbody tr{min-height:46px;background:#3b3b3b;}
+        .mmb-bookings-table th.cell-head-id,.mmb-bookings-table td.cell--id{width:72px;min-width:64px;white-space:nowrap;}
+        .mmb-bookings-table th.cell-head-customer,.mmb-bookings-table td.cell--customer{min-width:240px;}
+        .mmb-bookings-table th.cell-head-box,.mmb-bookings-table td.cell--box{min-width:200px;white-space:nowrap;}
+        .mmb-bookings-table th.cell-head-date,.mmb-bookings-table td.cell--date{min-width:132px;width:132px;}
+        .mmb-bookings-table th.cell-head-fulfillment,.mmb-bookings-table td.cell--fulfillment{width:118px;min-width:110px;}
+        .mmb-bookings-table th.cell-head-price,.mmb-bookings-table td.cell--total{width:112px;min-width:104px;white-space:nowrap;text-align:right;}
+        .mmb-bookings-table th.cell-head-status,.mmb-bookings-table td.cell--status{width:120px;}
+        .mmb-bookings-table td.cell--id{font-size:.82rem;font-weight:600;}
+        .mmb-bookings-table td.cell--id .badge-id{display:inline-block;}
+        .mmb-bookings-table td.cell--customer{display:flex;flex-direction:column;gap:.15rem;}
+        .mmb-bookings-table td.cell--customer .cell--name{display:block;font-weight:600;font-size:.9rem;color:#f8fafc;}
+        .mmb-bookings-table td.cell--customer .cell--email{font-size:.75rem;color:rgba(226,232,240,.8);word-break:break-word;}
+        .mmb-bookings-table td.cell--date{font-size:.72rem;line-height:1.25;}
+        .mmb-bookings-table td.cell--date .date-range{display:flex;flex-direction:column;gap:.15rem;align-items:flex-start;}
+        .mmb-bookings-table td.cell--date .date-range.date-range--single{justify-content:center;text-align:left;}
+        .mmb-bookings-table td.cell--date .date-range span{display:block;}
+        .mmb-bookings-table td.cell--fulfillment{white-space:nowrap;}
+        .mmb-bookings-table td.cell--total{font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right;}
+        .mmb-bookings-table th.cell-head-actions,.mmb-bookings-table td.cell--actions{min-width:210px;}
+        .mmb-btn{background:var(--mmb-accent);color:#fff;border:none;padding:.45rem .75rem;border-radius:10px;font-size:.83rem;font-weight:500;cursor:pointer;transition:background-color .2s;}
+        .mmb-btn:hover{background:#0284c7;} .mmb-btn:disabled{opacity:.45;cursor:not-allowed;filter:saturate(0.6) contrast(0.9);}
+        .mmb-btn-small{padding:.25rem .5rem;font-size:.75rem;min-width:28px;}
+        .mmb-btn-success{background:var(--mmb-ok);} .mmb-btn-success:hover{background:#059669;}
+        .mmb-btn-danger{background:var(--mmb-busy);} .mmb-btn-danger:hover{background:#dc2626;}
+        .mmb-btn-warning{background:var(--mmb-warn);} .mmb-btn-warning:hover{background:#d97706;}
+        .mmb-btn-danger-light{background:transparent;color:#b91c1c;border:1px solid rgba(239,68,68,.45);} .mmb-btn-danger-light:hover{background:rgba(239,68,68,.12);}
+        .mmb-btn-secondary{background:#6b7280;color:#fff;} .mmb-btn-secondary:hover{background:#4b5563;}
+        .mmb-reset{background:rgba(255,255,255,.16);color:#f8fafc;border:1px solid rgba(255,255,255,.22);} .mmb-reset:hover{background:rgba(255,255,255,.22);}
+        .mmb-modal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;justify-content:center;align-items:center;z-index:11000;font-family:'Poppins',sans-serif;}
+        .mmb-modal-content{background:var(--mmb-bg);color:var(--mmb-text);padding:1.5rem;border-radius:8px;max-width:640px;width:92%;max-height:85vh;overflow:auto;box-shadow:0 10px 25px rgba(0,0,0,.3);}
+        .mmb-modal h3{margin:0 0 .75rem 0;color:var(--mmb-text);}
+        .mmb-modal .mmb-field{display:flex;flex-direction:column;gap:.25rem;margin:.5rem 0;}
+        .mmb-modal .mmb-field-switch label{display:flex;align-items:center;gap:.5rem;font-weight:500;}
+        .mmb-alt-options{display:flex;flex-direction:column;gap:.35rem;}
+        .mmb-alt-options label{display:flex;align-items:center;gap:.5rem;cursor:pointer;}
+        .mmb-alt-options input[type="checkbox"]{width:16px;height:16px;}
+        .mmb-modal .mmb-field-switch input[type="checkbox"]{width:1.1rem;height:1.1rem;}
+        .mmb-modal .mmb-field-switch small{font-size:.75rem;color:var(--mmb-text-light,#6b7280);font-weight:400;display:block;margin-top:.25rem;}
+        #mmb-modal-form.mmb-email-disabled [data-email-field]{opacity:.6;}
+        .mmb-modal input,.mmb-modal select,.mmb-modal textarea{border:1px solid var(--mmb-border);background:var(--mmb-bg);color:var(--mmb-text);border-radius:6px;padding:.5rem;font-family:inherit;font-size:.9rem;}
+        .mmb-modal textarea{min-height:140px;resize:vertical;}
+        .mmb-modal-actions{display:flex;gap:.5rem;justify-content:flex-end;margin-top:1rem;}
+        .mmb-modal-btn{padding:.5rem 1rem;border:1px solid var(--mmb-border);border-radius:6px;cursor:pointer;font-size:.9rem;font-family:inherit;}
+        .mmb-modal-btn-primary{background:var(--mmb-accent);color:#fff;border-color:var(--mmb-accent);}
+        .mmb-modal-btn-secondary{background:var(--mmb-bg);color:var(--mmb-text);}
+        .mmb-status-badge{display:inline-flex;justify-content:center;align-items:center;min-width:0;width:auto;height:20px;padding:0 .5rem;border-radius:9999px;font-weight:600;font-size:.7rem;}
+        .mmb-status-pending{background:#fef3c7;color:#92400e;}
+        .mmb-status-confirmed{background:#d1fae5;color:#065f46;}
+        .mmb-status-rejected{background:#ffe4e6;color:#9f1239;}
+        .mmb-status-cancelled{background:#fee2e2;color:#991b1b;}
+        .mmb-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;}
+        .badge-id{font-variant-numeric:tabular-nums;letter-spacing:.5px;}
+        .mmb-footer{display:flex;justify-content:flex-end;align-items:center;height:40px;color:var(--mmb-text-light);font-size:.9rem;padding:0 1rem;background:rgba(17,24,39,.04);border-radius:12px;}
+        .mmb-text-muted{color:var(--mmb-text-light,#6b7280);}
+        .cell--actions-row{display:flex;gap:.25rem;flex-wrap:nowrap;align-items:center;}
+        .cell--actions-row .mmb-btn-small{width:44px;min-width:44px;height:32px;padding:0;display:inline-flex;align-items:center;justify-content:center;}
+        .mmb-detail-overlay{position:fixed;inset:0;background:var(--mmb-bg);display:flex;justify-content:center;align-items:stretch;z-index:10000;padding:0;overflow:auto;}
+        .mmb-detail-panel{background:var(--mmb-bg);color:var(--mmb-text);width:100%;min-height:100vh;display:flex;flex-direction:column;}
+        .mmb-detail-header{display:flex;justify-content:space-between;align-items:flex-start;padding:1.5rem 1.75rem 1rem;border-bottom:1px solid var(--mmb-border);gap:1rem;}
+        .mmb-detail-title{font-size:1.5rem;font-weight:600;margin:0;}
+        .mmb-detail-sub{margin:.25rem 0 0;font-size:.9rem;color:var(--mmb-text-light);}
+        .mmb-detail-close{background:transparent;border:none;color:var(--mmb-text-light);font-size:1.5rem;cursor:pointer;padding:.25rem .5rem;border-radius:8px;}
+        .mmb-detail-meta{display:flex;gap:.5rem;flex-wrap:wrap;justify-content:flex-end;}
+        .mmb-detail-body{flex:1;overflow:auto;padding:1.75rem 2rem;display:flex;flex-direction:column;gap:1.5rem;}
+        .mmb-detail-section{display:flex;flex-direction:column;gap:1rem;}
+        .mmb-detail-section h3{margin:0;font-size:1rem;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--mmb-text-light);}
+        .mmb-detail-grid{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));}
+        .mmb-detail-field{display:flex;flex-direction:column;gap:.35rem;}
+        .mmb-detail-field label{font-size:.78rem;font-weight:600;color:var(--mmb-text-light);text-transform:uppercase;letter-spacing:.06em;}
+        .mmb-detail-field input,.mmb-detail-field select,.mmb-detail-field textarea{border:1px solid var(--mmb-border);border-radius:10px;padding:.55rem .65rem;font-family:inherit;font-size:.92rem;background:var(--mmb-bg);color:var(--mmb-text);box-shadow:inset 0 1px 2px rgba(15,23,42,.04);}
+        .mmb-detail-field textarea{min-height:120px;resize:vertical;}
+        .mmb-detail-note{font-size:.85rem;color:var(--mmb-text-light);}
+        .mmb-detail-body [hidden]{display:none!important;}
+        form.mmb-email-disabled [data-email-field]{opacity:.6;}
+        .mmb-detail-footer{display:flex;justify-content:space-between;align-items:center;padding:1rem 1.75rem;border-top:1px solid var(--mmb-border);gap:1rem;background:rgba(17,24,39,.06);position:sticky;bottom:0;backdrop-filter:blur(12px);}
+        .mmb-detail-actions{display:flex;gap:.5rem;flex-wrap:wrap;justify-content:flex-end;}
+        .mmb-chip{display:inline-flex;align-items:center;gap:.35rem;background:rgba(17,24,39,.06);border-radius:999px;padding:.35rem .75rem;font-size:.8rem;font-weight:500;color:var(--mmb-text-light);}
+        .mmb-detail-divider{border:none;border-top:1px solid var(--mmb-border);margin:.5rem 0;}
+        .mmb-detail-checkbox{display:flex;align-items:center;gap:.5rem;font-size:.9rem;}
+        .mmb-detail-checkbox input{width:18px;height:18px;}
+        @media (max-width:900px){
+          .mmb-detail-header,.mmb-detail-footer{padding:1rem 1.25rem;}
+          .mmb-detail-body{padding:1.25rem;}
+        }
+      `; document.head.appendChild(s);
+    }
 
-        toolbar.appendChild(actions);
-        toolbar.appendChild(meta);
+    class AdminList{
+      constructor(options={}){
+        this.container = typeof options.container==='string'?document.querySelector(options.container):options.container;
+        if(!this.container) throw new Error('Container not found: '+options.container);
+        this.options={ locale:'de-DE', timezone:'Europe/Berlin', ...options };
+        this.state={
+          bookings:[], originalBookings:[], boxes:[],
+          loading:false,
+          filters:{ status:'', box:'', id:'', name:'' }
+        };
+        this.activeDetailOverlayClose = null;
+        this.activeDetailOverlayBookingId = null;
+        this.instanceId=Math.random().toString(36).substr(2,9); MMBCore.globalState.registerInstance(this.instanceId,this);
+        this.init();
+      }
+      destroy(){ MMBCore.globalState.unregisterInstance(this.instanceId); }
 
-        const status = document.createElement('div');
-        status.className = 'admin-status';
-        status.textContent = 'Bereit.';
+      async init(){ try{ this.render(); await this.loadInitialData(); this.bindUI(); this.applyFilters(); }catch(e){ console.error('AdminList init error:',e); MMBCore.Utils.showNotification('Fehler beim Initialisieren der Admin-Liste','error'); } }
 
-        const layout = document.createElement('div');
-        layout.className = 'admin-layout';
+      async loadInitialData(){
+        this.setState({loading:true});
+        await Promise.all([this.loadBookings(), this.loadBoxes()]);
+        this.setState({loading:false});
+      }
 
-        const listSection = document.createElement('section');
-        listSection.className = 'admin-layout__list';
-        listSection.innerHTML = `
-          <div class="admin-table-wrapper">
-            <table>
+      async loadBookings(){ try{
+        const res=await MMBApi.listBookings();
+        const items=(res.items||[]).map(r=>{
+          const boxId = String(r.box_id);
+          const totalAmount = Number(r.total_amount ?? 0);
+          const deposit = Number(r.deposit_eur ?? 0);
+          const pricingRaw = r.pricing_details_json ?? r.pricing_details ?? null;
+          const parsedPricing = this.safeParseJson(pricingRaw);
+          const normalizedPricing = this.normalizePricingDetails(parsedPricing);
+          const pricingCanonical = this.stableStringify(normalizedPricing || {});
+          const fulfillmentDetailsRaw = r.fulfillment_details_json ?? r.fulfillment_details ?? null;
+          const parsedFulfillmentDetails = this.safeParseJson(fulfillmentDetailsRaw);
+          const normalizedFulfillmentDetails = this.normalizeFulfillmentDetails(parsedFulfillmentDetails, (r.fulfillment_method || '').toString());
+          const fulfillmentMeta = this.computeFulfillmentMeta(r, normalizedFulfillmentDetails);
+          const fulfillmentCanonical = this.stableStringify(normalizedFulfillmentDetails || {});
+          return {
+            id:String(r.id),
+            box_id:boxId,
+            box_name: BOX_MAP[boxId] || r.box_name || ('Box #'+boxId),
+            start_date:r.start_date,
+            end_date:r.end_date,
+            status:(r.status||'').toString(),
+            customer_name:r.customer_name||'',
+            customer_email:r.customer_email||'',
+            customer_phone:r.customer_phone||'',
+            note:r.note ?? '',
+            price_total:Number.isFinite(totalAmount)?totalAmount:0,
+            deposit_eur:Number.isFinite(deposit)?deposit:0,
+            fulfillment_method:fulfillmentMeta.method,
+            fulfillment_label:fulfillmentMeta.label,
+            fulfillment_note:fulfillmentMeta.note,
+            fulfillment_price_delta:fulfillmentMeta.priceDelta,
+            fulfillment_adds_to_total:fulfillmentMeta.addsToTotal,
+            created_at:r.created_at,
+            pricing_details: normalizedPricing,
+            pricing_details_raw: pricingRaw,
+            pricing_details_canonical: pricingCanonical,
+            fulfillment_details: normalizedFulfillmentDetails,
+            fulfillment_details_raw: fulfillmentDetailsRaw,
+            fulfillment_details_canonical: fulfillmentCanonical
+          };
+        });
+        this.state.originalBookings = items;
+        this.applyFilters(); // hält Filter aktiv nach jedem Reload/Statuswechsel
+      }catch(err){ console.error('loadBookings error:',err); MMBCore.Utils.showNotification('Buchungen konnten nicht geladen werden','error'); } }
+
+      async loadBoxes(){
+        this.state.boxes = [
+          {id:'1',name:BOX_MAP['1']},
+          {id:'2',name:BOX_MAP['2']},
+          {id:'3',name:BOX_MAP['3']}
+        ];
+      }
+
+      setState(ns){ this.state={...this.state,...ns}; this.render(); }
+
+      // ---------- Focus Snapshot ----------
+      snapshotFocus(){
+        const ae = document.activeElement;
+        if(!ae || !this.container.contains(ae)) return null;
+        const id = ae.id || '';
+        let start=null,end=null;
+        try{ start=ae.selectionStart; end=ae.selectionEnd; }catch(e){}
+        return {id,start,end};
+      }
+      restoreFocus(snap){
+        if(!snap||!snap.id) return;
+        const el = document.getElementById(snap.id);
+        if(!el) return;
+        el.focus({preventScroll:true});
+        try{
+          const pos = (typeof snap.end==='number') ? snap.end : (el.value?el.value.length:0);
+          el.setSelectionRange(pos,pos);
+        }catch(e){}
+      }
+
+      // ---------- Rendering ----------
+      render(){
+        if(this.state.loading){
+          this.container.innerHTML=`<div class="mmb-widget"><div class="mmb-loading">Lade Buchungen...</div></div>`;
+          return;
+        }
+        const f = this.state.filters;
+        this.container.innerHTML=`
+          <div class="mmb-widget">
+            ${this.renderFilters(f)}
+            <div class="mmb-admin-list-wrap">${this.renderTable()}</div>
+            ${this.renderFooter()}
+          </div>`;
+        this.bindTableActions();
+        const btn = document.getElementById(`btn-reset-${this.instanceId}`);
+        if(btn && !btn._bound){ btn.addEventListener('click', ()=> this.resetFilters()); btn._bound=true; }
+      }
+
+      renderFilters(f){
+        return `
+        <div class="mmb-admin-filters">
+          <select id="filter-status-${this.instanceId}">
+            <option value="">Status: Alle</option>
+            <option value="pending"   ${f.status==='pending'?'selected':''}>Ausstehend</option>
+            <option value="confirmed" ${f.status==='confirmed'?'selected':''}>Bestätigt</option>
+            <option value="rejected"  ${f.status==='rejected'?'selected':''}>Abgelehnt</option>
+            <option value="cancelled" ${f.status==='cancelled'?'selected':''}>Storniert</option>
+          </select>
+          <select id="filter-box-${this.instanceId}">
+            <option value="">Box: Alle</option>
+            ${this.state.boxes.map(b=>`<option value="${b.id}" ${f.box===b.id?'selected':''}>${b.name}</option>`).join('')}
+          </select>
+          <input id="filter-id-${this.instanceId}" inputmode="numeric" pattern="[0-9]*" placeholder="ID (z. B. 00123)" value="${this.escape(f.id)}"/>
+          <input id="filter-name-${this.instanceId}" placeholder="Name oder E-Mail" value="${this.escape(f.name)}"/>
+          <div style="justify-self:end;">
+            <button class="mmb-btn mmb-reset" id="btn-reset-${this.instanceId}">Alle Filter löschen</button>
+          </div>
+        </div>`;
+      }
+
+      renderTable(){
+        const rows = (this.state.bookings||[]);
+        if(!rows.length){
+          return `
+            <table class="mmb-bookings-table">
               <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Kunde</th>
-                  <th>Box</th>
-                  <th>Zeitraum</th>
-                  <th>Fulfillment</th>
-                  <th>Preis</th>
-                  <th>Status</th>
-                  <th>Aktion</th>
-                </tr>
+                <tr><th class="cell-head-id">ID</th><th class="cell-head-customer">Kunde</th><th class="cell-head-box">Box</th><th class="cell-head-date">Zeitraum</th><th class="cell-head-fulfillment">Abwicklung</th><th class="cell-head-price">Preis</th><th class="cell-head-status">Status</th><th class="cell-head-actions">Aktionen</th></tr>
               </thead>
-              <tbody></tbody>
-            </table>
-          </div>
-        `;
-        const tbody = listSection.querySelector('tbody');
+              <tbody><tr><td colspan="8" style="padding:1rem;color:var(--mmb-text-light);">Keine Buchungen vorhanden</td></tr></tbody>
+            </table>`;
+        }
+        return `
+        <table class="mmb-bookings-table">
+          <thead>
+            <tr><th class="cell-head-id">ID</th><th class="cell-head-customer">Kunde</th><th class="cell-head-box">Box</th><th class="cell-head-date">Zeitraum</th><th class="cell-head-fulfillment">Abwicklung</th><th class="cell-head-price">Preis</th><th class="cell-head-status">Status</th><th class="cell-head-actions">Aktionen</th></tr>
+          </thead>
+          <tbody>
+            ${rows.map(b=>this.renderRow(b)).join('')}
+          </tbody>
+        </table>`;
+      }
 
-        const detailsSection = document.createElement('section');
-        detailsSection.className = 'admin-layout__details';
-        detailsSection.innerHTML = `
-          <div class="admin-details-header">
-            <h2><span data-detail="title">Details</span> <span data-detail="status"></span></h2>
-            <p data-detail="subtitle">Bitte wähle eine Buchung aus, um alle Informationen zu sehen.</p>
-          </div>
-          <div class="admin-details-body">
-            <div class="admin-details-empty">Keine Buchung ausgewählt.</div>
-          </div>
-        `;
-        const detailsBody = detailsSection.querySelector('.admin-details-body');
-        const detailsTitle = detailsSection.querySelector('[data-detail="title"]');
-        const detailsSubtitle = detailsSection.querySelector('[data-detail="subtitle"]');
-        const detailsStatus = detailsSection.querySelector('[data-detail="status"]');
+      formatEuro(value){
+        const amount = Math.round(Number(value) || 0);
+        return `${EURO_FORMATTER.format(amount)} €`;
+      }
 
-        layout.appendChild(listSection);
-        layout.appendChild(detailsSection);
+      renderRow(b){
+        const isConfirmed = b.status==='confirmed';
+        const isRejected  = b.status==='rejected';
+        const isCancelled = b.status==='cancelled';
+        const fulfillmentInfo = this.getFulfillmentInfo(b);
+        const fulfillmentNoteAttr = fulfillmentInfo.note ? ` title="${this.escape(fulfillmentInfo.note)}"` : '';
 
-        container.appendChild(toolbar);
-        container.appendChild(layout);
-        container.appendChild(status);
+        const emailLine = b.customer_email ? `<span class="cell--email">${this.escape(b.customer_email)}</span>` : '';
+        return `
+        <tr>
+          <td class="cell--id"><span class="badge-id">${displayId(b.id)}</span></td>
+          <td class="cell--customer"><span class="cell--name">${this.escape(b.customer_name)}</span>${emailLine}</td>
+          <td class="cell--box">${this.escape(b.box_name)}</td>
+          <td class="cell--date">${this.renderDateCell(b)}</td>
+          <td class="cell--fulfillment"${fulfillmentNoteAttr}>${this.escape(this.formatFulfillmentCell(b))}</td>
+          <td class="cell--total">${this.formatEuro(b.price_total)}</td>
+          <td class="cell--status"><span class="mmb-status-badge mmb-status-${b.status}">${this.translateStatus(b.status)}</span></td>
+          <td class="cell--actions">
+            <div class="cell--actions-row">
+              <button class="mmb-btn mmb-btn-small mmb-btn-secondary"
+                      data-action="viewDetails" data-id="${b.id}"
+                      title="Details anzeigen">ℹ️</button>
+              <button class="mmb-btn mmb-btn-small mmb-btn-success"
+                      data-action="confirmBooking" data-id="${b.id}"
+                      title="${isConfirmed?'Bereits bestätigt':'Buchung bestätigen'}"
+                      ${isConfirmed ? 'disabled aria-disabled="true"' : ''}>✓</button>
 
-        refreshBtn.addEventListener('click', () => {
-          loadData(true);
+              <button class="mmb-btn mmb-btn-small mmb-btn-danger"
+                      data-action="declineBooking" data-id="${b.id}"
+                      title="${isRejected?'Bereits abgelehnt':'Buchung ablehnen'}"
+                      ${isRejected ? 'disabled aria-disabled="true"' : ''}>×</button>
+
+              <button class="mmb-btn mmb-btn-small mmb-btn-warning"
+                      data-action="offerAlternative" data-id="${b.id}"
+                      title="Alternative Box vorschlagen">Alt</button>
+            </div>
+          </td>
+        </tr>`;
+      }
+
+      renderDateCell(b){
+        const parse = (value)=>{
+          if(!value) return null;
+          const d=new Date(value);
+          return Number.isNaN(d.getTime())?null:d;
+        };
+        const start=parse(b.start_date);
+        const end=parse(b.end_date);
+        const fmt=(d)=>d?d.toLocaleDateString('de-DE'):'–';
+        const wrap=(content)=>`<span class="date-range">${content}</span>`;
+        if(start && end){
+          const same=start.getFullYear()===end.getFullYear() && start.getMonth()===end.getMonth() && start.getDate()===end.getDate();
+          if(same){
+            return `<div class="date-range date-range--single"><span>${fmt(start)}</span></div>`;
+          }
+          return `<div class="date-range"><span>${fmt(start)}</span><span>${fmt(end)}</span></div>`;
+        }
+        if(start){ return `<div class="date-range date-range--single"><span>${fmt(start)}</span></div>`; }
+        if(end){ return `<div class="date-range date-range--single"><span>${fmt(end)}</span></div>`; }
+        return `<div class="date-range date-range--single"><span>–</span></div>`;
+      }
+
+      renderFooter(){
+        const shown = (this.state.bookings||[]).filter(r=>r && r.id).length;
+        const total = (this.state.originalBookings||[]).length;
+        return `<div class="mmb-footer">${shown} von ${total} Buchungen</div>`;
+      }
+
+      // ---------- Events ----------
+      bindUI(){
+        // Live-Filtern + Fokus halten
+        this.container.addEventListener('input', (e)=>{
+          const t = e.target;
+          if(!t.id) return;
+          const snap = this.snapshotFocus();
+          if(t.id===`filter-id-${this.instanceId}`){
+            this.state.filters.id = (t.value||'').replace(/[^\d]/g,''); // nur Ziffern
+            this.applyFilters(snap);
+          }
+          if(t.id===`filter-name-${this.instanceId}`){
+            this.state.filters.name = (t.value||'');
+            this.applyFilters(snap);
+          }
+        });
+        this.container.addEventListener('change', (e)=>{
+          const t = e.target;
+          if(!t.id) return;
+          const snap = this.snapshotFocus();
+          if(t.id===`filter-status-${this.instanceId}`){
+            this.state.filters.status = t.value||'';
+            this.applyFilters(snap);
+          }
+          if(t.id===`filter-box-${this.instanceId}`){
+            this.state.filters.box = t.value||'';
+            this.applyFilters(snap);
+          }
+          if(t.id===`btn-reset-${this.instanceId}`){
+            this.resetFilters();
+          }
         });
 
-        async function loadData(force) {
-          if (state.loading && !force) {
-            return;
+        const btn = document.getElementById(`btn-reset-${this.instanceId}`);
+        if(btn){ btn.addEventListener('click', ()=> this.resetFilters()); }
+      }
+
+      bindTableActions(){
+        this.container.querySelector('.mmb-widget')?.addEventListener('click', async (e)=>{
+          const btn = e.target.closest('button[data-action]');
+          if(!btn) return;
+          if (btn.disabled || btn.getAttribute('aria-disabled') === 'true') return;
+          e.preventDefault();
+          const id = btn.dataset.id;
+          if(btn.dataset.action==='viewDetails') { await this.viewDetails(id); return; }
+          if(btn.dataset.action==='confirmBooking') await this.confirmBooking(id);
+          if(btn.dataset.action==='declineBooking') await this.declineBooking(id);
+          if(btn.dataset.action==='offerAlternative') await this.offerAlternative(id);
+          if(btn.dataset.action==='editBooking') await this.editBooking(id);
+        });
+      }
+
+      resetFilters(){
+        const snap = this.snapshotFocus();
+        this.state.filters = { status:'', box:'', id:'', name:'' };
+        this.applyFilters(snap);
+      }
+
+      // ---------- Filterlogik ----------
+      applyFilters(focusSnapshot=null){
+        const f = this.state.filters;
+        const rows = this.state.originalBookings.filter(x=>{
+          if (f.status && x.status!==f.status) return false;
+          if (f.box && x.box_id!==f.box) return false;
+
+          if (f.id){
+            const disp = displayId(x.id);
+            if (!disp.startsWith(f.id)) return false;
           }
-          state.loading = true;
-          status.className = 'admin-status';
-          status.textContent = 'Lade Buchungen …';
-          if (tbody) {
-            tbody.classList.add('is-loading');
+
+          if (f.name){
+            const q = f.name.toLowerCase();
+            const inName = (x.customer_name||'').toLowerCase().includes(q);
+            const inMail = (x.customer_email||'').toLowerCase().includes(q);
+            if (!inName && !inMail) return false;
           }
+          return true;
+        });
 
-          try {
-            const data = await portal.request('list_bookings.php');
-            if (!data || data.ok === false) {
-              throw new Error(data && data.error ? data.error : 'Buchungen konnten nicht geladen werden.');
-            }
+        this.state.bookings = rows;
 
-            const items = Array.isArray(data.items) ? data.items : [];
-            state.bookings = items;
-            renderRows();
-            updateMeta(data.meta || {}, items.length);
+        this.render();
+        this.restoreFocus(focusSnapshot);
 
-            if (items.length) {
-              const preferredId = state.selectedId || items[0].id;
-              selectBooking(preferredId);
-            } else {
-              selectBooking(null);
-            }
+        const fid = document.getElementById(`filter-id-${this.instanceId}`);
+        const fnm = document.getElementById(`filter-name-${this.instanceId}`);
+        const fs  = document.getElementById(`filter-status-${this.instanceId}`);
+        const fb  = document.getElementById(`filter-box-${this.instanceId}`);
+        if(fid && fid.value !== this.state.filters.id) fid.value = this.state.filters.id;
+        if(fnm && fnm.value !== this.state.filters.name) fnm.value = this.state.filters.name;
+        if(fs && fs.value !== this.state.filters.status) fs.value = this.state.filters.status;
+        if(fb && fb.value !== this.state.filters.box) fb.value = this.state.filters.box;
 
-            state.lastLoadedAt = new Date();
-            status.className = 'admin-status is-success';
-            status.textContent = `Zuletzt aktualisiert: ${formatTimestamp(state.lastLoadedAt)}`;
-          } catch (error) {
-            if (error && error.code === 'UNAUTHORIZED') {
-              return;
-            }
-            status.className = 'admin-status is-error';
-            status.textContent = error && error.message ? String(error.message) : 'Unbekannter Fehler beim Laden der Buchungen.';
-            if (tbody) {
-              tbody.innerHTML = '<tr><td colspan="8" class="muted">Keine Daten verfügbar.</td></tr>';
-            }
-            selectBooking(null);
-          } finally {
-            state.loading = false;
-            if (tbody) {
-              tbody.classList.remove('is-loading');
-            }
+        const btn = document.getElementById(`btn-reset-${this.instanceId}`);
+        if(btn && !btn._bound){ btn.addEventListener('click', ()=> this.resetFilters()); btn._bound=true; }
+      }
+
+      // ---------- Aktionen ----------
+      async confirmBooking(id){
+        const b = this.state.originalBookings.find(x=>x.id===id); if(!b) return;
+        const subject = `Deine Buchung wurde bestätigt ✅ – Buchungs-ID: ${displayId(id)}`;
+        const body = this.tplConfirm(b);
+        const html = `
+          <div class="mmb-field"><strong>Buchung:</strong> ${displayId(id)} – ${this.escape(b.customer_name)} (${this.escape(b.box_name)})</div>
+          <div class="mmb-field"><label>Betreff</label><input name="subject" value="${this.escape(subject)}"/></div>
+          <div class="mmb-field"><label>Nachricht an Kund*in</label><textarea name="message">${this.escape(body)}</textarea></div>
+        `;
+        const values = await this.openModal({ title:'Buchung bestätigen', html, confirmText:'Status auf „Bestätigt“ setzen' });
+        if(!values) return;
+        await MMBApi.updateBookingStatus({ booking_id: Number(id), status: 'confirmed', send_email: 1, subject: values.subject, message: values.message });
+        await this.loadBookings();
+        MMBCore.Utils.showNotification('Buchung wurde bestätigt');
+      }
+
+      async declineBooking(id){
+        const b = this.state.originalBookings.find(x=>x.id===id); if(!b) return;
+        const subject = `Deine Buchung wurde abgelehnt ❌ – Buchungs-ID: ${displayId(id)}`;
+        const body = this.tplReject(b);
+        const html = `
+          <div class="mmb-field"><strong>Buchung:</strong> ${displayId(id)} – ${this.escape(b.customer_name)} (${this.escape(b.box_name)})</div>
+          <div class="mmb-field"><label>Grund (intern)</label><input name="reason" placeholder="z.B. Terminkonflikt"/></div>
+          <div class="mmb-field"><label>Betreff</label><input name="subject" value="${this.escape(subject)}"/></div>
+          <div class="mmb-field"><label>Nachricht an Kund*in</label><textarea name="message">${this.escape(body)}</textarea></div>
+        `;
+        const values = await this.openModal({ title:'Buchung ablehnen', html, confirmText:'Als „Abgelehnt“ markieren' });
+        if(!values) return;
+        await MMBApi.updateBookingStatus({ booking_id: Number(id), status: 'rejected', send_email: 1, subject: values.subject, message: values.message });
+        await this.loadBookings();
+        MMBCore.Utils.showNotification('Buchung wurde abgelehnt');
+      }
+
+      async offerAlternative(id){
+        const b = this.state.originalBookings.find(x=>x.id===id); if(!b) return;
+        const alternatives = [{id:'2',name:BOX_MAP['2']},{id:'3',name:BOX_MAP['3']},{id:'1',name:BOX_MAP['1']}]
+          .filter(x => x.id !== b.box_id);
+        const altMap = Object.fromEntries(alternatives.map(a=>[a.id,a]));
+        const subject = `Konflikt bei deiner Buchung ⚠️ – Buchungs-ID: ${displayId(id)}`;
+        const initialSelection = alternatives.length ? [alternatives[0]] : [];
+        const html = `
+          <div class="mmb-field"><strong>Buchung:</strong> ${displayId(id)} – ${this.escape(b.customer_name)}</div>
+          <div class="mmb-field"><label>Alternative Box(en)</label>
+            <div class="mmb-alt-options">
+              ${alternatives.map((x,idx)=>`
+                <label><input type="checkbox" name="alternative_box_ids" value="${x.id}" ${idx===0?'checked':''}/> ${this.escape(x.name)}</label>
+              `).join('')}
+            </div>
+          </div>
+          <div class="mmb-field"><label>Betreff</label><input name="subject" value="${this.escape(subject)}"/></div>
+          <div class="mmb-field"><label>Nachricht an Kund*in</label><textarea name="message">${this.escape(this.tplAlternative(b, initialSelection))}</textarea></div>
+        `;
+        const values = await this.openModal({
+          title:'Alternative Box vorschlagen',
+          html,
+          confirmText:'Alternative senden',
+          onMount: (form)=>{
+            const boxes = Array.from(form.querySelectorAll('input[name="alternative_box_ids"]'));
+            const ta  = form.querySelector('textarea[name="message"]');
+            const sync = ()=>{
+              const checked = boxes.filter(cb=>cb.checked);
+              if(!checked.length && boxes.length){
+                boxes[0].checked = true;
+                return sync();
+              }
+              const selected = checked.map(cb=>altMap[cb.value]).filter(Boolean);
+              const fallback = selected.length ? selected : initialSelection;
+              ta.value = this.tplAlternative(b, fallback);
+            };
+            boxes.forEach(cb=>cb.addEventListener('change', sync));
+            sync();
           }
+        });
+        if(!values) return;
+
+        const rawAlt = values.alternative_box_ids;
+        const selectedIds = Array.isArray(rawAlt) ? rawAlt : (rawAlt ? [rawAlt] : []);
+        const selected = selectedIds.map(v=>altMap[v]).filter(Boolean);
+        if(!selected.length){
+          MMBCore.Utils.showNotification('Bitte wähle mindestens eine Alternative aus.', 'error');
+          return;
         }
 
-        function renderRows() {
-          if (!tbody) {
-            return;
+        const payload = {
+          booking_id: Number(id),
+          status: 'rejected',
+          alternative_box_ids: selected.map(alt=>Number(alt.id)),
+          send_email: 1,
+          subject: values.subject,
+          message: values.message
+        };
+
+        const response = await MMBApi.updateBookingStatus(payload);
+        await this.loadBookings();
+
+        const mailInfo = response?.mail || null;
+        if(mailInfo && mailInfo.sent === false){
+          const err = mailInfo.error ? ` – ${mailInfo.error}` : '';
+          MMBCore.Utils.showNotification('Alternative versendet, aber E-Mail fehlgeschlagen'+err, 'error');
+        }else{
+          MMBCore.Utils.showNotification('Alternative vorgeschlagen (Status: Abgelehnt)');
+        }
+      }
+
+      async deleteBooking(id, booking=null, closeOverlay=null){
+        const current = booking || this.state.originalBookings.find(x=>String(x.id)===String(id));
+        if(!current){
+          MMBCore.Utils.showNotification('Buchung nicht gefunden','error');
+          return;
+        }
+        const display = displayId(current.id);
+        const html = `
+          <p>Diese Buchung wird dauerhaft entfernt und Kund*innen werden <strong>nicht</strong> informiert.</p>
+          <p><strong>Buchung:</strong> ${display} – ${this.escape(current.customer_name || 'Unbekannt')}</p>
+          <p>Möchtest du wirklich fortfahren?</p>
+        `;
+        const values = await this.openModal({
+          title:'Buchung endgültig löschen',
+          html,
+          confirmText:'Endgültig löschen',
+          cancelText:'Abbrechen'
+        });
+        if(!values) return;
+        try{
+          const response = await MMBApi.deleteBooking({ id: Number(id) });
+          const deleted = !response || response.deleted !== false;
+          if(typeof closeOverlay === 'function') closeOverlay();
+          else if(this.activeDetailOverlayClose) this.activeDetailOverlayClose();
+          const msg = deleted ? `Buchung ${display} wurde gelöscht` : `Buchung ${display} wurde nicht gefunden`;
+          const type = deleted ? 'info' : 'error';
+          MMBCore.Utils.showNotification(msg, type);
+          await this.loadBookings();
+        }catch(err){
+          console.error('deleteBooking error', err);
+          MMBCore.Utils.showNotification('Buchung konnte nicht gelöscht werden', 'error');
+        }
+      }
+
+      async editBooking(id){
+        const b = this.state.originalBookings.find(x=>x.id===id); if(!b) return;
+        const boxOptions = [{id:'1',name:BOX_MAP['1']},{id:'2',name:BOX_MAP['2']},{id:'3',name:BOX_MAP['3']}]
+          .map(x => `<option value="${x.id}" ${x.id===b.box_id?'selected':''}>${this.escape(x.name)}</option>`).join('');
+        const currentFulfillment = (b.fulfillment_method || 'pickup').toString();
+        const fulfillmentOptions = FULFILLMENT_CHOICES
+          .map(opt => `<option value="${opt.id}" ${opt.id===currentFulfillment?'selected':''}>${this.escape(opt.label)}</option>`)
+          .join('');
+        const fulfillmentInfo = this.getFulfillmentInfo(b);
+        const fulfillmentHint = fulfillmentInfo.note ? this.escape(fulfillmentInfo.note) : 'Keine zusätzlichen Hinweise';
+        const baseSubject = `Deine Buchung wurde aktualisiert 👷🏽 – Buchungs-ID: ${displayId(id)}`;
+        const parseAmount = (val)=>{
+          if(val===null || val===undefined) return NaN;
+          if(typeof val==='number') return val;
+          let str = String(val).trim();
+          if(!str) return NaN;
+          str = str.replace(/€/g,'').replace(/\s+/g,'');
+          if(str.includes(',')){
+            str = str.replace(/\./g,'').replace(',','.');
           }
-
-          if (!state.bookings.length) {
-            tbody.innerHTML = '<tr><td colspan="8" class="muted">Keine Buchungen vorhanden.</td></tr>';
-            return;
+          const num = Number(str);
+          if(Number.isNaN(num) && str.includes('.')){
+            const fallback = Number(str.replace(/\./g,''));
+            return Number.isNaN(fallback) ? NaN : fallback;
           }
+          return num;
+        };
+        const body = this.tplEditInfo(b);
+        const html = `
+          <div class="mmb-grid-2">
+            <div class="mmb-field"><label>Kundename</label><input name="customer_name" value="${this.escape(b.customer_name)}"/></div>
+            <div class="mmb-field"><label>E-Mail</label><input name="customer_email" value="${this.escape(b.customer_email)}"/></div>
+          </div>
+          <div class="mmb-grid-2">
+            <div class="mmb-field"><label>Telefon</label><input name="customer_phone" value="${this.escape(b.customer_phone)}"/></div>
+            <div class="mmb-field"><label>Box</label><select name="box_id">${boxOptions}</select></div>
+          </div>
+          <div class="mmb-grid-2">
+            <div class="mmb-field"><label>Start (YYYY-MM-DD)</label><input name="start_date" value="${this.escape(b.start_date)}"/></div>
+            <div class="mmb-field"><label>Ende (YYYY-MM-DD)</label><input name="end_date" value="${this.escape(b.end_date)}"/></div>
+          </div>
+          <div class="mmb-grid-2">
+            <div class="mmb-field"><label>Status</label>
+              <select name="status">
+                <option value="pending" ${b.status==='pending'?'selected':''}>Ausstehend</option>
+                <option value="confirmed" ${b.status==='confirmed'?'selected':''}>Bestätigt</option>
+                <option value="rejected" ${b.status==='rejected'?'selected':''}>Abgelehnt</option>
+                <option value="cancelled" ${b.status==='cancelled'?'selected':''}>Storniert</option>
+              </select>
+            </div>
+            <div class="mmb-field"><label>Preis (EUR)</label><input name="total_amount" value="${this.escape(b.price_total)}"/></div>
+          </div>
+          <div class="mmb-grid-2">
+            <div class="mmb-field"><label>Abwicklung</label><select name="fulfillment_method">${fulfillmentOptions}</select><small class="mmb-text-muted">Steuert Versand-/Lieferhinweise und Preisaufschläge.</small></div>
+            <div class="mmb-field"><label>Hinweis zur Abwicklung</label><div data-fulfillment-hint class="mmb-text-muted">${fulfillmentHint}</div></div>
+          </div>
+          <hr style="border:none;border-top:1px solid var(--mmb-border);margin:.75rem 0"/>
+          <div class="mmb-field mmb-field-switch">
+            <label><input type="checkbox" name="send_email" value="1" checked/> <span>Kund*in per E-Mail informieren</span></label>
+            <small>Wenn aktiviert, wird die aktualisierte Buchung an ${this.escape(b.customer_email)} gesendet.</small>
+          </div>
+          <div class="mmb-field" data-email-field><label>Betreff (E-Mail an Kund*in)</label><input name="subject" value="${this.escape(baseSubject)}"/></div>
+          <div class="mmb-field" data-email-field><label>Nachricht (E-Mail an Kund*in)</label><textarea name="message">${this.escape(body)}</textarea></div>
+        `;
+        const values = await this.openModal({
+          title:`Buchung bearbeiten – ${displayId(id)}`,
+          html,
+          confirmText:'Änderungen speichern',
+          onMount:(form)=>{
+            const subjectInput = form.querySelector('input[name="subject"]');
+            const messageInput = form.querySelector('textarea[name="message"]');
+            const sendSwitch = form.querySelector('input[name="send_email"]');
+            const watchFields = ['customer_name','customer_email','customer_phone','box_id','start_date','end_date','status','total_amount','fulfillment_method'];
+            let subjectDirty = false;
+            let messageDirty = false;
 
-          const rows = state.bookings.map((item) => {
-            const row = document.createElement('tr');
-            row.dataset.bookingId = String(item.id);
-            if (item.fulfillment_needs_attention) {
-              row.classList.add('is-needs-attention');
+            const collectCurrentValues = ()=>{
+              const data = {};
+              watchFields.forEach((name)=>{
+                const field = form.querySelector(`[name="${name}"]`);
+                if(!field) return;
+                data[name] = field.value;
+              });
+              return data;
+            };
+
+            const buildBookingForEmail = (vals)=>{
+              const boxId = String(vals.box_id ?? b.box_id ?? '');
+              const fulfillmentChoice = this.getFulfillmentChoice((vals.fulfillment_method ?? b.fulfillment_method ?? 'pickup').toString());
+              const parsedAmount = parseAmount(vals.total_amount ?? b.price_total);
+              return {
+                ...b,
+                customer_name: vals.customer_name ?? b.customer_name,
+                customer_email: vals.customer_email ?? b.customer_email,
+                customer_phone: vals.customer_phone ?? b.customer_phone,
+                box_id: boxId,
+                box_name: BOX_MAP[boxId] || BOX_MAP[String(b.box_id)] || b.box_name,
+                start_date: vals.start_date ?? b.start_date,
+                end_date: vals.end_date ?? b.end_date,
+                status: vals.status ?? b.status,
+                price_total: Number.isFinite(parsedAmount) ? parsedAmount : b.price_total,
+                fulfillment_method: fulfillmentChoice.id,
+                fulfillment_label: fulfillmentChoice.label,
+                fulfillment_note: fulfillmentChoice.note,
+                fulfillment_price_delta: fulfillmentChoice.priceDelta
+              };
+            };
+
+            const syncEmailFields = (force=false)=>{
+              if(!subjectInput || !messageInput) return;
+              const current = buildBookingForEmail(collectCurrentValues());
+              if(force || !subjectDirty){
+                subjectInput.value = baseSubject;
+              }
+              if(force || !messageDirty){
+                messageInput.value = this.tplEditInfo(current);
+              }
+            };
+
+            if(subjectInput){
+              subjectInput.addEventListener('input', ()=>{ subjectDirty = subjectInput.value !== baseSubject; });
             }
-            if (String(item.id) === String(state.selectedId)) {
-              row.classList.add('is-selected');
+            if(messageInput){
+              messageInput.addEventListener('input', ()=>{ messageDirty = true; });
             }
 
-            const customerName = escapeHtml(item.customer_name || '–');
-            const email = escapeHtml(item.customer_email || '–');
-            const boxName = escapeHtml(item.box_name || (item.box_id ? `Box #${item.box_id}` : '–'));
-            const period = `${formatDate(item.start_date)} – ${formatDate(item.end_date)}`;
-            const fulfillment = escapeHtml(item.fulfillment_display_label || item.fulfillment_label || item.fulfillment_method || '–');
-            const total = formatCurrency(item.total_amount);
-            const statusCell = createStatusBadge(item.status);
-            const displayId = escapeHtml(item.display_id || item.id || '–');
-
-            row.innerHTML = `
-              <td>${displayId}</td>
-              <td class="admin-table__customer"><span>${customerName}</span><span>${email}</span></td>
-              <td class="text-ellipsis" title="${boxName}">${boxName}</td>
-              <td>${escapeHtml(period)}</td>
-              <td class="text-ellipsis" title="${fulfillment}">${fulfillment}</td>
-              <td>${escapeHtml(total)}</td>
-              <td>${statusCell}</td>
-              <td><button type="button" class="admin-table__info-btn">Info</button></td>
-            `;
-
-            row.addEventListener('click', () => {
-              selectBooking(item.id);
+            watchFields.forEach((name)=>{
+              const field = form.querySelector(`[name="${name}"]`);
+              if(!field) return;
+              const evt = field.tagName === 'SELECT' ? 'change' : 'input';
+              field.addEventListener(evt, ()=> syncEmailFields());
             });
 
-            const infoBtn = row.querySelector('.admin-table__info-btn');
-            if (infoBtn) {
-              infoBtn.addEventListener('click', (event) => {
-                event.stopPropagation();
-                selectBooking(item.id);
+            const fulfillmentSelect = form.querySelector('select[name="fulfillment_method"]');
+            const fulfillmentHintEl = form.querySelector('[data-fulfillment-hint]');
+            const updateFulfillmentHint = ()=>{
+              if(!fulfillmentSelect || !fulfillmentHintEl) return;
+              const choice = this.getFulfillmentChoice(fulfillmentSelect.value);
+              fulfillmentHintEl.textContent = choice.note || 'Keine zusätzlichen Hinweise';
+            };
+            if(fulfillmentSelect){
+              fulfillmentSelect.addEventListener('change', updateFulfillmentHint);
+              updateFulfillmentHint();
+            }
+
+            const applyEmailToggleState = ()=>{
+              if(!subjectInput || !messageInput || !sendSwitch) return;
+              const enabled = sendSwitch.checked;
+              subjectInput.disabled = !enabled;
+              messageInput.disabled = !enabled;
+              form.classList.toggle('mmb-email-disabled', !enabled);
+            };
+
+            if(sendSwitch){
+              applyEmailToggleState();
+              sendSwitch.addEventListener('change', ()=>{
+                applyEmailToggleState();
+                if(sendSwitch.checked){
+                  syncEmailFields();
+                }
               });
             }
 
-            return row;
+            syncEmailFields(true);
+          }
+        });
+        if(!values) return;
+
+        const nextBoxIdRaw = values.box_id ?? b.box_id;
+        const nextBoxIdNum = Number(nextBoxIdRaw);
+        const finalBoxId = Number.isFinite(nextBoxIdNum) && nextBoxIdNum > 0 ? nextBoxIdNum : Number(b.box_id);
+
+        const originalTotalRaw = parseAmount(b.price_total ?? b.total_amount);
+        const fallbackDbTotal = Number(b.price_total ?? b.total_amount);
+        const originalTotal = Number.isFinite(originalTotalRaw)
+          ? Math.round(originalTotalRaw * 100) / 100
+          : (Number.isFinite(fallbackDbTotal) ? Math.round(fallbackDbTotal * 100) / 100 : 0);
+        const normalizedTotal = (()=>{
+          const parsed = parseAmount(values.total_amount);
+          if(Number.isFinite(parsed)) return Math.round(parsed * 100) / 100;
+          return originalTotal;
+        })();
+
+        const startDate = ((values.start_date||'').trim()) || b.start_date;
+        const endDate = ((values.end_date||'').trim()) || b.end_date;
+
+        const nextFulfillmentChoice = this.getFulfillmentChoice((values.fulfillment_method ?? b.fulfillment_method ?? 'pickup').toString());
+        const sanitized = {
+          customer_name: (values.customer_name||'').trim(),
+          customer_email: (values.customer_email||'').trim(),
+          customer_phone: (values.customer_phone||'').trim(),
+          box_id: finalBoxId,
+          start_date: startDate,
+          end_date: endDate,
+          status: (values.status || b.status || '').trim(),
+          total_amount: normalizedTotal,
+          fulfillment_method: nextFulfillmentChoice.id,
+          fulfillment_label: nextFulfillmentChoice.label,
+          fulfillment_note: nextFulfillmentChoice.note || '',
+          fulfillment_price_delta: Number.isFinite(nextFulfillmentChoice.priceDelta) ? nextFulfillmentChoice.priceDelta : 0
+        };
+
+        const originalFulfillment = this.getFulfillmentInfo(b);
+        const originalNormalized = {
+          customer_name: (b.customer_name || '').trim(),
+          customer_email: (b.customer_email || '').trim(),
+          customer_phone: (b.customer_phone || '').trim(),
+          box_id: Number(b.box_id),
+          start_date: (b.start_date || '').trim(),
+          end_date: (b.end_date || '').trim(),
+          status: (b.status || '').trim(),
+          total_amount: originalTotal,
+          fulfillment_method: originalFulfillment.method,
+          fulfillment_label: originalFulfillment.label,
+          fulfillment_note: originalFulfillment.note || '',
+          fulfillment_price_delta: originalFulfillment.priceDelta
+        };
+
+        const updatesToSend = {};
+        const markIfChanged = (key, nextValue, prevValue)=>{
+          if(key === 'total_amount'){
+            const nextFinite = Number.isFinite(nextValue);
+            const prevFinite = Number.isFinite(prevValue);
+            if(nextFinite && prevFinite && Math.abs(nextValue - prevValue) < 0.01) return;
+            if(!nextFinite && !prevFinite) return;
+          }else if(key === 'box_id'){
+            if(Number(nextValue) === Number(prevValue)) return;
+          }else{
+            if(nextValue === prevValue) return;
+          }
+          updatesToSend[key] = nextValue;
+        };
+
+        markIfChanged('customer_name', sanitized.customer_name, originalNormalized.customer_name);
+        markIfChanged('customer_email', sanitized.customer_email, originalNormalized.customer_email);
+        markIfChanged('customer_phone', sanitized.customer_phone, originalNormalized.customer_phone);
+        markIfChanged('box_id', sanitized.box_id, originalNormalized.box_id);
+        markIfChanged('start_date', sanitized.start_date, originalNormalized.start_date);
+        markIfChanged('end_date', sanitized.end_date, originalNormalized.end_date);
+        markIfChanged('status', sanitized.status, originalNormalized.status);
+        markIfChanged('total_amount', sanitized.total_amount, originalNormalized.total_amount);
+
+        const fulfillmentChanged = (
+          sanitized.fulfillment_method !== originalNormalized.fulfillment_method ||
+          sanitized.fulfillment_label !== originalNormalized.fulfillment_label ||
+          sanitized.fulfillment_note !== originalNormalized.fulfillment_note ||
+          Math.abs(sanitized.fulfillment_price_delta - originalNormalized.fulfillment_price_delta) > 0.01
+        );
+        if(fulfillmentChanged){
+          updatesToSend.fulfillment_method = sanitized.fulfillment_method;
+          updatesToSend.fulfillment_label = sanitized.fulfillment_label;
+          updatesToSend.fulfillment_note = sanitized.fulfillment_note;
+          updatesToSend.fulfillment_price_delta = sanitized.fulfillment_price_delta;
+        }
+
+        const hasUpdates = Object.keys(updatesToSend).length > 0;
+        const shouldSendEmail = values.send_email === '1' || values.send_email === 'on' || values.send_email === 'true';
+        const normalizedSubject = (values.subject || baseSubject).trim();
+        const normalizedMessage = (values.message || '').trim();
+
+        if(!hasUpdates && !shouldSendEmail){
+          MMBCore.Utils.showNotification('Keine Änderungen gespeichert');
+          return;
+        }
+
+        const bookingId = Number(id);
+        let updatesApplied = false;
+        if(hasUpdates){
+          const updatePayload = { id: bookingId };
+          Object.entries(updatesToSend).forEach(([key, value])=>{
+            if(key === 'box_id'){
+              updatePayload[key] = Number(value);
+            }else if(key === 'total_amount'){
+              const numeric = Number(value);
+              updatePayload[key] = Number.isFinite(numeric) ? Math.round(numeric * 100) / 100 : value;
+            }else if(key === 'fulfillment_price_delta'){
+              const numeric = Number(value);
+              updatePayload[key] = Number.isFinite(numeric) ? Math.round(numeric * 100) / 100 : 0;
+            }else{
+              updatePayload[key] = value;
+            }
           });
 
-          tbody.innerHTML = '';
-          rows.forEach((row) => tbody.appendChild(row));
-        }
-
-        function updateMeta(metaData, rowCount) {
-          const countEl = meta.querySelector('[data-meta="count"]');
-          const needsEl = meta.querySelector('[data-meta="needs"]');
-          const updatedEl = meta.querySelector('[data-meta="updated"]');
-
-          if (countEl) {
-            countEl.textContent = String(rowCount ?? metaData.count ?? 0);
-          }
-          if (needsEl) {
-            const value = metaData.requires_details ?? metaData.needs_attention ?? 0;
-            needsEl.textContent = String(value);
-          }
-          if (updatedEl) {
-            updatedEl.textContent = state.lastLoadedAt ? formatTimestamp(state.lastLoadedAt) : '–';
+          try {
+            await MMBApi.updateBooking(updatePayload);
+            updatesApplied = true;
+          } catch (err) {
+            console.error('updateBooking failed:', err);
+            const errorMessage = err && err.message ? err.message : 'Aktualisierung fehlgeschlagen';
+            MMBCore.Utils.showNotification(errorMessage, 'error');
+            return;
           }
         }
 
-        function selectBooking(id) {
-          state.selectedId = id !== null ? Number(id) : null;
-          if (tbody) {
-            Array.from(tbody.querySelectorAll('tr')).forEach((row) => {
-              row.classList.toggle('is-selected', String(row.dataset.bookingId) === String(state.selectedId));
+        let mailInfo = null;
+        let emailFailed = false;
+        let emailError = '';
+
+        if(shouldSendEmail){
+          const emailPayload = {
+            booking_id: bookingId,
+            send_email: 1,
+            subject: normalizedSubject,
+            message: normalizedMessage,
+          };
+          if(sanitized.status){
+            emailPayload.status = sanitized.status;
+          }
+
+          try {
+            const response = await MMBApi.updateBookingStatus(emailPayload);
+            mailInfo = response && response.mail ? response.mail : null;
+            if(mailInfo && mailInfo.sent === false){
+              emailFailed = true;
+              emailError = mailInfo.error ? ` (Fehler: ${mailInfo.error})` : '';
+            }
+          } catch (err) {
+            console.error('updateBookingStatus failed:', err);
+            emailFailed = true;
+            emailError = err && err.message ? ` (${err.message})` : '';
+          }
+        }
+
+        if(updatesApplied || shouldSendEmail){
+          await this.loadBookings();
+        }
+
+        if(shouldSendEmail){
+          if(emailFailed){
+            const base = updatesApplied ? 'Buchung aktualisiert (E-Mail konnte nicht gesendet werden)' : 'E-Mail konnte nicht gesendet werden';
+            MMBCore.Utils.showNotification(base + emailError, 'error');
+          }else{
+            const message = updatesApplied
+              ? 'Buchung aktualisiert & Kund*in informiert'
+              : 'E-Mail an Kund*in gesendet';
+            MMBCore.Utils.showNotification(message);
+          }
+        }else if(updatesApplied){
+          MMBCore.Utils.showNotification('Buchung aktualisiert');
+        }
+      }
+
+      // ---------- Modal & Utils ----------
+      openModal({ title, html, confirmText='OK', cancelText='Abbrechen', onMount=null }){
+        return new Promise((resolve)=>{
+          const modal = document.createElement('div');
+          modal.className = 'mmb-modal';
+          const cancelBtnHtml = cancelText ? `<button type="button" class="mmb-modal-btn mmb-modal-btn-secondary" data-cancel>${cancelText}</button>` : '';
+          const confirmBtnHtml = confirmText ? `<button type="submit" class="mmb-modal-btn mmb-modal-btn-primary">${confirmText}</button>` : '';
+          modal.innerHTML = `
+            <div class="mmb-modal-content" role="dialog" aria-modal="true">
+              <h3>${title}</h3>
+              <form id="mmb-modal-form">
+                ${html}
+                <div class="mmb-modal-actions">
+                  ${cancelBtnHtml}
+                  ${confirmBtnHtml}
+                </div>
+              </form>
+            </div>`;
+          document.body.appendChild(modal);
+
+          const form = modal.querySelector('#mmb-modal-form');
+          const cancelBtn = modal.querySelector('[data-cancel]');
+
+          if(typeof onMount==='function'){ try{ onMount(form, modal); }catch(e){} }
+
+          if(cancelBtn){ cancelBtn.addEventListener('click', ()=>{ modal.remove(); resolve(null); }); }
+          modal.addEventListener('click', (ev)=>{ if(ev.target===modal) { modal.remove(); resolve(null); }});
+          form.addEventListener('submit', (ev)=>{
+            ev.preventDefault();
+            const data = new FormData(form);
+            const values = {};
+            data.forEach((v,k)=>{
+              if(Object.prototype.hasOwnProperty.call(values,k)){
+                if(Array.isArray(values[k])) values[k].push(v);
+                else values[k] = [values[k], v];
+              }else{
+                values[k]=v;
+              }
             });
-          }
+            modal.remove();
+            resolve(values);
+          });
+        });
+      }
 
-          const booking = state.bookings.find((item) => String(item.id) === String(state.selectedId));
-          renderDetails(booking || null);
+      escape(s){ return (s??'').toString().replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+      translateStatus(s){ return ({pending:'Ausstehend',confirmed:'Bestätigt',rejected:'Abgelehnt',cancelled:'Storniert'})[s]||s; }
+
+      getFulfillmentChoice(id){ return FULFILLMENT_LOOKUP[id] || FULFILLMENT_CHOICES[0]; }
+      computeFulfillmentMeta(record, normalizedDetails){
+        const details = normalizedDetails && typeof normalizedDetails === 'object' ? normalizedDetails : {};
+        const fallbackMethod = (record.fulfillment_method ?? '').toString().toLowerCase();
+        const methodSource = details.method ?? fallbackMethod;
+        const method = (methodSource ?? '').toString().toLowerCase();
+        const choice = this.getFulfillmentChoice(method || fallbackMethod || 'pickup');
+        const label = details.label ?? record.fulfillment_label ?? choice.label;
+        const note = details.note ?? record.fulfillment_note ?? choice.note ?? '';
+        const priceCandidates = [details.price_delta, details.priceDelta, details.price, record.fulfillment_price_delta, choice.priceDelta];
+        const defaultPrice = Number(choice.priceDelta);
+        let priceDelta = Number.isFinite(defaultPrice) ? defaultPrice : 0;
+        for(const candidate of priceCandidates){
+          if(candidate === undefined || candidate === null) continue;
+          const num = Number(candidate);
+          if(Number.isFinite(num)){ priceDelta = num; break; }
         }
-
-        function renderDetails(item) {
-          if (!detailsBody || !detailsTitle || !detailsSubtitle || !detailsStatus) {
-            return;
-          }
-
-          if (!item) {
-            detailsTitle.textContent = 'Details';
-            detailsStatus.innerHTML = '';
-            detailsSubtitle.textContent = 'Bitte wähle eine Buchung aus, um alle Informationen zu sehen.';
-            detailsBody.innerHTML = '<div class="admin-details-empty">Keine Buchung ausgewählt.</div>';
-            return;
-          }
-
-          detailsTitle.textContent = `Buchung ${item.display_id || item.id}`;
-          detailsStatus.innerHTML = createStatusBadge(item.status);
-          detailsSubtitle.textContent = `Zeitraum: ${formatDate(item.start_date)} – ${formatDate(item.end_date)}`;
-
-          const sections = [];
-          sections.push(renderDefinitionSection('Buchung & Zeitraum', [
-            { label: 'Buchungs-ID', value: item.display_id || item.id },
-            { label: 'Status', value: formatStatusText(item.status) },
-            { label: 'Box', value: item.box_name || (item.box_id ? `Box #${item.box_id}` : '') },
-            { label: 'Start', value: formatDate(item.start_date) },
-            { label: 'Ende', value: formatDate(item.end_date) },
-            { label: 'Erstellt', value: formatTimestamp(item.created_at) },
-            { label: 'Letzte Änderung', value: formatTimestamp(item.updated_at) },
-          ]));
-
-          sections.push(renderDefinitionSection('Kunde', [
-            { label: 'Name', value: item.customer_name },
-            { label: 'E-Mail', value: item.customer_email },
-            { label: 'Telefon', value: item.customer_phone },
-          ]));
-
-          sections.push(renderPriceSection(item));
-
-          sections.push(renderFulfillmentSection(item));
-
-          sections.push(renderContactSection(item));
-
-          const noteSection = renderNoteSection(item);
-          if (noteSection) {
-            sections.push(noteSection);
-          }
-
-          detailsBody.innerHTML = sections.map((section) => section).join('');
+        const addsToTotalCandidate = details.adds_to_total ?? details.addsToTotal ?? record.fulfillment_adds_to_total;
+        const addsToTotal = typeof addsToTotalCandidate === 'boolean' ? addsToTotalCandidate : (choice.addsToTotal ?? true);
+        return {
+          method: method || choice.id,
+          label: label || choice.label,
+          note,
+          priceDelta,
+          addsToTotal
+        };
+      }
+      getFulfillmentInfo(b){
+        const details = b.fulfillment_details && typeof b.fulfillment_details === 'object' ? b.fulfillment_details : {};
+        const rawMethod = details.method ?? b.fulfillment_method;
+        const raw = (rawMethod || '').toString().toLowerCase();
+        const choice = this.getFulfillmentChoice(raw);
+        const label = details.label ?? b.fulfillment_label ?? choice.label;
+        const note = details.note ?? b.fulfillment_note ?? choice.note ?? '';
+        const priceCandidates = [details.price_delta, details.priceDelta, details.price, b.fulfillment_price_delta, choice.priceDelta];
+        const defaultPrice = Number(choice.priceDelta);
+        let price = Number.isFinite(defaultPrice) ? defaultPrice : 0;
+        for(const candidate of priceCandidates){
+          if(candidate === undefined || candidate === null) continue;
+          const num = Number(candidate);
+          if(Number.isFinite(num)){ price = num; break; }
         }
+        const addsToTotalCandidate = details.adds_to_total ?? details.addsToTotal ?? b.fulfillment_adds_to_total;
+        const addsToTotal = typeof addsToTotalCandidate === 'boolean' ? addsToTotalCandidate : (choice.addsToTotal ?? true);
+        const full = details.full ?? choice.full;
+        return {
+          method: raw || choice.id,
+          label: label || choice.label,
+          full,
+          note,
+          priceDelta: Number.isFinite(price) ? price : choice.priceDelta,
+          addsToTotal
+        };
+      }
+      formatFulfillmentCell(b){
+        const info = this.getFulfillmentInfo(b);
+        return info.label || info.full || '–';
+      }
+      formatEuro(amount){
+        const num = Number(amount||0);
+        const safe = Number.isFinite(num) ? num : 0;
+        return safe.toLocaleString('de-DE', {minimumFractionDigits:0, maximumFractionDigits:0}) + '€';
+      }
+      fulfillmentEmailLine(b){
+        const info = this.getFulfillmentInfo(b);
+        if(info.method==='pickup'){
+          return info.priceDelta>0 ? `${info.full} +${this.formatEuro(info.priceDelta)}` : `${info.full} (gratis)`;
+        }
+        if(info.method==='shipping'){
+          return `${info.full} +${this.formatEuro(info.priceDelta)}`;
+        }
+        return info.note ? `${info.full} (${info.note})` : info.full;
+      }
 
-        function renderDefinitionSection(title, rows) {
-          const normalized = Array.isArray(rows) ? rows : [];
-          const content = normalized.map((row) => {
-            const value = row && row.value !== undefined && row.value !== null && row.value !== ''
-              ? escapeHtml(String(row.value)).replace(/\n/g, '<br/>')
-              : '<span class="muted">–</span>';
-            return `
-              <div class="detail-item">
-                <dt>${escapeHtml(row.label || '')}</dt>
-                <dd>${value}</dd>
+      async viewDetails(id){
+        const booking = this.state.originalBookings.find(x=>String(x.id)===String(id));
+        if(!booking) return;
+        this.openDetailOverlay(booking);
+      }
+
+      async editBooking(id){
+        await this.viewDetails(id);
+      }
+
+      openDetailOverlay(booking){
+        const overlay = document.createElement('div');
+        overlay.className = 'mmb-detail-overlay';
+        overlay.innerHTML = `<div class="mmb-detail-panel"><div class="mmb-detail-header"><div><h2 class="mmb-detail-title">Buchung ${this.escape(displayId(booking.id))}</h2></div><button type="button" class="mmb-detail-close" data-close>×</button></div><div class="mmb-detail-body"><p>Detailansicht wird geladen…</p></div></div>`;
+        document.body.appendChild(overlay);
+        document.body.classList.add('mmb-detail-open');
+        const close = ()=>{
+          if(overlay.parentNode){ overlay.remove(); }
+          document.body.classList.remove('mmb-detail-open');
+          document.removeEventListener('keydown', escHandler);
+        };
+        const escHandler = (event)=>{ if(event.key==='Escape'){ close(); } };
+        document.addEventListener('keydown', escHandler);
+        overlay.addEventListener('click',(event)=>{ if(event.target===overlay) close(); });
+        overlay.querySelectorAll('[data-close]').forEach(btn=>btn.addEventListener('click', close));
+        // Vollständige Detailansicht wird im weiteren Verlauf aufgebaut
+        this.renderDetailOverlay(booking, overlay, close);
+      }
+
+      renderDetailOverlay(booking, overlay, closeOverlay){
+        const statusLabel = this.translateStatus(booking.status || 'pending');
+        const createdLabel = this.formatDateTimeLabel(booking.created_at);
+        const rangeLabel = this.formatBookingRangeLabel(booking.start_date, booking.end_date);
+        const boxOptions = this.getBoxOptionsForDetail(booking);
+        const boxOptionsHtml = boxOptions.map(box=>`<option value="${this.escape(box.id)}" ${box.id===String(booking.box_id)?'selected':''}>${this.escape(box.name)}</option>`).join('');
+        const currentFulfillmentMethod = (booking.fulfillment_method || 'pickup').toString();
+        const fulfillmentChoice = this.getFulfillmentChoice(currentFulfillmentMethod);
+        const fulfillmentOptionsHtml = FULFILLMENT_CHOICES.map(opt=>`<option value="${opt.id}" ${opt.id===currentFulfillmentMethod?'selected':''}>${this.escape(opt.label)}</option>`).join('');
+        const pricing = this.normalizePricingDetails(booking.pricing_details);
+        const fulfillmentDetails = this.normalizeFulfillmentDetails(booking.fulfillment_details, currentFulfillmentMethod) || {};
+        const depositValue = Number.isFinite(booking.deposit_eur) ? booking.deposit_eur : (Number(pricing?.deposit) || 0);
+        const totalValue = Number.isFinite(booking.price_total) ? booking.price_total : (Number(pricing?.total) || 0);
+        const baseTotalValue = Number.isFinite(pricing?.base_total) ? pricing.base_total : totalValue;
+        const originalValue = Number.isFinite(pricing?.original) ? pricing.original : baseTotalValue;
+        const shippingDeltaValue = Number.isFinite(pricing?.shipping_delta) ? pricing.shipping_delta : (Number.isFinite(fulfillmentChoice.priceDelta) ? fulfillmentChoice.priceDelta : 0);
+        const discountAmountValue = Number.isFinite(pricing?.discount_amount) ? pricing.discount_amount : 0;
+        const discountPercentExactValue = Number.isFinite(pricing?.discount_percent_exact) ? pricing.discount_percent_exact : 0;
+        const discountPercentDisplayValue = pricing?.discount_percent_display || (discountPercentExactValue ? String(discountPercentExactValue) : '');
+        const avgPerDayValue = Number.isFinite(pricing?.avg_per_day) ? pricing.avg_per_day : null;
+        const daysValue = Number.isFinite(pricing?.days) ? pricing.days : null;
+        const baseSubject = `Deine Buchung wurde aktualisiert 👷🏽 – Buchungs-ID: ${displayId(booking.id)}`;
+        const baseMessage = this.tplEditInfo(booking);
+        const shippingAllowPhone = fulfillmentDetails.allow_contact_phone !== false;
+        const shippingAllowWhatsApp = fulfillmentDetails.allow_contact_whatsapp === true || (fulfillmentDetails.contact_preferences && fulfillmentDetails.contact_preferences.whatsapp === true);
+        const preferredTimes = ['', '11:00','11:30','12:00','12:30','13:00','13:30','14:00','14:30','15:00','15:30','16:00'];
+        const existingPreferred = (fulfillmentDetails.preferred_time || '').trim();
+        if(existingPreferred && !preferredTimes.includes(existingPreferred)){
+          preferredTimes.push(existingPreferred);
+        }
+        const preferredOptionsHtml = preferredTimes.map(time=>{
+          const label = time ? `${time} Uhr` : 'Bitte auswählen';
+          const isSelected = time === (fulfillmentDetails.preferred_time || '');
+          return `<option value="${time}" ${isSelected?'selected':''}>${this.escape(label)}</option>`;
+        }).join('');
+        const showExtended = currentFulfillmentMethod === 'shipping' || currentFulfillmentMethod === 'delivery';
+
+        overlay.innerHTML = `
+          <div class="mmb-detail-panel" role="dialog" aria-modal="true">
+            <div class="mmb-detail-header">
+              <div>
+                <h2 class="mmb-detail-title">Buchung ${this.escape(displayId(booking.id))}</h2>
+                <p class="mmb-detail-sub">${this.escape(createdLabel)}</p>
               </div>
-            `;
-          }).join('');
-
-          return `
-            <section class="detail-section">
-              <h3>${escapeHtml(title)}</h3>
-              <div class="detail-grid">
-                ${content}
+              <div class="mmb-detail-meta">
+                <span class="mmb-chip">${this.escape(statusLabel)}</span>
+                <span class="mmb-chip">${this.escape(booking.box_name)}</span>
+                <span class="mmb-chip">${this.escape(rangeLabel)}</span>
               </div>
-            </section>
-          `;
+              <button type="button" class="mmb-detail-close" data-close aria-label="Detailansicht schließen">×</button>
+            </div>
+            <form class="mmb-detail-body" autocomplete="off">
+              <div class="mmb-detail-section">
+                <h3>Allgemein</h3>
+                <div class="mmb-detail-grid">
+                  <div class="mmb-detail-field">
+                    <label>Status</label>
+                    <select name="status">
+                      ${['pending','confirmed','rejected','cancelled'].map(st=>`<option value="${st}" ${st===(booking.status||'')?'selected':''}>${this.escape(this.translateStatus(st))}</option>`).join('')}
+                    </select>
+                  </div>
+                  <div class="mmb-detail-field">
+                    <label>Box</label>
+                    <select name="box_id">${boxOptionsHtml}</select>
+                  </div>
+                  <div class="mmb-detail-field">
+                    <label>Startdatum</label>
+                    <input name="start_date" type="date" value="${this.escape(booking.start_date||'')}">
+                  </div>
+                  <div class="mmb-detail-field">
+                    <label>Enddatum</label>
+                    <input name="end_date" type="date" value="${this.escape(booking.end_date||'')}">
+                  </div>
+                  <div class="mmb-detail-field">
+                    <label>Erstellt am</label>
+                    <input value="${this.escape(createdLabel)}" readonly disabled>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mmb-detail-section">
+                <h3>Kontakt</h3>
+                <div class="mmb-detail-grid">
+                  <div class="mmb-detail-field">
+                    <label>Name</label>
+                    <input name="customer_name" value="${this.escape(booking.customer_name||'')}">
+                  </div>
+                  <div class="mmb-detail-field">
+                    <label>E-Mail</label>
+                    <input name="customer_email" type="email" value="${this.escape(booking.customer_email||'')}">
+                  </div>
+                  <div class="mmb-detail-field">
+                    <label>Telefon</label>
+                    <input name="customer_phone" value="${this.escape(booking.customer_phone||'')}">
+                  </div>
+                </div>
+              </div>
+
+              <div class="mmb-detail-section">
+                <h3>Abwicklung</h3>
+                <div class="mmb-detail-grid">
+                  <div class="mmb-detail-field">
+                    <label>Art</label>
+                    <select name="fulfillment_method">${fulfillmentOptionsHtml}</select>
+                    <span class="mmb-detail-note" data-fulfillment-hint>${this.escape(fulfillmentChoice.note || 'Keine zusätzlichen Hinweise')}</span>
+                  </div>
+                  <div class="mmb-detail-field">
+                    <label>Interne Notiz</label>
+                    <textarea name="fulfillment_note">${this.escape(booking.fulfillment_note || '')}</textarea>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mmb-detail-section" data-fulfillment-section="extended" ${showExtended?'':'hidden'}>
+                <h3>Kontakt für Abwicklung</h3>
+                <div class="mmb-detail-grid">
+                  <div class="mmb-detail-field">
+                    <label>Ansprechpartner*in</label>
+                    <input name="fulfillment_contact_name" value="${this.escape(fulfillmentDetails.contact_name || booking.customer_name || '')}">
+                  </div>
+                  <div class="mmb-detail-field">
+                    <label>E-Mail</label>
+                    <input name="fulfillment_contact_email" type="email" value="${this.escape(fulfillmentDetails.contact_email || booking.customer_email || '')}">
+                  </div>
+                  <div class="mmb-detail-field">
+                    <label>Telefon</label>
+                    <input name="fulfillment_contact_phone" value="${this.escape(fulfillmentDetails.contact_phone || booking.customer_phone || '')}">
+                  </div>
+                </div>
+                <div class="mmb-detail-grid">
+                  <div class="mmb-detail-field">
+                    <label>Kontaktoptionen</label>
+                    <label class="mmb-detail-checkbox"><input type="checkbox" name="fulfillment_pref_phone" value="1" ${shippingAllowPhone?'checked':''}> Telefon erlaubt</label>
+                    <label class="mmb-detail-checkbox"><input type="checkbox" name="fulfillment_pref_whatsapp" value="1" ${shippingAllowWhatsApp?'checked':''}> WhatsApp erlaubt</label>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mmb-detail-section" data-fulfillment-section="shipping" ${currentFulfillmentMethod==='shipping'?'':'hidden'}>
+                <h3>Versandadresse</h3>
+                <div class="mmb-detail-grid">
+                  <div class="mmb-detail-field">
+                    <label>Straße &amp; Hausnummer</label>
+                    <input name="shipping_address_line1" value="${this.escape(fulfillmentDetails.address_line1 || '')}">
+                  </div>
+                  <div class="mmb-detail-field">
+                    <label>PLZ</label>
+                    <input name="shipping_postal_code" value="${this.escape(fulfillmentDetails.postal_code || '')}">
+                  </div>
+                  <div class="mmb-detail-field">
+                    <label>Ort</label>
+                    <input name="shipping_city" value="${this.escape(fulfillmentDetails.city || '')}">
+                  </div>
+                  <div class="mmb-detail-field">
+                    <label>Adresszusatz</label>
+                    <input name="shipping_address_extra" value="${this.escape(fulfillmentDetails.address_extra || '')}">
+                  </div>
+                </div>
+              </div>
+
+              <div class="mmb-detail-section" data-fulfillment-section="delivery" ${currentFulfillmentMethod==='delivery'?'':'hidden'}>
+                <h3>Lieferdetails</h3>
+                <div class="mmb-detail-grid">
+                  <div class="mmb-detail-field">
+                    <label>Treffpunkt oder Adresse</label>
+                    <textarea name="delivery_meeting_point">${this.escape(fulfillmentDetails.meeting_point || '')}</textarea>
+                  </div>
+                  <div class="mmb-detail-field">
+                    <label>Bevorzugte Uhrzeit</label>
+                    <select name="delivery_preferred_time">${preferredOptionsHtml}</select>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mmb-detail-section">
+                <h3>Rechnungsübersicht</h3>
+                <div class="mmb-detail-grid">
+                  <div class="mmb-detail-field">
+                    <label>Grundpreis</label>
+                    <input name="pricing_original" value="${this.escape(this.formatNumberInput(originalValue))}">
+                  </div>
+                  <div class="mmb-detail-field">
+                    <label>Zwischensumme</label>
+                    <input name="pricing_base_total" value="${this.escape(this.formatNumberInput(baseTotalValue))}">
+                  </div>
+                  <div class="mmb-detail-field">
+                    <label>Gesamtpreis</label>
+                    <input name="total_amount" value="${this.escape(this.formatNumberInput(totalValue))}">
+                  </div>
+                  <div class="mmb-detail-field">
+                    <label>Kaution</label>
+                    <input name="deposit_eur" value="${this.escape(this.formatNumberInput(depositValue))}">
+                  </div>
+                </div>
+                <div class="mmb-detail-grid">
+                  <div class="mmb-detail-field">
+                    <label>Rabatt (%)</label>
+                    <input name="pricing_discount_percent_exact" value="${this.escape(this.formatNumberInput(discountPercentExactValue))}">
+                  </div>
+                  <div class="mmb-detail-field">
+                    <label>Rabatt (Anzeige)</label>
+                    <input name="pricing_discount_percent_display" value="${this.escape(discountPercentDisplayValue)}">
+                  </div>
+                  <div class="mmb-detail-field">
+                    <label>Rabatt (Betrag)</label>
+                    <input name="pricing_discount_amount" value="${this.escape(this.formatNumberInput(discountAmountValue))}">
+                  </div>
+                  <div class="mmb-detail-field">
+                    <label>Versand/Lieferaufschlag</label>
+                    <input name="pricing_shipping_delta" value="${this.escape(this.formatNumberInput(shippingDeltaValue))}">
+                  </div>
+                  <div class="mmb-detail-field">
+                    <label>Ø Preis pro Tag</label>
+                    <input name="pricing_avg_per_day" value="${this.escape(this.formatNumberInput(avgPerDayValue))}">
+                  </div>
+                  <div class="mmb-detail-field">
+                    <label>Anzahl Tage</label>
+                    <input name="pricing_days" value="${this.escape(this.formatIntegerInput(daysValue))}">
+                  </div>
+                </div>
+                <div class="mmb-detail-note">Alle Beträge verstehen sich in Euro.</div>
+              </div>
+
+              <div class="mmb-detail-section">
+                <h3>Anmerkungen</h3>
+                <div class="mmb-detail-field">
+                  <label>Interne Notizen</label>
+                  <textarea name="note">${this.escape(booking.note || '')}</textarea>
+                </div>
+              </div>
+
+              <div class="mmb-detail-section">
+                <h3>E-Mail an Kund*in</h3>
+                <label class="mmb-detail-checkbox"><input type="checkbox" name="send_email" value="1" checked> Kund*in nach dem Speichern informieren</label>
+                <div class="mmb-detail-grid" data-email-field>
+                  <div class="mmb-detail-field">
+                    <label>Betreff</label>
+                    <input name="subject" value="${this.escape(baseSubject)}">
+                  </div>
+                  <div class="mmb-detail-field">
+                    <label>Nachricht</label>
+                    <textarea name="message">${this.escape(baseMessage)}</textarea>
+                  </div>
+                </div>
+                <div class="mmb-detail-note">Nur kundenrelevante Felder werden in der E-Mail angezeigt.</div>
+              </div>
+
+              <div class="mmb-detail-footer">
+                <button type="button" class="mmb-btn mmb-btn-secondary" data-close>Schließen</button>
+                <div class="mmb-detail-actions">
+                  <button type="button" class="mmb-btn mmb-btn-warning" data-action="offerAlternative">Alternative</button>
+                  <button type="button" class="mmb-btn mmb-btn-danger" data-action="declineBooking">Ablehnen</button>
+                  <button type="button" class="mmb-btn mmb-btn-success" data-action="confirmBooking">Bestätigen</button>
+                  <button type="button" class="mmb-btn mmb-btn-danger-light" data-action="deleteBooking">Löschen</button>
+                  <button type="submit" class="mmb-btn">Speichern</button>
+                </div>
+              </div>
+            </form>
+          </div>
+        `;
+
+        const form = overlay.querySelector('form');
+        if(!form) return;
+
+        overlay.querySelectorAll('[data-close]').forEach(btn=>btn.addEventListener('click', closeOverlay));
+
+        const idString = String(booking.id);
+        ['confirmBooking','declineBooking','offerAlternative'].forEach(action=>{
+          const btn = overlay.querySelector(`[data-action="${action}"]`);
+          if(!btn) return;
+          btn.addEventListener('click', async ()=>{
+            closeOverlay();
+            if(action==='confirmBooking') await this.confirmBooking(idString);
+            if(action==='declineBooking') await this.declineBooking(idString);
+            if(action==='offerAlternative') await this.offerAlternative(idString);
+          });
+        });
+
+        const deleteBtn = overlay.querySelector('[data-action="deleteBooking"]');
+        if(deleteBtn){
+          deleteBtn.addEventListener('click', async ()=>{
+            const confirmation = await this.openModal({
+              title:'Buchung löschen',
+              html:'<p>Möchtest du diese Buchung dauerhaft entfernen? Diese Aktion kann nicht rückgängig gemacht werden.</p>',
+              confirmText:'Ja, löschen',
+              cancelText:'Abbrechen'
+            });
+            if(confirmation === null) return;
+            const originalLabel = deleteBtn.textContent;
+            deleteBtn.textContent = 'Löschen…';
+            deleteBtn.disabled = true;
+            try{
+              await MMBApi.deleteBooking({ id: idString });
+              closeOverlay();
+              await this.loadBookings();
+              MMBCore.Utils.showNotification('Buchung gelöscht');
+            }catch(err){
+              console.error('deleteBooking failed:', err);
+              const msg = err && err.message ? ` (${err.message})` : '';
+              MMBCore.Utils.showNotification('Buchung konnte nicht gelöscht werden'+msg, 'error');
+            }finally{
+              if(deleteBtn.isConnected){
+                deleteBtn.disabled = false;
+                deleteBtn.textContent = originalLabel;
+              }
+            }
+          });
         }
 
-        function renderPriceSection(item) {
-          const pricing = extractPricing(item);
-          const rows = pricing.rows.map((row) => `
-            <tr>
-              <td>${escapeHtml(row.label)}</td>
-              <td>${escapeHtml(formatCurrency(row.amount))}</td>
-            </tr>
-          `).join('');
+        const fulfillmentSelect = form.querySelector('select[name="fulfillment_method"]');
+        const hintEl = form.querySelector('[data-fulfillment-hint]');
+        const detailSections = form.querySelectorAll('[data-fulfillment-section]');
+        const updateFulfillmentUI = ()=>{
+          if(!fulfillmentSelect) return;
+          const method = fulfillmentSelect.value;
+          detailSections.forEach(section=>{
+            const target = section.dataset.fulfillmentSection;
+            if(target==='extended'){
+              section.hidden = !(method==='shipping' || method==='delivery');
+            }else{
+              section.hidden = target !== method;
+            }
+          });
+          if(hintEl){
+            const choice = this.getFulfillmentChoice(method);
+            hintEl.textContent = choice.note || 'Keine zusätzlichen Hinweise';
+          }
+        };
+        updateFulfillmentUI();
+        if(fulfillmentSelect){ fulfillmentSelect.addEventListener('change', updateFulfillmentUI); }
 
-          const depositRow = pricing.deposit !== null
-            ? `<tr><td>Kaution</td><td>${escapeHtml(formatCurrency(pricing.deposit))}</td></tr>`
-            : '';
+        const subjectInput = form.querySelector('input[name="subject"]');
+        const messageInput = form.querySelector('textarea[name="message"]');
+        const sendSwitch = form.querySelector('input[name="send_email"]');
+        const watchFields = ['customer_name','customer_email','customer_phone','box_id','start_date','end_date','status','total_amount','fulfillment_method'];
+        let subjectDirty = false;
+        let messageDirty = false;
 
-          const otherRows = rows + depositRow || '<tr><td colspan="2" class="muted">Keine Preisdetails vorhanden.</td></tr>';
+        const collectCurrentValues = ()=>{
+          const data={};
+          watchFields.forEach(name=>{
+            const field=form.querySelector(`[name="${name}"]`);
+            if(!field) return;
+            data[name] = field.value;
+          });
+          return data;
+        };
 
-          const totalCell = pricing.total !== null
-            ? formatCurrency(pricing.total)
-            : '–';
+        const buildBookingForEmail = (vals)=>{
+          const boxId = String(vals.box_id ?? booking.box_id ?? '');
+          const fulfillmentChoiceLocal = this.getFulfillmentChoice((vals.fulfillment_method ?? booking.fulfillment_method ?? 'pickup').toString());
+          const parsedAmount = this.parseAmount(vals.total_amount ?? booking.price_total);
+          return {
+            ...booking,
+            customer_name: vals.customer_name ?? booking.customer_name,
+            customer_email: vals.customer_email ?? booking.customer_email,
+            customer_phone: vals.customer_phone ?? booking.customer_phone,
+            box_id: boxId,
+            box_name: BOX_MAP[boxId] || BOX_MAP[String(booking.box_id)] || booking.box_name,
+            start_date: vals.start_date ?? booking.start_date,
+            end_date: vals.end_date ?? booking.end_date,
+            status: vals.status ?? booking.status,
+            price_total: Number.isFinite(parsedAmount) ? parsedAmount : booking.price_total,
+            fulfillment_method: fulfillmentChoiceLocal.id,
+            fulfillment_label: fulfillmentChoiceLocal.label,
+            fulfillment_note: fulfillmentChoiceLocal.note,
+            fulfillment_price_delta: fulfillmentChoiceLocal.priceDelta
+          };
+        };
 
-          return `
-            <section class="detail-section">
-              <h3>Rechnung</h3>
-              <table class="detail-price-table">
-                <tbody>
-                  ${otherRows}
-                </tbody>
-                <tfoot>
-                  <tr>
-                    <td>Gesamtsumme</td>
-                    <td>${escapeHtml(totalCell)}</td>
-                  </tr>
-                </tfoot>
-              </table>
-            </section>
-          `;
+        const syncEmailFields = (force=false)=>{
+          if(!subjectInput || !messageInput) return;
+          const current = buildBookingForEmail(collectCurrentValues());
+          if(force || !subjectDirty){
+            subjectInput.value = baseSubject;
+          }
+          if(force || !messageDirty){
+            messageInput.value = this.tplEditInfo(current);
+          }
+        };
+
+        if(subjectInput){ subjectInput.addEventListener('input', ()=>{ subjectDirty = subjectInput.value !== baseSubject; }); }
+        if(messageInput){ messageInput.addEventListener('input', ()=>{ messageDirty = true; }); }
+
+        watchFields.forEach(name=>{
+          const field=form.querySelector(`[name="${name}"]`);
+          if(!field) return;
+          const evt = field.tagName === 'SELECT' ? 'change' : 'input';
+          field.addEventListener(evt, ()=> syncEmailFields());
+        });
+
+        const applyEmailToggleState = ()=>{
+          if(!subjectInput || !messageInput || !sendSwitch) return;
+          const enabled = !!sendSwitch.checked;
+          subjectInput.disabled = !enabled;
+          messageInput.disabled = !enabled;
+          form.classList.toggle('mmb-email-disabled', !enabled);
+        };
+
+        if(sendSwitch){
+          applyEmailToggleState();
+          sendSwitch.addEventListener('change', ()=>{
+            applyEmailToggleState();
+            if(sendSwitch.checked){ syncEmailFields(); }
+          });
         }
 
-        function extractPricing(item) {
-          const result = {
-            rows: [],
-            deposit: null,
-            total: null,
+        syncEmailFields(true);
+
+        form.addEventListener('submit', async (event)=>{
+          event.preventDefault();
+          await this.handleDetailSubmit(form, booking, closeOverlay, { baseSubject });
+        });
+      }
+
+      async handleDetailSubmit(form, booking, closeOverlay, meta={}){
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const originalLabel = submitBtn ? submitBtn.textContent : '';
+        if(submitBtn){ submitBtn.disabled = true; submitBtn.textContent = 'Speichern…'; }
+        try{
+          const getField = (name)=>form.querySelector(`[name="${name}"]`);
+          const getValue = (name)=>{
+            const el = getField(name);
+            if(!el) return '';
+            if(el.type === 'checkbox') return el.checked;
+            return el.value ?? '';
           };
 
-          const numberKeys = [
-            ['price_base', 'Grundpreis'],
-            ['base_price', 'Grundpreis'],
-            ['price_weekend', 'Wochenendzuschlag'],
-            ['price_extension', 'Verlängerung'],
-            ['price_delivery', 'Lieferung'],
-            ['price_services', 'Service'],
-            ['price_extra', 'Zusatzkosten'],
-            ['price_additional', 'Zusatzkosten'],
-            ['price_discount', 'Rabatt'],
-          ];
+          const nextBoxIdRaw = getValue('box_id') || booking.box_id;
+          const nextBoxIdNum = Number(nextBoxIdRaw);
+          const finalBoxId = Number.isFinite(nextBoxIdNum) && nextBoxIdNum > 0 ? nextBoxIdNum : Number(booking.box_id);
 
-          const seen = new Set();
-          numberKeys.forEach(([key, label]) => {
-            if (key in item && isNumeric(item[key])) {
-              seen.add(key);
-              const amount = Number(item[key]);
-              if (amount !== 0 || key === 'price_base' || key === 'base_price') {
-                result.rows.push({ label, amount });
-              }
+          const totalParsed = this.parseAmount(getValue('total_amount'));
+          const normalizedTotal = Number.isFinite(totalParsed)
+            ? this.roundCurrency(totalParsed)
+            : (Number.isFinite(booking.price_total) ? this.roundCurrency(booking.price_total) : 0);
+
+          const depositParsed = this.parseAmount(getValue('deposit_eur'));
+          const normalizedDeposit = Number.isFinite(depositParsed)
+            ? this.roundCurrency(depositParsed)
+            : (Number.isFinite(booking.deposit_eur) ? this.roundCurrency(booking.deposit_eur) : 0);
+
+          const startDate = (getValue('start_date') || booking.start_date || '').trim();
+          const endDate = (getValue('end_date') || booking.end_date || '').trim();
+          const statusValue = (getValue('status') || booking.status || '').trim();
+
+          const nextFulfillmentMethod = (getValue('fulfillment_method') || booking.fulfillment_method || 'pickup').toString();
+          const nextFulfillmentChoice = this.getFulfillmentChoice(nextFulfillmentMethod);
+          const fulfillmentNoteValue = (getValue('fulfillment_note') || booking.fulfillment_note || '').trim();
+          const shippingDeltaParsed = this.parseAmount(getValue('pricing_shipping_delta'));
+          const fulfillmentPriceDelta = Number.isFinite(shippingDeltaParsed)
+            ? this.roundCurrency(shippingDeltaParsed)
+            : (Number.isFinite(nextFulfillmentChoice.priceDelta) ? this.roundCurrency(nextFulfillmentChoice.priceDelta) : 0);
+
+          const sanitized = {
+            customer_name: (getValue('customer_name') || booking.customer_name || '').trim(),
+            customer_email: (getValue('customer_email') || booking.customer_email || '').trim(),
+            customer_phone: (getValue('customer_phone') || booking.customer_phone || '').trim(),
+            box_id: finalBoxId,
+            start_date: startDate,
+            end_date: endDate,
+            status: statusValue,
+            total_amount: normalizedTotal,
+            fulfillment_method: nextFulfillmentChoice.id,
+            fulfillment_label: nextFulfillmentChoice.label,
+            fulfillment_note: fulfillmentNoteValue,
+            fulfillment_price_delta: fulfillmentPriceDelta,
+            note: (getValue('note') || booking.note || '').trim(),
+            deposit_eur: normalizedDeposit
+          };
+
+          const originalFulfillment = this.getFulfillmentInfo(booking);
+          const originalNormalized = {
+            customer_name: (booking.customer_name || '').trim(),
+            customer_email: (booking.customer_email || '').trim(),
+            customer_phone: (booking.customer_phone || '').trim(),
+            box_id: Number(booking.box_id),
+            start_date: (booking.start_date || '').trim(),
+            end_date: (booking.end_date || '').trim(),
+            status: (booking.status || '').trim(),
+            total_amount: Number.isFinite(booking.price_total) ? this.roundCurrency(booking.price_total) : 0,
+            fulfillment_method: originalFulfillment.method,
+            fulfillment_label: originalFulfillment.label,
+            fulfillment_note: originalFulfillment.note || '',
+            fulfillment_price_delta: this.roundCurrency(originalFulfillment.priceDelta || 0),
+            note: (booking.note || '').trim(),
+            deposit_eur: Number.isFinite(booking.deposit_eur) ? this.roundCurrency(booking.deposit_eur) : 0
+          };
+
+          const updatesToSend = {};
+          const markIfChanged = (key, nextValue, prevValue)=>{
+            if(key==='total_amount' || key==='deposit_eur' || key==='fulfillment_price_delta'){
+              const nextFinite = Number.isFinite(nextValue);
+              const prevFinite = Number.isFinite(prevValue);
+              if(nextFinite && prevFinite && Math.abs(nextValue - prevValue) < 0.01) return;
+              if(!nextFinite && !prevFinite) return;
+            }else if(key==='box_id'){
+              if(Number(nextValue) === Number(prevValue)) return;
+            }else{
+              if(nextValue === prevValue) return;
             }
-          });
+            updatesToSend[key] = nextValue;
+          };
 
-          if (!seen.has('price_base') && !seen.has('base_price')) {
-            const total = isNumeric(item.total_amount) ? Number(item.total_amount) : null;
-            const fulfillment = isNumeric(item.fulfillment_price_delta) ? Number(item.fulfillment_price_delta) : 0;
-            if (total !== null) {
-              const base = total - fulfillment;
-              if (!Number.isNaN(base) && base !== 0) {
-                result.rows.unshift({ label: 'Grundpreis', amount: base });
+          markIfChanged('customer_name', sanitized.customer_name, originalNormalized.customer_name);
+          markIfChanged('customer_email', sanitized.customer_email, originalNormalized.customer_email);
+          markIfChanged('customer_phone', sanitized.customer_phone, originalNormalized.customer_phone);
+          markIfChanged('box_id', sanitized.box_id, originalNormalized.box_id);
+          markIfChanged('start_date', sanitized.start_date, originalNormalized.start_date);
+          markIfChanged('end_date', sanitized.end_date, originalNormalized.end_date);
+          markIfChanged('status', sanitized.status, originalNormalized.status);
+          markIfChanged('total_amount', sanitized.total_amount, originalNormalized.total_amount);
+          markIfChanged('note', sanitized.note, originalNormalized.note);
+          markIfChanged('deposit_eur', sanitized.deposit_eur, originalNormalized.deposit_eur);
+
+          const fulfillmentChanged = (
+            sanitized.fulfillment_method !== originalNormalized.fulfillment_method ||
+            sanitized.fulfillment_label !== originalNormalized.fulfillment_label ||
+            sanitized.fulfillment_note !== originalNormalized.fulfillment_note ||
+            Math.abs(sanitized.fulfillment_price_delta - originalNormalized.fulfillment_price_delta) > 0.01
+          );
+          if(fulfillmentChanged){
+            updatesToSend.fulfillment_method = sanitized.fulfillment_method;
+            updatesToSend.fulfillment_label = sanitized.fulfillment_label;
+            updatesToSend.fulfillment_note = sanitized.fulfillment_note;
+            updatesToSend.fulfillment_price_delta = sanitized.fulfillment_price_delta;
+          }
+
+          const pricingPayload = this.buildPricingDetailsPayload(form, booking, sanitized, nextFulfillmentChoice);
+          const pricingCanonical = this.stableStringify(pricingPayload || {});
+          const originalPricingCanonical = booking.pricing_details_canonical || this.stableStringify({});
+          if(pricingCanonical !== originalPricingCanonical){
+            updatesToSend.pricing_details_json = pricingPayload && Object.keys(pricingPayload).length ? pricingPayload : null;
+          }
+
+          const fulfillmentDetailsPayload = this.buildFulfillmentDetailsPayload(form, nextFulfillmentChoice.id, booking.fulfillment_details);
+          const nextFulfillmentCanonical = this.stableStringify(fulfillmentDetailsPayload || {});
+          const originalFulfillmentCanonical = booking.fulfillment_details_canonical || this.stableStringify({});
+          if(nextFulfillmentCanonical !== originalFulfillmentCanonical){
+            updatesToSend.fulfillment_details_json = fulfillmentDetailsPayload && Object.keys(fulfillmentDetailsPayload).length ? fulfillmentDetailsPayload : null;
+          }
+
+          const hasUpdates = Object.keys(updatesToSend).length > 0;
+          const sendSwitch = getField('send_email');
+          const shouldSendEmail = !!(sendSwitch && sendSwitch.checked);
+          const subjectValue = (getValue('subject') || '').trim();
+          const messageValue = (getValue('message') || '').trim();
+
+          if(!hasUpdates && !shouldSendEmail){
+            MMBCore.Utils.showNotification('Keine Änderungen gespeichert');
+            return;
+          }
+
+          const bookingId = Number(booking.id);
+          let updatesApplied = false;
+          if(hasUpdates){
+            const payload = { id: bookingId };
+            Object.entries(updatesToSend).forEach(([key,value])=>{
+              if(value === undefined) return;
+              if(key === 'box_id'){
+                payload[key] = Number(value);
+                return;
               }
+              if(key === 'total_amount' || key === 'deposit_eur' || key === 'fulfillment_price_delta'){
+                const numeric = Number(value);
+                payload[key] = Number.isFinite(numeric) ? this.roundCurrency(numeric) : value;
+                return;
+              }
+              if((key === 'pricing_details_json' || key === 'fulfillment_details_json') && value === null){
+                payload[key] = null;
+                return;
+              }
+              payload[key] = value;
+            });
+            try{
+              await MMBApi.updateBooking(payload);
+              updatesApplied = true;
+            }catch(err){
+              console.error('updateBooking failed:', err);
+              const message = err && err.message ? err.message : 'Aktualisierung fehlgeschlagen';
+              MMBCore.Utils.showNotification(message, 'error');
+              return;
             }
           }
 
-          if (isNumeric(item.fulfillment_price_delta)) {
-            const amount = Number(item.fulfillment_price_delta);
-            result.rows.push({ label: 'Fulfillment', amount });
+          let emailFailed = false;
+          let emailError = '';
+          if(shouldSendEmail){
+            try{
+              const emailPayload = {
+                booking_id: bookingId,
+                send_email: 1,
+                subject: subjectValue || meta.baseSubject || '',
+                message: messageValue || ''
+              };
+              if(sanitized.status){ emailPayload.status = sanitized.status; }
+              const response = await MMBApi.updateBookingStatus(emailPayload);
+              const mailInfo = response && response.mail ? response.mail : null;
+              if(mailInfo && mailInfo.sent === false){
+                emailFailed = true;
+                emailError = mailInfo.error ? ` (Fehler: ${mailInfo.error})` : '';
+              }
+            }catch(err){
+              console.error('updateBookingStatus failed:', err);
+              emailFailed = true;
+              emailError = err && err.message ? ` (${err.message})` : '';
+            }
           }
 
-          if (isNumeric(item.deposit_eur)) {
-            result.deposit = Number(item.deposit_eur);
-          }
+          closeOverlay();
+          await this.loadBookings();
 
-          if (isNumeric(item.total_amount)) {
-            result.total = Number(item.total_amount);
+          if(shouldSendEmail){
+            if(emailFailed){
+              const base = updatesApplied ? 'Buchung aktualisiert (E-Mail konnte nicht gesendet werden)' : 'E-Mail konnte nicht gesendet werden';
+              MMBCore.Utils.showNotification(base + emailError, 'error');
+            }else{
+              const msg = updatesApplied ? 'Buchung aktualisiert & Kund*in informiert' : 'E-Mail an Kund*in gesendet';
+              MMBCore.Utils.showNotification(msg);
+            }
+          }else if(updatesApplied){
+            MMBCore.Utils.showNotification('Buchung aktualisiert');
           }
+        }finally{
+          if(submitBtn){ submitBtn.disabled = false; submitBtn.textContent = originalLabel; }
+        }
+      }
 
-          return result;
+      getBoxOptionsForDetail(booking){
+        const seen = new Set();
+        const options = [];
+        (this.state.boxes||[]).forEach(box=>{
+          const id = String(box.id);
+          if(seen.has(id)) return;
+          seen.add(id);
+          options.push({id,name:box.name});
+        });
+        const currentId = String(booking.box_id);
+        if(currentId && !seen.has(currentId)){
+          options.push({id:currentId,name:booking.box_name || BOX_MAP[currentId] || `Box #${currentId}`});
+        }
+        if(!options.length){
+          Object.entries(BOX_MAP).forEach(([id,name])=>options.push({id,name}));
+        }
+        return options;
+      }
+
+      formatDateTimeLabel(value){
+        if(!value) return '–';
+        const date = new Date(value);
+        if(Number.isNaN(date.getTime())) return String(value);
+        return date.toLocaleString('de-DE', { dateStyle:'long', timeStyle:'short' });
+      }
+
+      formatBookingRangeLabel(start,end){
+        const parse=(val)=>{ if(!val) return null; const d=new Date(val); return Number.isNaN(d.getTime())?null:d; };
+        const s=parse(start); const e=parse(end);
+        if(s && e){
+          const sLabel=s.toLocaleDateString('de-DE');
+          const eLabel=e.toLocaleDateString('de-DE');
+          return sLabel===eLabel ? sLabel : `${sLabel} – ${eLabel}`;
+        }
+        if(s) return s.toLocaleDateString('de-DE');
+        if(e) return e.toLocaleDateString('de-DE');
+        return '–';
+      }
+
+      formatNumberInput(value, decimals=2){
+        const num = Number(value);
+        if(!Number.isFinite(num)) return '';
+        return (Math.round(num * Math.pow(10,decimals))/Math.pow(10,decimals)).toFixed(decimals).replace('.', ',');
+      }
+
+      formatIntegerInput(value){
+        const num = Number(value);
+        if(!Number.isFinite(num)) return '';
+        return String(Math.round(num));
+      }
+
+      roundCurrency(value, decimals=2){
+        const num = Number(value);
+        if(!Number.isFinite(num)) return 0;
+        const factor = Math.pow(10,decimals);
+        return Math.round(num*factor)/factor;
+      }
+
+      parseAmount(value){
+        if(value === null || value === undefined) return NaN;
+        if(typeof value === 'number') return value;
+        let str = String(value).trim();
+        if(!str) return NaN;
+        str = str.replace(/€/g,'').replace(/\s+/g,'');
+        str = str.replace(',', '.');
+        const num = Number(str);
+        if(Number.isNaN(num) && str.includes('.')){
+          const fallback = Number(str.replace(/\./g,''));
+          return Number.isNaN(fallback)?NaN:fallback;
+        }
+        return num;
+      }
+
+      safeParseJson(value){
+        if(!value) return null;
+        if(typeof value === 'object') return value;
+        try{ return JSON.parse(value); }catch(e){ return null; }
+      }
+
+      normalizePricingDetails(data){
+        if(!data || typeof data !== 'object') return null;
+        const result = {};
+        const numericFields = ['total','deposit','original','base_total','shipping_delta','discount_amount','discount_percent_exact','avg_per_day','fulfillment_price_delta'];
+        numericFields.forEach(field=>{
+          if(data[field] === undefined || data[field] === null) return;
+          const num = Number(data[field]);
+          if(Number.isFinite(num)) result[field] = num;
+        });
+        if(data.discount_percent_display !== undefined) result.discount_percent_display = String(data.discount_percent_display);
+        if(data.days !== undefined){
+          const daysNum = Number(data.days);
+          if(Number.isFinite(daysNum)) result.days = daysNum;
+        }
+        if(data.pricing_mode) result.pricing_mode = data.pricing_mode;
+        if(data.fulfillment_id) result.fulfillment_id = data.fulfillment_id;
+        if(data.fulfillment_label) result.fulfillment_label = data.fulfillment_label;
+        if(data.fulfillment_note) result.fulfillment_note = data.fulfillment_note;
+        if(data.fulfillment_adds_to_total !== undefined) result.fulfillment_adds_to_total = !!data.fulfillment_adds_to_total;
+        return Object.keys(result).length ? result : null;
+      }
+
+      normalizeFulfillmentDetails(details, fallbackMethod){
+        if(!details || typeof details !== 'object') return null;
+        const clone = JSON.parse(JSON.stringify(details));
+        const fallback = fallbackMethod ? fallbackMethod.toString().toLowerCase() : '';
+        if(clone.method){
+          clone.method = clone.method.toString().toLowerCase();
+        }else if(fallback){
+          clone.method = fallback;
+        }
+        if(clone.label !== undefined && clone.label !== null) clone.label = clone.label.toString();
+        if(clone.note !== undefined && clone.note !== null) clone.note = clone.note.toString();
+        if(clone.full !== undefined && clone.full !== null) clone.full = clone.full.toString();
+        const priceKey = clone.price_delta !== undefined ? 'price_delta' : (clone.priceDelta !== undefined ? 'priceDelta' : (clone.price !== undefined ? 'price' : null));
+        if(priceKey){
+          const num = Number(clone[priceKey]);
+          if(Number.isFinite(num)) clone.price_delta = num;
+          else delete clone[priceKey];
+        }
+        if(clone.price_delta === undefined && clone.priceDelta !== undefined){
+          const num = Number(clone.priceDelta);
+          if(Number.isFinite(num)) clone.price_delta = num;
+          delete clone.priceDelta;
+        }
+        if(clone.price !== undefined) delete clone.price;
+        if(clone.adds_to_total !== undefined){ clone.adds_to_total = !!clone.adds_to_total; }
+        if(clone.addsToTotal !== undefined){ clone.adds_to_total = !!clone.addsToTotal; delete clone.addsToTotal; }
+        if(clone.contact_preferences && typeof clone.contact_preferences === 'object'){
+          clone.contact_preferences = {
+            phone: !!clone.contact_preferences.phone,
+            whatsapp: !!clone.contact_preferences.whatsapp
+          };
+        }
+        if(clone.allow_contact_phone === undefined){
+          clone.allow_contact_phone = clone.contact_preferences ? !!clone.contact_preferences.phone : true;
+        }else{
+          clone.allow_contact_phone = clone.allow_contact_phone !== false;
+        }
+        if(clone.allow_contact_whatsapp === undefined){
+          clone.allow_contact_whatsapp = clone.contact_preferences ? !!clone.contact_preferences.whatsapp : false;
+        }else{
+          clone.allow_contact_whatsapp = !!clone.allow_contact_whatsapp;
+        }
+        return clone;
+      }
+
+      stableStringify(value){
+        const normalize=(input)=>{
+          if(input === null || typeof input !== 'object') return input;
+          if(Array.isArray(input)) return input.map(item=>normalize(item));
+          const sortedKeys = Object.keys(input).sort();
+          const out={};
+          sortedKeys.forEach(key=>{ out[key] = normalize(input[key]); });
+          return out;
+        };
+        try{ return JSON.stringify(normalize(value)); }catch(e){ return ''; }
+      }
+
+      buildPricingDetailsPayload(form, booking, sanitized, fulfillmentChoice){
+        const getValue = (name)=>{
+          const el = form.querySelector(`[name="${name}"]`);
+          return el ? (el.value ?? '') : '';
+        };
+        const parseAmountField = (name)=>{
+          const val = getValue(name);
+          const parsed = this.parseAmount(val);
+          return Number.isFinite(parsed) ? this.roundCurrency(parsed) : NaN;
+        };
+
+        const payload = {};
+        const total = parseAmountField('total_amount');
+        if(Number.isFinite(total)) payload.total = total; else payload.total = sanitized.total_amount;
+
+        const baseTotal = parseAmountField('pricing_base_total');
+        if(Number.isFinite(baseTotal)) payload.base_total = baseTotal;
+
+        const original = parseAmountField('pricing_original');
+        if(Number.isFinite(original)) payload.original = original;
+
+        const shippingDelta = parseAmountField('pricing_shipping_delta');
+        if(Number.isFinite(shippingDelta)) payload.shipping_delta = shippingDelta; else payload.shipping_delta = sanitized.fulfillment_price_delta;
+
+        const discountExact = parseAmountField('pricing_discount_percent_exact');
+        if(Number.isFinite(discountExact)) payload.discount_percent_exact = discountExact;
+
+        const discountAmount = parseAmountField('pricing_discount_amount');
+        if(Number.isFinite(discountAmount)) payload.discount_amount = discountAmount;
+
+        const avgPerDay = parseAmountField('pricing_avg_per_day');
+        if(Number.isFinite(avgPerDay)) payload.avg_per_day = avgPerDay;
+
+        const discountDisplay = getValue('pricing_discount_percent_display').trim();
+        if(discountDisplay !== '') payload.discount_percent_display = discountDisplay;
+
+        const daysRaw = getValue('pricing_days').trim();
+        if(daysRaw !== ''){
+          const daysNum = Number(daysRaw);
+          if(Number.isFinite(daysNum)) payload.days = Math.round(daysNum);
         }
 
-        function renderFulfillmentSection(item) {
-          const structured = item.fulfillment_details_structured || item.fulfillment_details || {};
-          const fulfillment = item.fulfillment || {};
-          const missing = Array.isArray(structured.missing) ? structured.missing : [];
-          const requires = !!structured.requires_details;
-          const needs = !!structured.needs_attention;
+        payload.deposit = sanitized.deposit_eur;
+        payload.fulfillment_id = sanitized.fulfillment_method;
+        payload.fulfillment_label = sanitized.fulfillment_label;
+        payload.fulfillment_note = sanitized.fulfillment_note;
+        payload.fulfillment_price_delta = sanitized.fulfillment_price_delta;
+        payload.fulfillment_adds_to_total = fulfillmentChoice.addsToTotal !== false;
 
-          const rows = [
-            { label: 'Mietart', value: item.fulfillment_display_label || fulfillment.display_label || item.fulfillment_label || item.fulfillment_method },
-            { label: 'Beschreibung', value: fulfillment.full || item.fulfillment_note || fulfillment.note },
-            { label: 'Preisanteil', value: formatCurrency(item.fulfillment_price_delta) },
-            { label: 'Details benötigt', value: requires ? 'Ja' : 'Nein' },
-            { label: 'Nachfragen offen', value: needs ? (missing.length ? missing.join('\n') : 'Ja') : 'Nein' },
-          ];
-
-          if (structured.meta) {
-            rows.push({ label: 'Letzte Übermittlung', value: structured.meta.submitted_at || '' });
-            rows.push({ label: 'Übermittelt via', value: structured.meta.submitted_via || '' });
+        if(payload.total === undefined) payload.total = sanitized.total_amount;
+        if(payload.shipping_delta === undefined) payload.shipping_delta = sanitized.fulfillment_price_delta;
+        if(payload.discount_percent_display === undefined && payload.discount_percent_exact !== undefined){
+          payload.discount_percent_display = String(payload.discount_percent_exact);
+        }
+        if(!payload.pricing_mode){
+          if(Number.isFinite(payload.days) && payload.days > 1){
+            payload.pricing_mode = 'range';
+          }else if(Number.isFinite(payload.days) && payload.days === 1){
+            payload.pricing_mode = 'single';
+          }else if(booking.pricing_details && booking.pricing_details.pricing_mode){
+            payload.pricing_mode = booking.pricing_details.pricing_mode;
           }
-
-          return renderDefinitionSection('Fulfillment', rows);
         }
 
-        function renderContactSection(item) {
-          const structured = item.fulfillment_details_structured || item.fulfillment_details || {};
-          const contact = structured.contact || {};
-          const shipping = structured.shipping || {};
-          const delivery = structured.delivery || {};
+        return payload;
+      }
 
-          const addressParts = [
-            shipping.address_line1,
-            shipping.address_line2,
-            [shipping.postal_code, shipping.city].filter(Boolean).join(' '),
-            shipping.address_extra,
-          ].filter((part) => part && String(part).trim() !== '').map((part) => String(part));
+      buildFulfillmentDetailsPayload(form, method, existing){
+        if(method !== 'shipping' && method !== 'delivery'){
+          return null;
+        }
+        const getValue = (name)=>{
+          const el = form.querySelector(`[name="${name}"]`);
+          return el ? (el.value ?? '').toString().trim() : '';
+        };
+        const getChecked = (name)=>{
+          const el = form.querySelector(`[name="${name}"]`);
+          return el ? !!el.checked : false;
+        };
 
-          const address = addressParts.length ? addressParts.join('\n') : '';
+        const payload = {
+          method,
+          submitted_via: (existing && typeof existing === 'object' && existing.submitted_via)
+            ? existing.submitted_via
+            : 'admin_panel'
+        };
 
-          const rows = [
-            { label: 'Kontaktperson', value: contact.name || item.customer_name },
-            { label: 'Kontakt-E-Mail', value: contact.email || item.customer_email },
-            { label: 'Kontakt-Telefon', value: contact.phone || item.customer_phone },
-            { label: 'Einwilligung WhatsApp', value: contact.consent === true ? 'Ja' : contact.consent === false ? 'Nein' : '' },
-            { label: 'Versandadresse', value: address },
-            { label: 'Treffpunkt (Lieferung)', value: delivery.meeting_point || '' },
-            { label: 'Wunschzeit', value: delivery.preferred_time || '' },
-          ];
+        const contactName = getValue('fulfillment_contact_name');
+        const contactEmail = getValue('fulfillment_contact_email');
+        const contactPhone = getValue('fulfillment_contact_phone');
+        if(contactName) payload.contact_name = contactName;
+        if(contactEmail) payload.contact_email = contactEmail;
+        if(contactPhone) payload.contact_phone = contactPhone;
 
-          return renderDefinitionSection('Kontakt & Lieferung', rows);
+        const allowPhone = getChecked('fulfillment_pref_phone');
+        const allowWhatsApp = getChecked('fulfillment_pref_whatsapp');
+        payload.allow_contact_phone = allowPhone;
+        payload.allow_contact_whatsapp = allowWhatsApp;
+        payload.contact_preferences = { phone: allowPhone, whatsapp: allowWhatsApp };
+
+        if(method === 'shipping'){
+          const line1 = getValue('shipping_address_line1');
+          const postal = getValue('shipping_postal_code');
+          const city = getValue('shipping_city');
+          const extra = getValue('shipping_address_extra');
+          if(line1) payload.address_line1 = line1;
+          if(postal) payload.postal_code = postal;
+          if(city) payload.city = city;
+          if(extra) payload.address_extra = extra;
         }
 
-        function renderNoteSection(item) {
-          const note = item.note && String(item.note).trim() !== '' ? String(item.note) : '';
-          const priceComment = item.price_comment || '';
-          const combined = [note, priceComment].filter((value) => value && value.trim() !== '').join('\n\n');
-
-          if (!combined) {
-            return '<section class="detail-section"><h3>Notizen</h3><p class="muted">Keine Notiz hinterlegt.</p></section>';
-          }
-
-          return `
-            <section class="detail-section">
-              <h3>Notizen</h3>
-              <div class="admin-details-note">
-                <strong>Kommentar</strong>
-                <span>${escapeHtml(combined).replace(/\n/g, '<br/>')}</span>
-              </div>
-            </section>
-          `;
+        if(method === 'delivery'){
+          const meeting = getValue('delivery_meeting_point');
+          const preferred = getValue('delivery_preferred_time');
+          if(meeting) payload.meeting_point = meeting;
+          if(preferred) payload.preferred_time = preferred;
         }
 
-        function escapeHtml(value) {
-          if (value === null || value === undefined) {
-            return '';
+        Object.keys(payload).forEach(key=>{
+          const value = payload[key];
+          if(value === '' || value === null || (typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0)){
+            delete payload[key];
           }
-          return String(value)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
-        }
+        });
 
-        function formatDate(value) {
-          if (!value) {
-            return '–';
-          }
-          const date = new Date(value);
-          if (Number.isNaN(date.getTime())) {
-            return String(value);
-          }
-          return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
-        }
+        const meaningfulKeys = Object.keys(payload).filter(key=>!['method','submitted_via'].includes(key));
+        return meaningfulKeys.length ? payload : null;
+      }
 
-        function formatTimestamp(value) {
-          if (!value) {
-            return '–';
-          }
-          const date = new Date(value);
-          if (Number.isNaN(date.getTime())) {
-            return String(value);
-          }
-          return date.toLocaleString('de-DE', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-          });
-        }
+      tplConfirm(b){
+        const range = `${new Date(b.start_date).toLocaleDateString('de-DE')} – ${new Date(b.end_date).toLocaleDateString('de-DE')}`;
+        return `Hallo ${b.customer_name},
 
-        function formatCurrency(value) {
-          const number = Number(value);
-          if (Number.isFinite(number)) {
-            return number.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
-          }
-          return value !== undefined && value !== null && value !== '' ? String(value) : '–';
-        }
+hier sind hervorragende Neuigkeiten für dich 🎉
+Wir haben deine Buchung mit der Buchungs-ID: ${displayId(b.id)} bestätigt.
 
-        function isNumeric(value) {
-          return value !== null && value !== '' && !Number.isNaN(Number(value));
-        }
+Deine Buchung im Überblick:
+👤 Name: ${b.customer_name}
+📧 E-Mail: ${b.customer_email}
+🎵 Musikbox: ${b.box_name}
+🕰️ Zeitraum: ${range}
+🚚 Abwicklung: ${this.fulfillmentEmailLine(b)}
+💶 Gesamtkosten: ${this.formatEuro(b.price_total)}
 
-        function createStatusBadge(status) {
-          const normalized = String(status || '').toLowerCase();
-          const label = normalized ? normalized.charAt(0).toUpperCase() + normalized.slice(1) : '–';
-          let cls = 'status-badge';
-          if (normalized === 'pending') {
-            cls += ' status-badge--pending';
-          } else if (normalized === 'confirmed') {
-            cls += ' status-badge--confirmed';
-          } else if (normalized === 'cancelled' || normalized === 'rejected') {
-            cls += ' status-badge--cancelled';
-          }
-          return `<span class="${cls}">${escapeHtml(label)}</span>`;
-        }
+Bitte überprüfe einmal, ob wir deine Buchung korrekt hinterlegt haben.
 
-        function formatStatusText(status) {
-          const normalized = String(status || '').toLowerCase();
-          if (!normalized) {
-            return '–';
-          }
-          return normalized.charAt(0).toUpperCase() + normalized.slice(1);
-        }
+Falls du noch offene Fragen hast, kannst du uns jederzeit kontaktieren.
 
-        loadData(true);
-      },
+Viele Grüße
+Dein MietMichBox Team
+www.mietmichbox.de
+
+E-Mail: info@mietmichbox.de
+Telefon: 01742015500`;
+      }
+
+      tplReject(b){
+        const range = `${new Date(b.start_date).toLocaleDateString('de-DE')} – ${new Date(b.end_date).toLocaleDateString('de-DE')}`;
+        return `Hallo ${b.customer_name},
+
+vielen Dank für deine Buchung (${displayId(b.id)}) für den Zeitraum ${range}.
+Leider können wir diese Buchung nicht annehmen, da zu deinem gewählten Zeitraum bereits alle unsere Musikboxen vermietet sind.
+
+Du kannst gerne direkt in unserem <a href="https://www.mietmichbox.de/buchungskalender" target="_blank" rel="noopener">Buchungskalender</a> eine neue Buchung zu einem anderen Zeitraum anfragen oder uns als Antwort auf diese E-Mail alternative Zeiträume nennen, sodass wir gemeinsam eine Lösung finden können. Wir helfen dir gerne schnellstmöglich weiter.
+
+Falls du noch offene Fragen hast, kannst du uns jederzeit kontaktieren.
+
+Viele Grüße
+Dein MietMichBox Team
+www.mietmichbox.de
+
+E-Mail: info@mietmichbox.de
+Telefon: 01742015500`;
+      }
+
+      tplAlternative(b, alternatives){
+        const range = `${new Date(b.start_date).toLocaleDateString('de-DE')} – ${new Date(b.end_date).toLocaleDateString('de-DE')}`;
+        const names = Array.isArray(alternatives)
+          ? alternatives.map(x=>x?.name).filter(Boolean)
+          : (alternatives && alternatives.name ? [alternatives.name] : []);
+        let altSentence;
+        if(names.length === 0){
+          altSentence = 'Wir schlagen dir als Alternative aktuell keine weitere Box vor.';
+        }else if(names.length === 1){
+          altSentence = `Wir schlagen dir als Alternative die ${names[0]} vor.`;
+        }else if(names.length === 2){
+          altSentence = `Wir schlagen dir als Alternative die ${names[0]} oder die ${names[1]} vor.`;
+        }else{
+          const list = names.slice();
+          const last = list.pop();
+          altSentence = `Wir schlagen dir als Alternative die ${list.join(', die ')} oder die ${last} vor.`;
+        }
+        return `Hallo ${b.customer_name},
+
+tut uns leid, aber unsere Musikboxen sind sehr gefragt 🔥
+
+Für deine Buchung (${displayId(b.id)}) ist die Musikbox ${b.box_name} für den Zeitraum ${range} leider nicht mehr verfügbar. ${altSentence}
+
+Du kannst gerne direkt in unserem <a href="https://www.mietmichbox.de/buchungskalender" target="_blank" rel="noopener">Buchungskalender</a> eine neue Buchung mit einer anderen Musikbox oder zu einem anderen Zeitraum anfragen. Alternativ kannst du uns auch als Antwort auf diese E-Mail die alternative Musikbox oder den alternativen Zeitraum nennen, sodass wir deine Buchung aktualisieren können. Wir helfen dir gerne schnellstmöglich weiter.
+
+Falls du noch offene Fragen hast, kannst du uns jederzeit kontaktieren.
+
+Viele Grüße
+Dein MietMichBox Team
+www.mietmichbox.de
+
+E-Mail: info@mietmichbox.de
+Telefon: 01742015500`;
+      }
+
+      tplEditInfo(b){
+        const start = new Date(b.start_date);
+        const end = new Date(b.end_date);
+        const validStart = !Number.isNaN(start.getTime());
+        const validEnd = !Number.isNaN(end.getTime());
+        const range = (validStart && validEnd)
+          ? `${start.toLocaleDateString('de-DE')} – ${end.toLocaleDateString('de-DE')}`
+          : `${b.start_date} – ${b.end_date}`;
+        const price = Number(b.price_total ?? b.total_amount ?? 0);
+        const priceLabel = Number.isFinite(price)
+          ? price.toLocaleString('de-DE', {minimumFractionDigits:2, maximumFractionDigits:2})
+          : (b.price_total ?? b.total_amount ?? '0');
+        const statusLabel = this.translateStatus(b.status || 'pending');
+        const name = b.customer_name || 'Kund*in';
+        const email = b.customer_email || '–';
+        const box = b.box_name || BOX_MAP[String(b.box_id)] || '—';
+        const fulfillment = this.fulfillmentEmailLine(b);
+        return `Hallo ${name},
+
+wir haben Details in deiner Buchung (${displayId(b.id)}) aktualisiert.
+
+Deine aktualisierte Buchung im Überblick:
+👤 Name: ${name}
+📧 E-Mail: ${email}
+🎵 Musikbox: ${box}
+🕰️ Zeitraum: ${range}
+🚚 Abwicklung: ${fulfillment}
+💶 Preis: ${priceLabel}€
+
+Bitte überprüfe einmal, ob wir deine Buchung korrekt hinterlegt haben.
+
+Falls du noch offene Fragen hast, kannst du uns jederzeit kontaktieren.
+
+Viele Grüße
+Dein MietMichBox Team
+www.mietmichbox.de
+
+E-Mail: info@mietmichbox.de
+Telefon: 01742015500`;
+      }
+    }
+
+    injectAdminListCSS();
+    global.MietMichBoxAdminList={ init:(opts)=>new AdminList(opts) };
+
+  })(window);
+  </script>
+
+  <!-- ======================= INIT ======================= -->
+  <script>
+    document.addEventListener('DOMContentLoaded', async function(){
+      try {
+        await MMBAdminAuth.ensureSession();
+        MietMichBoxAdminList.init({ container:'#mmb-admin-list', locale:'de-DE', timezone:'Europe/Berlin' });
+      } catch (error) {
+        console.error('Admin-Login konnte nicht initialisiert werden', error);
+        const container = document.querySelector('#mmb-admin-list');
+        if (container) {
+          container.innerHTML = '<p class="mmb-error">Der Admin-Login konnte nicht initialisiert werden. Bitte prüfen Sie die HTTPS-Verbindung oder wenden Sie sich an den Support.</p>';
+        }
+      }
     });
-  })();
   </script>
 </body>
 </html>

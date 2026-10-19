@@ -1,0 +1,5 @@
+/.env
+/.env.local
+/admin_users.php
+*.log
+.DS_Store

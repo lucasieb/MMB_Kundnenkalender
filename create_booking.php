@@ -66,63 +66,305 @@ const FULFILLMENT_DEFS = [
   'pickup' => [
     'label' => 'Abholung',
     'full' => 'Abholung in Wesel',
-    'display_suffix' => 'in Wesel',
     'price_delta' => 0.0,
     'adds_to_total' => true,
     'note' => '',
-    'info_lines' => [
-      '📍 Treffpunkt stimmen wir individuell in Wesel ab.',
-      '🕚 Abholung ab deinem Miettag um 11:00 Uhr möglich.',
-      '🔁 Rückgabe am Folgetag nach Mietende bis 10:00 Uhr.',
-    ],
   ],
   'shipping' => [
     'label' => 'Versand',
     'full' => 'Versand (deutschlandweit)',
-    'display_suffix' => 'ganz.de',
     'price_delta' => 80.0,
     'adds_to_total' => true,
     'note' => 'inkl. Express-Hin- & Rückversand sowie Vorbereitungspauschale',
-    'info_lines' => [
-      '🚚 Wir versenden deine Musikbox einen Tag vor Mietbeginn per Express.',
-      '📦 Rückversand am letzten Miettag mit dem beiliegenden QR-Code.',
-      '📝 Bitte halte Lieferadresse sowie Kontaktinfos bereit, falls noch nicht übermittelt.',
-    ],
   ],
   'delivery' => [
     'label' => 'Lieferung',
     'full' => 'Lieferung (NRW-weit)',
-    'display_suffix' => 'ganz.nrb',
     'price_delta' => 0.0,
     'adds_to_total' => false,
     'note' => 'zzgl. individueller Lieferpauschale – wir melden uns mit einem Angebot',
-    'info_lines' => [
-      '🚗 Wir liefern dir die Musikbox persönlich innerhalb von NRW.',
-      '🕒 Wir stimmen deine Wunschzeit (Mittag, halbstündlich) individuell ab.',
-      '📍 Bitte teile uns deinen Treffpunkt oder die Lieferadresse mit.',
-    ],
   ],
 ];
 
+function map_fulfillment_method($value): ?string {
+  if ($value === null) {
+    return null;
+  }
+  $normalized = strtolower(trim((string)$value));
+  if ($normalized === '') {
+    return null;
+  }
+  $normalized = str_replace(['ä', 'ö', 'ü', 'ß'], ['ae', 'oe', 'ue', 'ss'], $normalized);
+  switch ($normalized) {
+    case 'pickup':
+    case 'abholung':
+    case 'selfpickup':
+    case 'selbstabholung':
+      return 'pickup';
+    case 'shipping':
+    case 'versand':
+    case 'lieferungperversand':
+      return 'shipping';
+    case 'delivery':
+    case 'lieferung':
+      return 'delivery';
+  }
+  return null;
+}
+
 /**
  * @param array<string,mixed> $input
+ * @param array<string,mixed>|null $details
+ * @param array<string,mixed>|null $pricing
+ */
+function determine_fulfillment_method(array $input, ?array $details, ?array $pricing): string {
+  $candidates = [];
+  foreach (['fulfillment_method', 'fulfillment', 'fulfillment_id', 'fulfillment_choice'] as $key) {
+    if (array_key_exists($key, $input)) {
+      $candidates[] = $input[$key];
+    }
+  }
+  if ($details) {
+    foreach (['method', 'fulfillment_id', 'id'] as $key) {
+      if (array_key_exists($key, $details)) {
+        $candidates[] = $details[$key];
+      }
+    }
+  }
+  if ($pricing) {
+    foreach (['fulfillment_id', 'fulfillment_method'] as $key) {
+      if (array_key_exists($key, $pricing)) {
+        $candidates[] = $pricing[$key];
+      }
+    }
+  }
+  foreach ($candidates as $candidate) {
+    $mapped = map_fulfillment_method($candidate);
+    if ($mapped !== null) {
+      return $mapped;
+    }
+  }
+  return 'pickup';
+}
+
+/**
+ * @param array<int,mixed> $values
+ */
+function first_non_empty_string(array $values): ?string {
+  foreach ($values as $value) {
+    if ($value === null) {
+      continue;
+    }
+    $string = trim((string)$value);
+    if ($string !== '') {
+      return $string;
+    }
+  }
+  return null;
+}
+
+/**
+ * @param array<int,mixed> $values
+ */
+function first_numeric(array $values): ?float {
+  foreach ($values as $value) {
+    if ($value === null || $value === '') {
+      continue;
+    }
+    if (is_numeric($value)) {
+      return (float)$value;
+    }
+    $parsed = num($value, null);
+    if ($parsed !== null) {
+      return $parsed;
+    }
+  }
+  return null;
+}
+
+/**
+ * @param array<int,mixed> $values
+ */
+function first_bool(array $values): ?bool {
+  foreach ($values as $value) {
+    if ($value === null) {
+      continue;
+    }
+    if (is_bool($value)) {
+      return $value;
+    }
+    $normalized = strtolower(trim((string)$value));
+    if ($normalized === '') {
+      continue;
+    }
+    if (in_array($normalized, ['1', 'true', 'yes', 'y', 'on'], true)) {
+      return true;
+    }
+    if (in_array($normalized, ['0', 'false', 'no', 'n', 'off'], true)) {
+      return false;
+    }
+  }
+  return null;
+}
+
+/**
+ * @param array<string,mixed>|null $details
+ * @param array<string,mixed> $flatInput
+ */
+function normalize_fulfillment_details_for_storage(?array $details, string $method, array $flatInput = []): ?array {
+  $data = is_array($details) ? $details : [];
+
+  // Allow fallback from flat payload keys (z. B. aus Formularen im Adminpanel)
+  $fallbacks = [
+    'contact_name'  => ['fulfillment_contact_name', 'contact_name'],
+    'contact_email' => ['fulfillment_contact_email', 'contact_email'],
+    'contact_phone' => ['fulfillment_contact_phone', 'contact_phone'],
+    'address_line1' => ['shipping_address_line1', 'address_line1'],
+    'postal_code'   => ['shipping_postal_code', 'postal_code'],
+    'city'          => ['shipping_city', 'city'],
+    'address_extra' => ['shipping_address_extra', 'address_extra'],
+    'meeting_point' => ['delivery_meeting_point', 'meeting_point'],
+    'preferred_time'=> ['delivery_preferred_time', 'preferred_time'],
+  ];
+  foreach ($fallbacks as $target => $keys) {
+    if (!array_key_exists($target, $data)) {
+      foreach ($keys as $key) {
+        if (array_key_exists($key, $flatInput)) {
+          $data[$target] = $flatInput[$key];
+          break;
+        }
+      }
+    }
+  }
+
+  $data['method'] = $method;
+
+  $stringFields = ['label','full','note','contact_name','contact_email','contact_phone','address_line1','postal_code','city','address_extra','meeting_point','preferred_time','submitted_via'];
+  foreach ($stringFields as $field) {
+    if (array_key_exists($field, $data)) {
+      $value = trim((string)$data[$field]);
+      if ($value === '') {
+        unset($data[$field]);
+      } else {
+        $data[$field] = $value;
+      }
+    }
+  }
+
+  $price = first_numeric([
+    $data['price_delta'] ?? null,
+    $data['price'] ?? null,
+    $data['priceDelta'] ?? null,
+  ]);
+  if ($price !== null) {
+    $data['price_delta'] = $price;
+  }
+  unset($data['price'], $data['priceDelta']);
+
+  $addsToTotal = first_bool([
+    $data['adds_to_total'] ?? null,
+    $data['addsToTotal'] ?? null,
+  ]);
+  if ($addsToTotal !== null) {
+    $data['adds_to_total'] = $addsToTotal;
+  }
+  unset($data['addsToTotal']);
+
+  $prefPhone = null;
+  $prefWhatsapp = null;
+  if (isset($data['contact_preferences']) && is_array($data['contact_preferences'])) {
+    $prefPhone = first_bool([$data['contact_preferences']['phone'] ?? null]);
+    $prefWhatsapp = first_bool([$data['contact_preferences']['whatsapp'] ?? null]);
+  }
+
+  $allowPhone = first_bool([$data['allow_contact_phone'] ?? null, $prefPhone]);
+  $allowWhatsapp = first_bool([$data['allow_contact_whatsapp'] ?? null, $prefWhatsapp]);
+  if ($allowPhone === null) {
+    $allowPhone = true;
+  }
+  if ($allowWhatsapp === null) {
+    $allowWhatsapp = false;
+  }
+  $data['allow_contact_phone'] = $allowPhone;
+  $data['allow_contact_whatsapp'] = $allowWhatsapp;
+  $data['contact_preferences'] = [
+    'phone' => $allowPhone,
+    'whatsapp' => $allowWhatsapp,
+  ];
+
+  foreach ($data as $key => $value) {
+    if ($key === 'method') {
+      continue;
+    }
+    if ($value === '' || $value === null) {
+      unset($data[$key]);
+      continue;
+    }
+    if (is_array($value) && $value === []) {
+      unset($data[$key]);
+    }
+  }
+
+  return $data ?: ['method' => $method];
+}
+
+/**
+ * @param array<string,mixed> $input
+ * @param array<string,mixed>|null $details
+ * @param array<string,mixed>|null $pricing
  * @return array{method:string,label:string,full:string,note:string,price_delta:float,adds_to_total:bool}
  */
-function normalize_fulfillment_from_request(array $input): array {
-  $method = strtolower(trim((string)($input['fulfillment_method'] ?? '')));
-  if (!isset(FULFILLMENT_DEFS[$method])) {
-    $method = 'pickup';
+function normalize_fulfillment_from_request(array $input, ?array $details = null, ?array $pricing = null): array {
+  $method = determine_fulfillment_method($input, $details, $pricing);
+  $def = FULFILLMENT_DEFS[$method] ?? FULFILLMENT_DEFS['pickup'];
+
+  $label = first_non_empty_string([
+    $input['fulfillment_label'] ?? null,
+    $pricing['fulfillment_label'] ?? null,
+    $details['label'] ?? null,
+    $def['label'] ?? null,
+  ]) ?? (string)($def['label'] ?? '');
+
+  $full = first_non_empty_string([
+    $details['full'] ?? null,
+    $def['full'] ?? null,
+    $label,
+  ]) ?? $label;
+
+  $note = first_non_empty_string([
+    $input['fulfillment_note'] ?? null,
+    $pricing['fulfillment_note'] ?? null,
+    $details['note'] ?? null,
+    $def['note'] ?? '',
+  ]) ?? '';
+
+  $price = first_numeric([
+    $input['fulfillment_price_delta'] ?? null,
+    $pricing['fulfillment_price_delta'] ?? null,
+    $details['price_delta'] ?? null,
+    $def['price_delta'] ?? null,
+  ]);
+  if ($price === null) {
+    $price = (float)($def['price_delta'] ?? 0.0);
   }
-  $def = FULFILLMENT_DEFS[$method];
+
+  $adds = first_bool([
+    $input['fulfillment_adds_to_total'] ?? null,
+    $pricing['fulfillment_adds_to_total'] ?? null,
+    $details['adds_to_total'] ?? null,
+    $def['adds_to_total'] ?? null,
+  ]);
+  if ($adds === null) {
+    $adds = (bool)($def['adds_to_total'] ?? true);
+  }
+
   return [
     'method' => $method,
-    'label' => (string)$def['label'],
-    'full' => (string)$def['full'],
-    'note' => (string)$def['note'],
-    'price_delta' => (float)$def['price_delta'],
-    'adds_to_total' => (bool)$def['adds_to_total'],
-    'display_suffix' => (string)($def['display_suffix'] ?? ''),
-    'info_lines' => (array)($def['info_lines'] ?? []),
+    'label' => $label,
+    'full' => $full,
+    'note' => $note,
+    'price_delta' => (float)$price,
+    'adds_to_total' => (bool)$adds,
   ];
 }
 
@@ -130,181 +372,24 @@ function normalize_fulfillment_from_request(array $input): array {
  * @param array{method:string,label:string,full:string,note:string,price_delta:float,adds_to_total:bool} $info
  */
 function fulfillment_email_line(array $info): string {
-  $suffix = trim((string)($info['display_suffix'] ?? ''));
-  $label  = (string)$info['label'];
-  return $suffix !== '' ? ($label . ' (' . $suffix . ')') : $label;
-}
+  $method = $info['method'];
+  $full   = $info['full'];
+  $price  = (float)$info['price_delta'];
+  $note   = trim((string)$info['note']);
 
-/**
- * @param array{info_lines?:array<int,string>} $info
- * @return list<string>
- */
-function fulfillment_instruction_lines(array $info): array {
-  $lines = [];
-  if (!empty($info['info_lines']) && is_array($info['info_lines'])) {
-    foreach ($info['info_lines'] as $line) {
-      $line = trim((string)$line);
-      if ($line !== '') {
-        $lines[] = $line;
-      }
-    }
+  if ($method === 'pickup') {
+    return $price > 0 ? ($full . ' +' . format_price($price)) : ($full . ' (gratis)');
   }
-  return $lines;
-}
-
-/**
- * @param array<string,mixed> $input
- * @return array<string,mixed>|null
- */
-function extract_fulfillment_details_from_request(array $input): ?array {
-  if (isset($input['fulfillment_details']) && is_array($input['fulfillment_details'])) {
-    return $input['fulfillment_details'];
-  }
-
-  foreach (['fulfillment_details_json', 'fulfillment_details'] as $key) {
-    if (!array_key_exists($key, $input)) {
-      continue;
-    }
-    $value = $input[$key];
-    if (is_array($value)) {
-      return $value;
-    }
-    if (is_string($value) && $value !== '') {
-      $decoded = json_decode($value, true);
-      if (is_array($decoded)) {
-        return $decoded;
-      }
-    }
-  }
-
-  return null;
-}
-
-/**
- * @param array<string,mixed> $raw
- */
-function normalize_contact_flag(array $raw, string $key, bool $default = false): bool {
-  if (array_key_exists($key, $raw)) {
-    return is_truthy($raw[$key]);
-  }
-  return $default;
-}
-
-/**
- * @param array<string,mixed> $raw
- */
-function extract_contact_channel(array $raw, string $channel): bool {
-  $channel = strtolower($channel);
-  if (isset($raw['contact_preferences']) && is_array($raw['contact_preferences']) && array_key_exists($channel, $raw['contact_preferences'])) {
-    return is_truthy($raw['contact_preferences'][$channel]);
-  }
-  if (isset($raw['contact_methods']) && is_array($raw['contact_methods'])) {
-    foreach ($raw['contact_methods'] as $method) {
-      if (is_string($method) && strtolower(trim($method)) === $channel) {
-        return true;
-      }
-    }
-  }
-  return false;
-}
-
-/**
- * @param array<string,mixed> $input
- * @param array{customer_name:string,customer_email:string,customer_phone:string} $defaults
- * @return array<string,mixed>
- */
-function build_initial_fulfillment_details(string $method, array $input, array $defaults): array {
-  if (!in_array($method, ['shipping', 'delivery'], true)) {
-    return ['method' => $method];
-  }
-
-  $raw = extract_fulfillment_details_from_request($input);
-  if ($raw === null) {
-    json_response(['ok' => false, 'error' => 'Zusatzangaben fehlen für die gewählte Abwicklung', 'code' => 'validation'], 422);
-  }
-
-  $contactName = trim((string)($raw['contact_name'] ?? $defaults['customer_name'] ?? ''));
-  $contactEmail = trim((string)($raw['contact_email'] ?? $defaults['customer_email'] ?? ''));
-  $contactPhone = trim((string)($raw['contact_phone'] ?? $defaults['customer_phone'] ?? ''));
-
-  if ($contactName === '') {
-    json_response(['ok'=>false,'error'=>'Kontaktname für Zusatzangaben fehlt','code'=>'validation'], 422);
-  }
-  if ($contactEmail === '' || !filter_var($contactEmail, FILTER_VALIDATE_EMAIL)) {
-    json_response(['ok'=>false,'error'=>'Kontakt-E-Mail ist ungültig','code'=>'validation'], 422);
-  }
-  if ($contactPhone === '') {
-    json_response(['ok'=>false,'error'=>'Kontaktnummer fehlt für Zusatzangaben','code'=>'validation'], 422);
-  }
-
-  $allowPhone = normalize_contact_flag($raw, 'allow_contact_phone', false)
-    || normalize_contact_flag($raw, 'contact_phone_allowed', false)
-    || extract_contact_channel($raw, 'phone');
-  $allowWhatsApp = normalize_contact_flag($raw, 'allow_contact_whatsapp', false)
-    || normalize_contact_flag($raw, 'contact_whatsapp_allowed', false)
-    || extract_contact_channel($raw, 'whatsapp');
-
-  if (!$allowPhone && !$allowWhatsApp) {
-    json_response(['ok'=>false,'error'=>'Bitte mindestens eine Kontaktoption (Telefon oder WhatsApp) erlauben','code'=>'validation'], 422);
-  }
-
-  $details = [
-    'method' => $method,
-    'submitted_via' => 'customer_portal',
-    'submitted_at' => (new DateTimeImmutable('now', new DateTimeZone('Europe/Berlin')))->format(DateTimeInterface::ATOM),
-    'contact_name' => $contactName,
-    'contact_email' => $contactEmail,
-    'contact_phone' => $contactPhone,
-    'allow_contact_phone' => $allowPhone,
-    'allow_contact_whatsapp' => $allowWhatsApp,
-    'contact_preferences' => [
-      'phone' => $allowPhone,
-      'whatsapp' => $allowWhatsApp,
-    ],
-    'contact_via' => array_values(array_filter([
-      $allowPhone ? 'phone' : null,
-      $allowWhatsApp ? 'whatsapp' : null,
-    ])),
-    'customer_name' => $defaults['customer_name'],
-    'customer_email' => $defaults['customer_email'],
-    'customer_phone' => $defaults['customer_phone'],
-  ];
-
   if ($method === 'shipping') {
-    $addressLine1 = trim((string)($raw['address_line1'] ?? $raw['street'] ?? ''));
-    $postalCode = trim((string)($raw['postal_code'] ?? $raw['zip'] ?? ''));
-    $city = trim((string)($raw['city'] ?? ''));
-    if ($addressLine1 === '' || $postalCode === '' || $city === '') {
-      json_response(['ok'=>false,'error'=>'Bitte vollständige Lieferadresse angeben','code'=>'validation'], 422);
-    }
-    $details['address_line1'] = $addressLine1;
-    if (isset($raw['address_line2']) && trim((string)$raw['address_line2']) !== '') {
-      $details['address_line2'] = trim((string)$raw['address_line2']);
-    }
-    $details['postal_code'] = $postalCode;
-    $details['city'] = $city;
-    if (isset($raw['address_extra']) && trim((string)$raw['address_extra']) !== '') {
-      $details['address_extra'] = trim((string)$raw['address_extra']);
-    }
+    return $full . ' +' . format_price($price);
   }
-
-  if ($method === 'delivery') {
-    $meetingPoint = trim((string)($raw['meeting_point'] ?? $raw['address'] ?? ''));
-    $preferredTime = trim((string)($raw['preferred_time'] ?? ''));
-    if ($meetingPoint === '' || $preferredTime === '') {
-      json_response(['ok'=>false,'error'=>'Bitte Treffpunkt und Wunschzeit angeben','code'=>'validation'], 422);
-    }
-    $details['meeting_point'] = $meetingPoint;
-    $details['preferred_time'] = $preferredTime;
-  }
-
-  return $details;
+  return $note !== '' ? ($full . ' (' . $note . ')') : $full;
 }
 
 /**
  * Erstellt Betreff + Text für die automatische Eingangsbestätigung.
  *
- * @param array{customer_name:string,customer_email:string,box_id:int,start_date:string,end_date:string,total_amount:float,display_id:string,fulfillment_method?:string,fulfillment_label?:string,fulfillment_note?:string,fulfillment_price_delta?:float} $data
+ * @param array{customer_name:string,customer_email:string,box_id:int,start_date:string,end_date:string,total_amount:float,display_id:string,fulfillment_method?:string,fulfillment_label?:string,fulfillment_note?:string,fulfillment_price_delta?:float,fulfillment_details?:mixed,fulfillment_details_json?:string,pricing_details?:mixed,pricing_details_json?:string} $data
  * @return array<string,mixed>
  */
 function booking_mail_context(array $data): array {
@@ -313,9 +398,42 @@ function booking_mail_context(array $data): array {
   $boxName   = box_name_by_id((int)$data['box_id']);
   $totalDisp = format_price((float)$data['total_amount']);
 
-  $fulfillmentInfo = normalize_fulfillment_from_request($data);
+  $fulfillmentDetails = null;
+  if (isset($data['fulfillment_details'])) {
+    if (is_array($data['fulfillment_details'])) {
+      $fulfillmentDetails = $data['fulfillment_details'];
+    } elseif (is_string($data['fulfillment_details'])) {
+      $decoded = json_decode($data['fulfillment_details'], true);
+      if (is_array($decoded)) {
+        $fulfillmentDetails = $decoded;
+      }
+    }
+  } elseif (isset($data['fulfillment_details_json']) && is_string($data['fulfillment_details_json'])) {
+    $decoded = json_decode($data['fulfillment_details_json'], true);
+    if (is_array($decoded)) {
+      $fulfillmentDetails = $decoded;
+    }
+  }
+
+  $pricingDetails = null;
+  if (isset($data['pricing_details'])) {
+    if (is_array($data['pricing_details'])) {
+      $pricingDetails = $data['pricing_details'];
+    } elseif (is_string($data['pricing_details'])) {
+      $decoded = json_decode($data['pricing_details'], true);
+      if (is_array($decoded)) {
+        $pricingDetails = $decoded;
+      }
+    }
+  } elseif (isset($data['pricing_details_json']) && is_string($data['pricing_details_json'])) {
+    $decoded = json_decode($data['pricing_details_json'], true);
+    if (is_array($decoded)) {
+      $pricingDetails = $decoded;
+    }
+  }
+
+  $fulfillmentInfo = normalize_fulfillment_from_request($data, $fulfillmentDetails, $pricingDetails);
   $fulfillmentLine = fulfillment_email_line($fulfillmentInfo);
-  $fulfillmentInstructions = fulfillment_instruction_lines($fulfillmentInfo);
 
   $startDate = new DateTimeImmutable($data['start_date']);
   $endDate   = new DateTimeImmutable($data['end_date']);
@@ -331,7 +449,7 @@ function booking_mail_context(array $data): array {
     'range'       => $range,
     'fulfillment' => $fulfillmentLine,
     'fulfillment_info' => $fulfillmentInfo,
-    'fulfillment_instructions' => $fulfillmentInstructions,
+    'fulfillment_details' => $fulfillmentDetails,
   ];
 }
 
@@ -343,13 +461,8 @@ function build_submission_mail(array $data): array {
   $range     = $ctx['range'];
   $totalDisp = $ctx['totalDisp'];
   $fulfillment = $ctx['fulfillment'];
-  $fulfillmentInstructions = $ctx['fulfillment_instructions'];
 
   $subject = "Deine Buchung wurde übermittelt 🚀 – Buchungs-ID: {$data['display_id']}";
-  $instructionLines = $fulfillmentInstructions;
-  $instructionText = $instructionLines
-    ? ('• ' . implode("\n• ", array_map('strval', $instructionLines)))
-    : '• Wir melden uns kurzfristig mit allen weiteren Details.';
 
   $text = <<<TXT
 Hallo {$name},
@@ -363,9 +476,6 @@ Deine Buchung im Überblick:
 🕰️ Zeitraum: {$range}
 🚚 Abwicklung: {$fulfillment}
 💶 Gesamtkosten: {$totalDisp}
-
-Informationen für deine gewählte Abwicklung:
-{$instructionText}
 
 Bitte überprüfe einmal, ob deine Buchung korrekt bei uns eingegangen ist.
 
@@ -394,21 +504,92 @@ function build_internal_submission_mail(array $data): array {
   $range     = $ctx['range'];
   $totalDisp = $ctx['totalDisp'];
   $fulfillment = $ctx['fulfillment'];
-  $fulfillmentInstructions = $ctx['fulfillment_instructions'];
   $displayId = $data['display_id'];
+  $fulfillmentInfo = $ctx['fulfillment_info'];
+  $fulfillmentDetails = $ctx['fulfillment_details'];
 
   $linkUrl   = 'https://mietmichbox.de/buchungsverwaltung';
   $subject   = "👋🏼 Neue Buchungsanfrage 👷🏽 – Buchungs-ID: {$displayId}";
 
-  $instructionLines = $fulfillmentInstructions;
-  $instructionText = $instructionLines
-    ? ('• ' . implode("\n• ", array_map('strval', $instructionLines)))
-    : '• Wir melden uns kurzfristig mit allen weiteren Details.';
-  $instructionListHtml = $instructionLines
-    ? implode("\n", array_map(fn($line) => '<li>'.htmlspecialchars((string)$line, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8').'</li>', $instructionLines))
-    : '<li>Wir melden uns kurzfristig mit allen weiteren Details.</li>';
+  $extraTextLines = [];
+  $extraHtmlLines = [];
+  $method = is_array($fulfillmentInfo) ? ($fulfillmentInfo['method'] ?? null) : null;
 
-  $text = <<<TXT
+  if (in_array($method, ['shipping', 'delivery'], true) && is_array($fulfillmentDetails)) {
+    $escHtml = static function (string $value): string {
+      return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    };
+
+    $contactName = trim((string)($fulfillmentDetails['contact_name'] ?? ''));
+    $contactEmail = trim((string)($fulfillmentDetails['contact_email'] ?? ''));
+    $contactPhone = trim((string)($fulfillmentDetails['contact_phone'] ?? ''));
+    if ($contactName !== '') {
+      $extraTextLines[] = "👥 Kontaktname: {$contactName}";
+      $extraHtmlLines[] = '👥 Kontaktname: ' . $escHtml($contactName);
+    }
+    if ($contactEmail !== '') {
+      $extraTextLines[] = "✉️ Kontakt-E-Mail: {$contactEmail}";
+      $extraHtmlLines[] = '✉️ Kontakt-E-Mail: ' . $escHtml($contactEmail);
+    }
+    if ($contactPhone !== '') {
+      $extraTextLines[] = "📞 Kontakt-Telefon: {$contactPhone}";
+      $extraHtmlLines[] = '📞 Kontakt-Telefon: ' . $escHtml($contactPhone);
+    }
+
+    $allowedChannels = [];
+    $allowPhone = $fulfillmentDetails['allow_contact_phone'] ?? ($fulfillmentDetails['contact_preferences']['phone'] ?? null);
+    $allowWhatsapp = $fulfillmentDetails['allow_contact_whatsapp'] ?? ($fulfillmentDetails['contact_preferences']['whatsapp'] ?? null);
+    if ($allowPhone) {
+      $allowedChannels[] = 'Telefon';
+    }
+    if ($allowWhatsapp) {
+      $allowedChannels[] = 'WhatsApp';
+    }
+    if ($allowedChannels) {
+      $channels = implode(', ', $allowedChannels);
+      $extraTextLines[] = "☎️ Kontaktwege: {$channels}";
+      $extraHtmlLines[] = '☎️ Kontaktwege: ' . $escHtml($channels);
+    }
+
+    if ($method === 'shipping') {
+      $addressParts = [];
+      $addressLine = trim((string)($fulfillmentDetails['address_line1'] ?? ''));
+      $postalCode = trim((string)($fulfillmentDetails['postal_code'] ?? ''));
+      $city = trim((string)($fulfillmentDetails['city'] ?? ''));
+      $addressExtra = trim((string)($fulfillmentDetails['address_extra'] ?? ''));
+      if ($addressLine !== '') {
+        $addressParts[] = $addressLine;
+      }
+      $postalCity = trim($postalCode . ' ' . $city);
+      if ($postalCity !== '') {
+        $addressParts[] = $postalCity;
+      }
+      if ($addressExtra !== '') {
+        $addressParts[] = $addressExtra;
+      }
+      if ($addressParts) {
+        $addressLineText = implode(', ', $addressParts);
+        $extraTextLines[] = "📦 Lieferadresse: {$addressLineText}";
+        $extraHtmlLines[] = '📦 Lieferadresse: ' . $escHtml($addressLineText);
+      }
+    }
+
+    if ($method === 'delivery') {
+      $meetingPoint = trim((string)($fulfillmentDetails['meeting_point'] ?? ''));
+      $preferredTime = trim((string)($fulfillmentDetails['preferred_time'] ?? ''));
+      if ($meetingPoint !== '') {
+        $extraTextLines[] = "📍 Treffpunkt: {$meetingPoint}";
+        $extraHtmlLines[] = '📍 Treffpunkt: ' . $escHtml($meetingPoint);
+      }
+      if ($preferredTime !== '') {
+        $timeDisp = $preferredTime . ' Uhr';
+        $extraTextLines[] = "⏰ Wunschzeit: {$timeDisp}";
+        $extraHtmlLines[] = '⏰ Wunschzeit: ' . $escHtml($timeDisp);
+      }
+    }
+  }
+
+  $textBase = <<<TXT
 Hallo MietMichBox Team,
 
 eine neue Buchungsanfrage ist eingegangen. Der Status steht bislang auf Ausstehend. ⚠️
@@ -420,14 +601,15 @@ Buchung im Überblick:
 🕰️ Zeitraum: {$range}
 🚚 Abwicklung: {$fulfillment}
 💶 Gesamtkosten: {$totalDisp}
-
-Informationen für die gewählte Abwicklung:
-{$instructionText}
-
-Buchung in der Buchungsverwaltung einsehen: {$linkUrl}
 TXT;
 
-  $html = <<<HTML
+  $text = $textBase . "\n";
+  if ($extraTextLines) {
+    $text .= "\nZusätzliche Angaben:\n" . implode("\n", $extraTextLines) . "\n";
+  }
+  $text .= "\nBuchung in der Buchungsverwaltung einsehen: {$linkUrl}";
+
+  $htmlBase = <<<HTML
 <p>Hallo MietMichBox Team,</p>
 <p>eine neue Buchungsanfrage ist eingegangen. Der Status steht bislang auf Ausstehend.</p>
 <p>Buchung im Überblick:<br>
@@ -437,12 +619,13 @@ TXT;
 🕰️ Zeitraum: {$range}<br>
 🚚 Abwicklung: {$fulfillment}<br>
 💶 Gesamtkosten: {$totalDisp}</p>
-<p>Informationen für die gewählte Abwicklung:</p>
-<ul>
-{$instructionListHtml}
-</ul>
-<p>Buchung in der <a href="{$linkUrl}">Buchungsverwaltung</a> einsehen.</p>
 HTML;
+
+  $html = $htmlBase;
+  if ($extraHtmlLines) {
+    $html .= '<p>Zusätzliche Angaben:<br>' . implode('<br>', $extraHtmlLines) . '</p>';
+  }
+  $html .= "<p>Buchung in der <a href=\"{$linkUrl}\">Buchungsverwaltung</a> einsehen.</p>";
 
   return [
     'subject' => $subject,
@@ -470,13 +653,19 @@ function send_mail_via_available(string $email, string $name, array $mailData): 
     }
   } elseif (function_exists('sendMail')) {
     $sent = (bool)sendMail($email, $mailData['subject'], $mailData['text'], $name);
+    if (!$sent && function_exists('get_last_mail_error')) {
+      $lastError = trim((string)get_last_mail_error());
+      if ($lastError !== '') {
+        $info['error'] = $lastError;
+      }
+    }
   } else {
     $info['error'] = 'no mail function';
     return $info;
   }
 
   $info['sent'] = $sent;
-  if (!$sent) {
+  if (!$sent && !isset($info['error'])) {
     $info['error'] = 'Mailer lieferte false zurück';
   }
   return $info;
@@ -508,7 +697,6 @@ try {
   $pdo = get_pdo();
 
   $in = read_input();
-  error_log('[create_booking] input='.json_encode($in, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES));
 
   // Pflichtfelder
   $box_id = isset($in['box_id']) ? (int)$in['box_id'] : 0;
@@ -519,17 +707,61 @@ try {
   $phone  = trim((string)($in['customer_phone'] ?? ''));
   $note   = trim((string)($in['note']           ?? ''));
 
-  $fulfillment = normalize_fulfillment_from_request($in);
+  $pricingDetailsJson = null;
+  $pricingDetailsArray = null;
+  if (array_key_exists('pricing_details_json', $in)) {
+    $pricingRaw = $in['pricing_details_json'];
+  } elseif (array_key_exists('pricing_details', $in)) {
+    $pricingRaw = $in['pricing_details'];
+  } else {
+    $pricingRaw = null;
+  }
+  if (is_array($pricingRaw)) {
+    $pricingDetailsArray = $pricingRaw;
+    $pricingDetailsJson = json_encode($pricingRaw, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+  } elseif (is_string($pricingRaw) && trim($pricingRaw) !== '') {
+    $pricingTrimmed = trim($pricingRaw);
+    $pricingDetailsJson = $pricingTrimmed;
+    $decodedPricing = json_decode($pricingTrimmed, true);
+    if (is_array($decodedPricing)) {
+      $pricingDetailsArray = $decodedPricing;
+    }
+  }
+
+  $fulfillmentDetailsJson = null;
+  $fulfillmentDetailsArray = null;
+  if (array_key_exists('fulfillment_details_json', $in)) {
+    $fulfillmentRaw = $in['fulfillment_details_json'];
+  } elseif (array_key_exists('fulfillment_details', $in)) {
+    $fulfillmentRaw = $in['fulfillment_details'];
+  } else {
+    $fulfillmentRaw = null;
+  }
+  if (is_array($fulfillmentRaw)) {
+    $fulfillmentDetailsArray = $fulfillmentRaw;
+    $fulfillmentDetailsJson = json_encode($fulfillmentRaw, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+  } elseif (is_string($fulfillmentRaw) && trim($fulfillmentRaw) !== '') {
+    $fulfillmentTrimmed = trim($fulfillmentRaw);
+    $fulfillmentDetailsJson = $fulfillmentTrimmed;
+    $decodedFulfillment = json_decode($fulfillmentTrimmed, true);
+    if (is_array($decodedFulfillment)) {
+      $fulfillmentDetailsArray = $decodedFulfillment;
+    }
+  }
+
+  $fulfillment = normalize_fulfillment_from_request($in, $fulfillmentDetailsArray, $pricingDetailsArray);
   $fulfillmentMethod = $fulfillment['method'];
   $fulfillmentLabel  = $fulfillment['label'];
   $fulfillmentNote   = $fulfillment['note'];
   $fulfillmentPrice  = (float)$fulfillment['price_delta'];
-  $fulfillmentDetailsArray = build_initial_fulfillment_details($fulfillmentMethod, $in, [
-    'customer_name' => $name,
-    'customer_email' => $email,
-    'customer_phone' => $phone,
-  ]);
-  $initialFulfillmentDetails = json_encode($fulfillmentDetailsArray, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '{}';
+
+  $normalizedFulfillmentDetails = normalize_fulfillment_details_for_storage($fulfillmentDetailsArray, $fulfillmentMethod, $in);
+  if ($normalizedFulfillmentDetails !== null) {
+    $fulfillmentDetailsArray = $normalizedFulfillmentDetails;
+    $fulfillmentDetailsJson = json_encode($normalizedFulfillmentDetails, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+  } elseif ($fulfillmentDetailsJson === null && $fulfillmentDetailsArray !== null) {
+    $fulfillmentDetailsJson = json_encode($fulfillmentDetailsArray, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+  }
 
   // Overlap-Flag: nur TRUE zählt; FALSE wird ignoriert (Server-Default bleibt)
   $force = null;
@@ -591,20 +823,18 @@ try {
   if (has_col($pdo,'note'))           { $fields[]='note';           $place[]=':note';           $params[':note']=$note; }
   if (has_col($pdo,'total_amount'))   { $fields[]='total_amount';   $place[]=':total_amount';   $params[':total_amount']=$total; }
   if (has_col($pdo,'deposit_eur'))    { $fields[]='deposit_eur';    $place[]=':deposit_eur';    $params[':deposit_eur']=$deposit; }
+  if ($pricingDetailsJson !== null) {
+    if (has_col($pdo,'pricing_details_json')) { $fields[]='pricing_details_json'; $place[]=':pricing_details_json'; $params[':pricing_details_json']=$pricingDetailsJson; }
+    elseif (has_col($pdo,'pricing_details')) { $fields[]='pricing_details'; $place[]=':pricing_details'; $params[':pricing_details']=$pricingDetailsJson; }
+  }
+  if ($fulfillmentDetailsJson !== null) {
+    if (has_col($pdo,'fulfillment_details_json')) { $fields[]='fulfillment_details_json'; $place[]=':fulfillment_details_json'; $params[':fulfillment_details_json']=$fulfillmentDetailsJson; }
+    elseif (has_col($pdo,'fulfillment_details')) { $fields[]='fulfillment_details'; $place[]=':fulfillment_details'; $params[':fulfillment_details']=$fulfillmentDetailsJson; }
+  }
   if (has_col($pdo,'fulfillment_method')) { $fields[]='fulfillment_method'; $place[]=':fulfillment_method'; $params[':fulfillment_method']=$fulfillmentMethod; }
   if (has_col($pdo,'fulfillment_label'))  { $fields[]='fulfillment_label';  $place[]=':fulfillment_label';  $params[':fulfillment_label']=$fulfillmentLabel; }
   if (has_col($pdo,'fulfillment_note'))   { $fields[]='fulfillment_note';   $place[]=':fulfillment_note';   $params[':fulfillment_note']=$fulfillmentNote; }
   if (has_col($pdo,'fulfillment_price_delta')) { $fields[]='fulfillment_price_delta'; $place[]=':fulfillment_price_delta'; $params[':fulfillment_price_delta']=$fulfillmentPrice; }
-  if (has_col($pdo,'fulfillment_details_json')) {
-    $fields[] = 'fulfillment_details_json';
-    $place[]  = ':fulfillment_details_json';
-    $params[':fulfillment_details_json'] = $initialFulfillmentDetails;
-  }
-  if (has_col($pdo,'fulfillment_details')) {
-    $fields[] = 'fulfillment_details';
-    $place[]  = ':fulfillment_details';
-    $params[':fulfillment_details'] = $initialFulfillmentDetails;
-  }
 
   // created_at → NOW() (nur wenn Spalte existiert)
   if (has_col($pdo,'created_at')) { $fields[]='created_at'; $place[]='NOW()'; }
@@ -643,6 +873,11 @@ try {
       'fulfillment_label'  => $fulfillmentLabel,
       'fulfillment_note'   => $fulfillmentNote,
       'fulfillment_price_delta' => $fulfillmentPrice,
+      'fulfillment_details' => $fulfillmentDetailsArray,
+      'fulfillment_details_json' => $fulfillmentDetailsJson,
+      'pricing_details' => $pricingDetailsArray,
+      'pricing_details_json' => $pricingDetailsJson,
+      'fulfillment_adds_to_total' => $fulfillment['adds_to_total'],
     ];
 
     try {
@@ -675,8 +910,9 @@ try {
       'fulfillment_label'=>$fulfillmentLabel,
       'fulfillment_price_delta'=>$fulfillmentPrice,
       'fulfillment_note'=>$fulfillmentNote,
-      'fulfillment_details_json' => $initialFulfillmentDetails,
-      'fulfillment_details' => $fulfillmentDetailsArray
+      'fulfillment_adds_to_total'=>$fulfillment['adds_to_total'],
+      'fulfillment_details'=>$fulfillmentDetailsArray,
+      'fulfillment_details_json'=>$fulfillmentDetailsJson,
     ],
     'mail'=>$mailInfo,
     'internal_mail'=>$internalMailInfo
