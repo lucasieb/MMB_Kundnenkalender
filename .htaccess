@@ -3,6 +3,19 @@ AddDefaultCharset utf-8
   AddCharset utf-8 .html .htm .css .js .php
 </IfModule>
 
+# The builder embeds this stable URL, so browsers must revalidate it after deploys.
+<Files "admin_auth.js">
+  <IfModule mod_expires.c>
+    ExpiresActive Off
+  </IfModule>
+  <IfModule mod_headers.c>
+    Header unset Expires
+    Header always unset Expires
+    Header set Cache-Control "no-cache, max-age=0, must-revalidate"
+    Header always set Cache-Control "no-cache, max-age=0, must-revalidate"
+  </IfModule>
+</Files>
+
 Options -Indexes
 
 <IfModule mod_headers.c>
