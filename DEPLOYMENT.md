@@ -4,6 +4,10 @@
 
 Work in `main`. The customer calendar on the home page, booking page, and three product pages uses the script and styles restored from `main2` (verified 2026-10-19). The published booking list and admin calendar also use the `main2` scripts; Hostinger adds its own iframe resize script. Updating PHP by SFTP does not update code pasted into the Website Builder. Keep those snippets and their API changes together.
 
+On 2026-10-20 the two admin snippets were manually updated and published in the Website Builder to load `admin_auth.js?v=56c343a0`. Their source copies are `Adminbuchungsliste` and `Adminkalender`. Keep the same version in both embeds. The version bypasses older copies held by browsers and Hostinger's CDN; `.htaccess` now requires revalidation of this script. After future authentication script changes, update the version in both source copies and both Builder code fields, then publish and verify the live page. Publishing GitHub files alone does not perform this step.
+
+The Builder editor sandboxes its previews with `allow-scripts` only. Its opaque preview origin cannot access the authenticated API or coordinate same-origin frames; verify login on the published website after unlocking its separate guest page gate.
+
 Pushes to `main` deploy automatically after PHP syntax and isolated HTTP contract tests pass. Manual runs are restricted to `main`. After upload the workflow verifies the deployed commit in `deployment.json` and checks `ping.php`. A green upload by itself is not an end-to-end booking or email test.
 
 ## Admin accounts
