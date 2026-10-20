@@ -89,7 +89,7 @@
         const start=(first.getDay()===0?6:first.getDay()-1), days=[], prevLast=new Date(y,m,0);
         for(let i=start-1;i>=0;i--){days.push({date:new Date(y,m-1,prevLast.getDate()-i),otherMonth:true});}
         for(let d=1; d<=last.getDate(); d++){days.push({date:new Date(y,m,d),otherMonth:false});}
-        const total=Math.ceil(days.length/7)*7; for(let d=1; d<=total-days.length; d++){days.push({date:new Date(y,m+1,d),otherMonth:true});}
+        const total=Math.ceil(days.length/7)*7, trailing=total-days.length; for(let d=1; d<=trailing; d++){days.push({date:new Date(y,m+1,d),otherMonth:true});}
         return days;}
     };
     global.MMBCore={events:new EventEmitter(),Utils};

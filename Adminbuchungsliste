@@ -70,7 +70,7 @@
       generateCalendarDays(cur){const y=cur.getFullYear(),m=cur.getMonth(),first=new Date(y,m,1),last=new Date(y,m+1,0); const start=(first.getDay()===0?6:first.getDay()-1); const days=[]; const prevLast=new Date(y,m,0);
         for(let i=start-1;i>=0;i--){days.push({date:new Date(y,m-1,prevLast.getDate()-i),otherMonth:true});}
         for(let d=1; d<=last.getDate(); d++){days.push({date:new Date(y,m,d),otherMonth:false});}
-        const total=Math.ceil(days.length/7)*7; for(let d=1; d<=total-days.length; d++){days.push({date:new Date(y,m+1,d),otherMonth:true});}
+        const total=Math.ceil(days.length/7)*7, trailing=total-days.length; for(let d=1; d<=trailing; d++){days.push({date:new Date(y,m+1,d),otherMonth:true});}
         return days;},
       showNotification(msg,type='info'){const ex=document.querySelector(`.mmb-${type}-notification`); if(ex) ex.remove(); const el=document.createElement('div'); el.className=`mmb-${type}-notification`; const bg=type==='error'?'var(--mmb-busy)':'var(--mmb-ok)';
         el.style.cssText=`position:fixed;top:20px;right:20px;background:${bg};color:#fff;padding:1rem;border-radius:4px;box-shadow:0 4px 6px rgba(0,0,0,.1);z-index:1000;max-width:300px;`; el.textContent=msg; document.body.appendChild(el); setTimeout(()=>el.remove(),5000);}
