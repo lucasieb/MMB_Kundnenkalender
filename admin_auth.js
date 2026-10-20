@@ -159,7 +159,7 @@
       if (global.parent !== global && global.frameElement && global.parent.innerWidth <= 900) {
         const host = global.parent;
         const header = host.document.querySelector('header');
-        host.scrollTo({top:host.scrollY + global.frameElement.getBoundingClientRect().top - (header?.getBoundingClientRect().height || 80) - 12, behavior:'smooth'});
+        host.scrollTo({top:host.scrollY + global.frameElement.getBoundingClientRect().top - (header?.getBoundingClientRect().height || 80) - 12, behavior:'auto'});
       }
     } catch (_) {}
   }
