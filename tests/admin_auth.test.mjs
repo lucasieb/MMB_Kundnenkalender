@@ -11,6 +11,7 @@ class Element {
     this.events = {};
     this.hidden = false;
     this.value = '';
+    this.style = {setProperty(){}};
     const classes = new Set();
     this.classList = {
       add: name => classes.add(name),
@@ -43,27 +44,33 @@ function frame(parent, server) {
   };
   const context = {
     document, parent, closed: false, location: {href:'https://www.mietmichbox.de/buchungsverwaltung',protocol:'https:'},
-    URL, URLSearchParams, setTimeout, console: {error(){}}, fetch: server.fetch,
+    URL, URLSearchParams, Headers, setTimeout, console: {error(){}}, fetch: server.fetch,
   };
   context.window = context;
   vm.runInNewContext(source, context);
   return vm.runInContext('window', context);
 }
 function backend() {
-  const state = {authenticated:false,token:'initial',gets:0,posts:0,offline:false};
+  const state = {authenticated:false,token:'initial',sessionToken:'anonymous.transport',gets:0,posts:0,offline:false};
   state.fetch = async (url, options = {}) => {
     if (state.offline) throw new Error('offline');
+    const authorization = new Headers(options.headers).get('Authorization');
+    if (url.endsWith('list_bookings.php')) {
+      assert.equal(authorization,'Bearer ' + state.sessionToken, 'both frames must use the rotated login token');
+      return {ok:state.authenticated,status:state.authenticated?200:401};
+    }
     if (url.endsWith('admin_login_token.php')) {
       state.gets++;
       state.token = 'token-' + state.gets;
-      return {ok:true,status:200,text:async()=>JSON.stringify({ok:true,authenticated:state.authenticated,token:state.token})};
+      return {ok:true,status:200,text:async()=>JSON.stringify({ok:true,authenticated:state.authenticated,token:state.token,session_token:state.sessionToken})};
     }
     state.posts++;
+    assert.equal(authorization,'Bearer ' + state.sessionToken, 'login must carry its session even without cookies');
     const body = new URLSearchParams(options.body);
     assert.equal(body.get('csrf_token'), state.token, 'CSRF must be refreshed before login');
     const ok = body.get('username') === 'test-user' && body.get('password') === 'test-password';
-    if (ok) state.authenticated = true;
-    return {ok,status:ok?200:401,text:async()=>JSON.stringify({ok,error:ok?'':'Login fehlgeschlagen'})};
+    if (ok) { state.authenticated = true; state.sessionToken='authenticated.rotated'; }
+    return {ok,status:ok?200:401,text:async()=>JSON.stringify({ok,error:ok?'':'Login fehlgeschlagen',session_token:ok?state.sessionToken:null})};
   };
   return state;
 }
@@ -97,6 +104,9 @@ test('one login unlocks both embedded tools; wrong password stays retryable', as
   assert.equal(overlay(top).hidden,true);
   assert.equal(bottom.document.body.classList.contains('mmb-auth-pending'),false);
   assert.equal(top.document.body.classList.contains('mmb-auth-pending'),false);
+  assert.equal((await top.MMBAdminAuth.fetch('list_bookings.php')).status,200);
+  assert.equal((await bottom.MMBAdminAuth.fetch('list_bookings.php')).status,200);
+  await assert.rejects(bottom.MMBAdminAuth.fetch('https://unrelated.example/list_bookings.php'),/API-Adresse/);
   const reloaded = frame(parent,server);
   await reloaded.MMBAdminAuth.ensureSession();
   assert.equal(overlay(reloaded),undefined, 'existing session must survive frame reload');

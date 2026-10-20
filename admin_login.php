@@ -115,6 +115,7 @@ if (!$valid) {
 }
 
 session_regenerate_id(true);
+unset($_SESSION['admin_transport_secret']);
 $_SESSION['admin_username'] = $username;
 $_SESSION['admin_display_name'] = isset($userConfig['display_name']) ? (string) $userConfig['display_name'] : ($userConfig['name'] ?? $username);
 $_SESSION['admin_last_activity'] = time();
@@ -123,6 +124,7 @@ unset($_SESSION['admin_csrf_token']);
 
 echo json_encode([
     'ok' => true,
+    'session_token' => admin_transport_token(),
     'user' => [
         'username' => $username,
         'display_name' => isset($userConfig['display_name']) ? (string) $userConfig['display_name'] : ($userConfig['name'] ?? $username),
