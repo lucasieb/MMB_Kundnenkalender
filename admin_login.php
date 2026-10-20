@@ -118,6 +118,7 @@ session_regenerate_id(true);
 $_SESSION['admin_username'] = $username;
 $_SESSION['admin_display_name'] = isset($userConfig['display_name']) ? (string) $userConfig['display_name'] : ($userConfig['name'] ?? $username);
 $_SESSION['admin_last_activity'] = time();
+$_SESSION['admin_credentials_version'] = admin_credentials_version();
 unset($_SESSION['admin_csrf_token']);
 
 echo json_encode([

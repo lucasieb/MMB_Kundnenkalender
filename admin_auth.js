@@ -86,6 +86,48 @@
   let ensurePromise = null;
   let authenticated = false;
 
+  // Hostinger embeds both tools as same-origin srcdoc frames. Share only the
+  // pending login operation, never credentials or a session token.
+  function getSessionCoordinator(){
+    let host = global;
+    try {
+      if (global.parent && global.parent.document) host = global.parent;
+    } catch (_) { /* A standalone/cross-origin embed keeps its own login. */ }
+    const key = '__mmbAdminLoginV2';
+    let shared = host[key];
+    if (!shared || shared.apiBase !== API_BASE || (shared.owner && shared.owner.closed)) {
+      shared = { apiBase: API_BASE, pending: null, owner: null };
+      host[key] = shared;
+    }
+    return shared;
+  }
+
+  function setPendingLayout(pending){
+    ensureStyle();
+    document.documentElement.classList.add('mmb-admin-document');
+    document.body.classList.add('mmb-admin-embed');
+    document.body.classList.toggle('mmb-auth-pending', pending);
+  }
+
+  let waiting;
+  function showWaiting(){
+    setPendingLayout(true);
+    if (!waiting) {
+      waiting = document.createElement('div');
+      waiting.className = 'mmb-login-waiting';
+      waiting.setAttribute('role', 'status');
+      waiting.textContent = 'Bitte oben in der Buchungsübersicht anmelden. Beide Bereiche werden gemeinsam freigeschaltet.';
+      document.body.appendChild(waiting);
+    }
+    waiting.hidden = false;
+  }
+
+  function readyLayout(){
+    if (waiting) waiting.hidden = true;
+    hideOverlay();
+    setPendingLayout(false);
+  }
+
   function ensureStyle(){
     if (document.getElementById(STYLE_ID)) {
       return;
@@ -93,7 +135,11 @@
     const style = document.createElement('style');
     style.id = STYLE_ID;
     style.textContent = `
-      .mmb-login-overlay{position:fixed;inset:0;background:rgba(17,24,39,.65);display:flex;align-items:center;justify-content:center;z-index:9999;padding:1.5rem;}
+      html.mmb-admin-document{height:auto!important;min-height:720px;overflow:visible!important;}
+      body.mmb-admin-embed{height:auto!important;min-height:720px!important;min-width:0;}
+      body.mmb-auth-pending #mmb-admin-shell{display:none;}
+      body.mmb-admin-embed #mmb-admin-shell{min-width:0;}
+      .mmb-login-overlay{position:relative;background:rgba(17,24,39,.65);display:flex;align-items:center;justify-content:center;flex:1;width:100%;min-height:720px;box-sizing:border-box;padding:2rem 1rem;}
       .mmb-login-overlay[hidden]{display:none;}
       .mmb-login-dialog{background:#fff;border-radius:10px;box-shadow:0 20px 45px rgba(15,23,42,.35);max-width:420px;width:100%;padding:2rem;font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
       .mmb-login-dialog h2{margin:0 0 .75rem;font-size:1.35rem;font-weight:600;color:#111827;}
@@ -106,6 +152,8 @@
       .mmb-login-submit:hover{background:#0284c7;}
       .mmb-login-submit[disabled]{opacity:.7;cursor:progress;}
       .mmb-login-footer{margin-top:1rem;font-size:.85rem;color:#6b7280;text-align:center;}
+      .mmb-login-waiting{display:flex;align-items:center;justify-content:center;flex:1;min-height:720px;padding:2rem;box-sizing:border-box;color:#e5e7eb;font-family:system-ui,sans-serif;text-align:center;}
+      .mmb-login-waiting[hidden]{display:none;}
     `;
     document.head.appendChild(style);
   }
@@ -146,7 +194,7 @@
   }
 
   function showOverlay(){
-    ensureStyle();
+    setPendingLayout(true);
     ensureOverlay();
     overlay.hidden = false;
     overlay.classList.add('is-visible');
@@ -209,9 +257,10 @@
   }
 
   async function performLogin(username, password){
-    if (!csrfToken) {
-      await fetchState();
-    }
+    // Re-read the shared cookie session before submitting: another frame may
+    // have refreshed its CSRF token or already completed the login.
+    const state = await fetchState();
+    if (state.authenticated) return state;
     const body = new URLSearchParams();
     body.set('username', username);
     body.set('password', password);
@@ -261,7 +310,7 @@
     }
     try {
       await performLogin(username, password);
-      hideOverlay();
+      readyLayout();
       showError('');
       form.reset();
       if (pendingResolve) {
@@ -273,12 +322,8 @@
     } catch (error) {
       console.error('Admin login failed', error);
       showError(error && error.message ? error.message : 'Login fehlgeschlagen');
-      if (error && error.isFatal && pendingReject) {
-        pendingReject(error);
-        pendingResolve = null;
-        pendingReject = null;
-        hideOverlay();
-      }
+      // Keep the form visible so a wrong password or transient network error
+      // can be corrected without reloading both widgets.
       return;
     } finally {
       if (submitButton) {
@@ -294,20 +339,38 @@
     if (ensurePromise) {
       return ensurePromise;
     }
-    ensurePromise = (async () => {
-      const state = await fetchState();
-      if (state.authenticated) {
-        return;
-      }
-      return new Promise((resolve, reject) => {
-        pendingResolve = () => {
-          authenticated = true;
-          resolve();
-        };
-        pendingReject = reject;
-        showOverlay();
+    setPendingLayout(false);
+    const shared = getSessionCoordinator();
+    if (shared.pending) {
+      showWaiting();
+      ensurePromise = shared.pending.then(() => {
+        authenticated = true;
+        readyLayout();
       });
-    })();
+    } else {
+      shared.owner = global;
+      const login = (async () => {
+        let initialError = null;
+        try {
+          const state = await fetchState();
+          if (state.authenticated) return;
+        } catch (error) { initialError = error; }
+        return new Promise((resolve, reject) => {
+          pendingResolve = () => { authenticated = true; resolve(); };
+          pendingReject = reject;
+          showOverlay();
+          if (initialError) showError('Die Anmeldung konnte noch nicht geladen werden. Bitte erneut anmelden.');
+        });
+      })();
+      shared.pending = login;
+      ensurePromise = login.finally(() => {
+        if (shared.pending === login) {
+          shared.pending = null;
+          shared.owner = null;
+        }
+        readyLayout();
+      });
+    }
     try {
       await ensurePromise;
     } finally {

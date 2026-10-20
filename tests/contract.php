@@ -35,9 +35,9 @@ $cookies = [];
 function check(bool $ok, string $message): void {
     if (!$ok) throw new RuntimeException($message);
 }
-function request(string $path, ?array $data = null, bool $json = false): array {
-    global $address, $cookies;
-    $headers = ['Origin: https://www.mietmichbox.de', 'X-Forwarded-Proto: https'];
+function request(string $path, ?array $data = null, bool $json = false, string $origin = 'https://www.mietmichbox.de'): array {
+    global $address, $cookies, $lastHeaders;
+    $headers = ['Origin: ' . $origin, 'X-Forwarded-Proto: https'];
     if ($cookies) {
         $parts = [];
         foreach ($cookies as $key => $value) $parts[] = "$key=$value";
@@ -50,6 +50,7 @@ function request(string $path, ?array $data = null, bool $json = false): array {
     }
     $options['header'] = implode("\r\n", $headers);
     $body = file_get_contents('http://' . $address . '/' . $path, false, stream_context_create(['http' => $options]));
+    $lastHeaders = $http_response_header ?? [];
     foreach ($http_response_header ?? [] as $header)
         if (preg_match('/^Set-Cookie:\s*([^=]+)=([^;]*)/i', $header, $match)) $cookies[$match[1]] = $match[2];
     preg_match('/\s(\d{3})\s/', $http_response_header[0] ?? '', $status);
@@ -65,6 +66,8 @@ try {
     }
     [$status, $state] = request('admin_login_token.php');
     check($status === 200 && $state['authenticated'] === false && !isset($state['auth_disabled']), 'Admin login must be required');
+    [$status] = request('admin_login_token.php', null, false, 'https://builder.hostinger.com');
+    check($status === 200 && in_array('Access-Control-Allow-Origin: https://builder.hostinger.com', $lastHeaders, true), 'Builder must receive explicit CORS authorization');
     [$status] = request('list_bookings.php');
     check($status === 401, 'Anonymous list must be denied');
     [$status] = request('admin_login.php', ['username'=>'test-admin','password'=>'wrong','csrf_token'=>$state['token']]);
@@ -110,6 +113,11 @@ try {
     check(json_decode($row['fulfillment_details_json'],true)['contact_phone']==='1234','Updated contact lost');
     [$status,$calendar]=request('calendar_unavailable.php?box_id=3&from=2027-01-01&to=2027-01-31');
     check($status===200 && $calendar['ok']===true && count($calendar['unavailable']['bookings'])===3,'Public availability failed');
+    file_put_contents($temp . '/admin_users.php', "\n// changed credentials\n", FILE_APPEND);
+    [$status,$state]=request('admin_login_token.php');
+    check($status===200 && $state['authenticated']===false,'Changed credentials must expire existing sessions');
+    [$status]=request('list_bookings.php');
+    check($status===401,'Expired session must not read bookings');
     echo "PASS: authenticated admin, pickup/shipping/delivery, pricing/address persistence, legacy requests, validation, updates, availability, SMTP failure isolation\n";
 } finally {
     proc_terminate($process);
