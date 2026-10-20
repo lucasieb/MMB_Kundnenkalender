@@ -92,7 +92,7 @@ function sendMail(string $to, string $subject, string $body, string $toName = ''
         $mailer = build_mailer();
         $mailer->addAddress($to, $toName);
         $mailer->Subject = $subject;
-        $mailer->Body    = nl2br($body, false);
+        $mailer->Body    = nl2br(htmlspecialchars($body, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'), false);
         $mailer->AltBody = $body;
         $mailer->send();
         return true;
