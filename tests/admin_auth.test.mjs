@@ -47,7 +47,7 @@ function frame(parent, server) {
   };
   context.window = context;
   vm.runInNewContext(source, context);
-  return context;
+  return vm.runInContext('window', context);
 }
 function backend() {
   const state = {authenticated:false,token:'initial',gets:0,posts:0,offline:false};
@@ -117,4 +117,42 @@ test('login participates in document sizing and recovers from initial connection
   await submit(widget,'test-password');
   await pending;
   assert.equal(overlay(widget).hidden,true);
+});
+
+test('booking list owns the login even when the calendar finishes loading first', async () => {
+  const server = backend(), parent = {document:{}};
+  const top = frame(parent,server), bottom = frame(parent,server);
+  parent.document.querySelectorAll = () => [{
+    contentWindow:top,
+    getAttribute:() => '<div id="mmb-admin-list"></div><script src="https://backend.example/admin_auth.js"></script>',
+  }];
+  const calendar = bottom.MMBAdminAuth.ensureSession();
+  await settle();
+  assert.equal(server.gets,0, 'calendar must wait for the booking list');
+  assert.equal(overlay(bottom),undefined);
+  const list = top.MMBAdminAuth.ensureSession();
+  await settle();
+  assert.equal(server.gets,1);
+  assert.ok(overlay(top));
+  await submit(top,'test-password');
+  await Promise.all([list,calendar]);
+  assert.equal(server.posts,1);
+  assert.equal(top.document.body.classList.contains('mmb-auth-pending'),false);
+  assert.equal(bottom.document.body.classList.contains('mmb-auth-pending'),false);
+});
+
+test('a late calendar uses the session already confirmed by the booking list', async () => {
+  const server = backend(), parent = {document:{}};
+  server.authenticated = true;
+  const top = frame(parent,server), bottom = frame(parent,server);
+  parent.document.querySelectorAll = () => [{
+    contentWindow:top,
+    getAttribute:() => '<div id="mmb-admin-list"></div><script src="https://backend.example/admin_auth.js"></script>',
+  }];
+  await top.MMBAdminAuth.ensureSession();
+  await bottom.MMBAdminAuth.ensureSession();
+  assert.equal(server.gets,1);
+  assert.equal(overlay(top),undefined);
+  assert.equal(overlay(bottom),undefined);
+  assert.equal(bottom.document.body.classList.contains('mmb-auth-pending'),false);
 });
