@@ -558,7 +558,7 @@ function build_internal_submission_mail(array $data): array {
       $extraHtmlLines[] = '☎️ Kontaktwege: ' . $escHtml($channels);
     }
 
-    if ($method === 'shipping') {
+    if ($method === 'shipping' || $method === 'delivery') {
       $addressParts = [];
       $addressLine = trim((string)($fulfillmentDetails['address_line1'] ?? ''));
       $postalCode = trim((string)($fulfillmentDetails['postal_code'] ?? ''));
@@ -711,7 +711,7 @@ try {
   try { $customer = booking_customer_fields($in); } catch (InvalidArgumentException $e) { json_response(['ok'=>false,'error'=>$e->getMessage(),'code'=>'validation'],422); }
   if (!is_truthy($in['accept_terms']??false) || !is_truthy($in['privacy_acknowledged']??false)) json_response(['ok'=>false,'error'=>'Bitte AGB und Datenschutzhinweis bestätigen.','code'=>'validation'],422);
   // Fail explicitly instead of silently losing data when migration is missing.
-  foreach (['customer_phone','billing_address_line1','billing_postal_code','billing_city','customer_birthdate','fulfillment_method','fulfillment_details_json','pricing_details_json','email_verification_hash','privacy_notice_version'] as $column) {
+  foreach (['customer_phone','billing_address_line1','billing_postal_code','billing_city','customer_birthdate','fulfillment_method','fulfillment_details_json','pricing_details_json','email_verification_hash','privacy_notice_version','privacy_acknowledged_at','email_verification_expires_at','email_verified_at','customer_mail_sent_at','internal_mail_sent_at','note','deposit_eur','fulfillment_label','fulfillment_note','fulfillment_price_delta'] as $column) {
     if (!has_col($pdo,$column)) json_response(['ok'=>false,'error'=>'Buchungssystem wird aktualisiert. Bitte später erneut versuchen.','code'=>'schema_missing'],503);
   }
 

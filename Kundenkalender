@@ -256,6 +256,7 @@
   .mmb-form-note,.mmb-privacy-note{font-size:13px;line-height:1.6;overflow-wrap:anywhere;}
   .mmb-privacy-note{padding:12px;background:#343434;border-radius:8px;}
   .mmb-privacy-note p{margin:8px 0;}
+  .mmb-privacy-note summary{min-height:44px;display:flex;align-items:center;cursor:pointer;font-weight:600;}
   .mmb-review{background:#343434;border-left:3px solid #0ea5e9;padding:12px;overflow-wrap:anywhere;font-size:14px;}
   .mmb-back{background:#52525b;}
   [data-target-address][hidden]{display:none!important;}
@@ -915,6 +916,7 @@ class Calendar{
       if(!data.customer_name?.trim() || !data.customer_email?.trim() || !data.customer_phone?.trim()){ return this.modal('Bitte prüfen','Bitte Name, E-Mail und Telefonnummer ausfüllen.'); }
       if(!this.state.sel.start){ return this.modal('Zeitraum fehlt','Bitte einen Zeitraum im Kalender wählen.'); }
 
+      if(!/^\+?[0-9 ()\/.\-]+$/.test(data.customer_phone.trim()) || data.customer_phone.replace(/\D/g,'').length<7 || data.customer_phone.replace(/\D/g,'').length>15) return this.modal('Telefonnummer prüfen','Bitte eine erreichbare Telefonnummer mit Vorwahl angeben.');
       const start=this.state.sel.start, end=this.state.sel.end || this.state.sel.start;
 
       // >>> NEU: Summen aus dem State (Fallback: on-the-fly berechnen)
@@ -1048,7 +1050,7 @@ class Calendar{
       <label>Geburtsdatum (freiwillig)<input name="customer_birthdate" type="date" autocomplete="bday" min="1900-01-01" max="${Utils.formatDate(new Date())}" value="${esc(draft.customer_birthdate)}"><small>Für die spätere Vertragsvorbereitung. Du kannst die Anfrage ohne Geburtsdatum senden.</small></label>
       ${extended?`<label class="mmb-check-row"><input name="same_address" type="checkbox" ${draft.same_address===false?'':'checked'}> Zieladresse wie Rechnungsadresse</label><div data-target-address ${draft.same_address===false?'':'hidden'}>${addressFields('target_',method==='shipping'?'Versandadresse':'Lieferadresse')}</div>`:''}
       ${method==='delivery'?`<label>Hinweis zum Treffpunkt (optional)<input name="meeting_point" maxlength="400" value="${esc(draft.meeting_point)}"></label><label>Wunschzeit (optional)<input type="time" name="preferred_time" value="${esc(draft.preferred_time)}"><small>Die tatsächliche Lieferzeit stimmen wir mit dir ab.</small></label>`:''}
-      <div class="mmb-privacy-note"><strong>Deine Daten</strong><p>Wir verwenden sie zur Bearbeitung deiner Anfrage sowie zur Vorbereitung und Abwicklung von Vertrag und Rechnung (Art. 6 Abs. 1 lit. b DSGVO). Keine Werbung und kein Verkauf deiner Daten. Notwendige technische Dienstleister sind Hostinger und IONOS; bei Versand/Lieferung erhält der beauftragte Transportdienst die dafür nötigen Angaben.</p><p>Speicherung nur solange für Anfrage und Vertrag erforderlich oder gesetzlich vorgeschrieben. Rechnungsbelege sind grundsätzlich acht Jahre aufzubewahren; je Unterlage können andere gesetzliche Fristen gelten. Einzelheiten und deine Rechte findest du im <a href="https://www.mietmichbox.de/datenschutzerklarung" target="_blank" rel="noopener">Datenschutzhinweis</a>.</p></div>
+      <details class="mmb-privacy-note"><summary>Deine Daten: Nutzung &amp; Speicherdauer</summary><p>Wir verwenden sie zur Bearbeitung deiner Anfrage sowie zur Vorbereitung und Abwicklung von Vertrag und Rechnung (Art. 6 Abs. 1 lit. b DSGVO). Keine Werbung und kein Verkauf deiner Daten. Notwendige technische Dienstleister sind Hostinger und IONOS; bei Versand/Lieferung erhält der beauftragte Transportdienst die dafür nötigen Angaben.</p><p>Speicherung nur solange für Anfrage und Vertrag erforderlich oder gesetzlich vorgeschrieben. Rechnungsbelege sind grundsätzlich acht Jahre aufzubewahren; je Unterlage können andere gesetzliche Fristen gelten. Einzelheiten und deine Rechte findest du im <a href="https://www.mietmichbox.de/datenschutzerklarung" target="_blank" rel="noopener">Datenschutzhinweis</a>.</p></details>
       <label class="mmb-check-row"><input type="checkbox" name="accept_terms" required> <span>Ich habe die <a href="https://www.mietmichbox.de/agb" target="_blank" rel="noopener">AGB</a> gelesen und akzeptiere sie. *</span></label>
       <label class="mmb-check-row"><input type="checkbox" name="privacy_acknowledged" required> <span>Ich habe den Datenschutzhinweis zur Kenntnis genommen und meine Angaben geprüft. *</span></label>
       <p class="mmb-form-note">Nach dem Absenden erhältst du eine Eingangsmail mit Bestätigungslink für deine E-Mail-Adresse. Das bestätigt die Erreichbarkeit, nicht deine Identität. Deine Anfrage wird anschließend von uns geprüft.</p>
@@ -1058,7 +1060,7 @@ class Calendar{
       const form=side.querySelector('form'), same=form.querySelector('[name="same_address"]'), target=form.querySelector('[data-target-address]');
       const sync=()=>{if(target){target.hidden=same.checked;target.querySelectorAll('input').forEach(i=>i.disabled=same.checked);}};
       sync(); if(same)same.addEventListener('change',sync);
-      const saveDraft=()=>{this.detailsDraft=Object.fromEntries(new FormData(form));this.detailsDraft.same_address=same?same.checked:true;};
+      const saveDraft=()=>{this.detailsDraft=Object.fromEntries([...form.querySelectorAll('input')].filter(i=>i.type!=='checkbox').map(i=>[i.name,i.value]));this.detailsDraft.same_address=same?same.checked:true;};
       form.addEventListener('input',saveDraft);
       form.querySelector('[data-back]').addEventListener('click',()=>{saveDraft();resolve(null);});
       form.addEventListener('submit',event=>{

@@ -152,6 +152,10 @@ try {
       [$status]=request('create_booking.php',array_replace($valid,[$key=>$invalid]));
       check($status===422,'Invalid field accepted: '.$key);
     }
+    foreach (['shipping','delivery'] as $method) {
+      [$status]=request('create_booking.php',array_replace($valid,['fulfillment_method'=>$method]));
+      check($status===422,'Missing destination address accepted: '.$method);
+    }
     [$status,$list]=request('list_bookings.php');
     check($status===200 && $list['ok']===true && count($list['items'] ?? [])===4,'Authenticated list failed');
     [$status,$updated]=request('update_booking.php',[
@@ -179,6 +183,11 @@ try {
     $verificationUrl='http://'.$address.'/verify_booking_email.php?id='.$verifyId.'&token='.$verifyToken;
     $get=file_get_contents($verificationUrl);
     check(str_contains($get,'E-Mail-Adresse bestätigen') && !$db->query('SELECT email_verified_at FROM bookings WHERE id='.$verifyId)->fetchColumn(),'Email scanners must not verify on GET');
+    $wrongPage=file_get_contents('http://'.$address.'/verify_booking_email.php?id='.$verifyId.'&token='.str_repeat('0',64));
+    check(str_contains($wrongPage,'Link ist ungültig'),'Forged verification token accepted');
+    $db->exec("UPDATE bookings SET email_verification_expires_at='2000-01-01 00:00:00' WHERE id=".$verifyId);
+    $expired=file_get_contents($verificationUrl);check(str_contains($expired,'Link ist ungültig'),'Expired verification accepted');
+    $db->exec("UPDATE bookings SET email_verification_expires_at='2099-01-01 00:00:00' WHERE id=".$verifyId);
     $postOptions=['http'=>['method'=>'POST','header'=>'Content-Type: application/x-www-form-urlencoded','content'=>http_build_query(['id'=>$verifyId,'token'=>$verifyToken])]];
     $posted=file_get_contents('http://'.$address.'/verify_booking_email.php',false,stream_context_create($postOptions));
     check(str_contains($posted,'E-Mail-Adresse bestätigt') && $db->query('SELECT email_verified_at FROM bookings WHERE id='.$verifyId)->fetchColumn(),'Confirmation POST failed');
@@ -195,7 +204,7 @@ try {
     check($status===401,'Expired session must not read bookings');
     [$status]=request('list_bookings.php',null,false,'https://www.mietmichbox.de',$rotatedToken,false);
     check($status===401,'Credential changes must also expire bearer sessions');
-    echo "PASS: authenticated admin, pickup/shipping/delivery, pricing/address persistence, legacy requests, validation, updates, availability, SMTP failure isolation\n";
+    echo "PASS: authenticated admin, pickup/shipping/delivery, pricing/address persistence, schema migration, customer/billing validation, email verification/revocation, updates, availability, separate SMTP outcomes\n";
 } finally {
     proc_terminate($process);
     proc_close($process);
