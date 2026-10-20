@@ -1028,9 +1028,12 @@ class Calendar{
   }
 
   modal(title,text){
-    document.getElementById('mmb-modal-title').textContent=title;
-    document.getElementById('mmb-modal-text').textContent=text;
-    document.getElementById('mmb-modal').style.display='flex';
+    const panel=this.root.querySelector('.mmb-booking-form');if(!panel)return;
+    panel.querySelector('[data-inline-feedback]')?.remove();
+    const feedback=document.createElement('div');feedback.dataset.inlineFeedback='1';feedback.setAttribute('role','alert');feedback.tabIndex=-1;
+    feedback.style.cssText='padding:12px;border:1px solid #fda4af;background:#7f1d1d;color:white;border-radius:8px;white-space:pre-wrap;overflow-wrap:anywhere';
+    feedback.textContent=title+'\n'+text;panel.prepend(feedback);feedback.focus({preventScroll:true});
+    try {const frame=window.frameElement;window.parent.scrollBy({top:frame.getBoundingClientRect().top+feedback.getBoundingClientRect().top-120,behavior:'smooth'});}catch{feedback.scrollIntoView({block:'center'});}
   }
 
   async promptFulfillmentDetails(method, defaults, booking){

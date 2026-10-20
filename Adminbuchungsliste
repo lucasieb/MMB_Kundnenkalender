@@ -2276,7 +2276,7 @@ Telefon: 01742015500`;
 vielen Dank für deine Buchung (${displayId(b.id)}) für den Zeitraum ${range}.
 Leider können wir diese Buchung nicht annehmen, da zu deinem gewählten Zeitraum bereits alle unsere Musikboxen vermietet sind.
 
-Du kannst gerne direkt in unserem <a href="https://www.mietmichbox.de/buchungskalender" target="_blank" rel="noopener">Buchungskalender</a> eine neue Buchung zu einem anderen Zeitraum anfragen oder uns als Antwort auf diese E-Mail alternative Zeiträume nennen, sodass wir gemeinsam eine Lösung finden können. Wir helfen dir gerne schnellstmöglich weiter.
+Du kannst gerne direkt in unserem Buchungskalender (https://www.mietmichbox.de/musikbox-online-buchen) eine neue Buchung zu einem anderen Zeitraum anfragen oder uns als Antwort auf diese E-Mail alternative Zeiträume nennen, sodass wir gemeinsam eine Lösung finden können. Wir helfen dir gerne schnellstmöglich weiter.
 
 Falls du noch offene Fragen hast, kannst du uns jederzeit kontaktieren.
 
@@ -2311,7 +2311,7 @@ tut uns leid, aber unsere Musikboxen sind sehr gefragt 🔥
 
 Für deine Buchung (${displayId(b.id)}) ist die Musikbox ${b.box_name} für den Zeitraum ${range} leider nicht mehr verfügbar. ${altSentence}
 
-Du kannst gerne direkt in unserem <a href="https://www.mietmichbox.de/buchungskalender" target="_blank" rel="noopener">Buchungskalender</a> eine neue Buchung mit einer anderen Musikbox oder zu einem anderen Zeitraum anfragen. Alternativ kannst du uns auch als Antwort auf diese E-Mail die alternative Musikbox oder den alternativen Zeitraum nennen, sodass wir deine Buchung aktualisieren können. Wir helfen dir gerne schnellstmöglich weiter.
+Du kannst gerne direkt in unserem Buchungskalender (https://www.mietmichbox.de/musikbox-online-buchen) eine neue Buchung mit einer anderen Musikbox oder zu einem anderen Zeitraum anfragen. Alternativ kannst du uns auch als Antwort auf diese E-Mail die alternative Musikbox oder den alternativen Zeitraum nennen, sodass wir deine Buchung aktualisieren können. Wir helfen dir gerne schnellstmöglich weiter.
 
 Falls du noch offene Fragen hast, kannst du uns jederzeit kontaktieren.
 

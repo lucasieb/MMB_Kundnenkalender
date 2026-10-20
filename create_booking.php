@@ -464,12 +464,12 @@ function build_submission_mail(array $data): array {
   $totalDisp = $ctx['totalDisp'];
   $fulfillment = $ctx['fulfillment'];
 
-  $subject = "Deine Buchung wurde übermittelt 🚀 – Buchungs-ID: {$data['display_id']}";
+  $subject = "Deine Buchungsanfrage ist eingegangen – Buchungs-ID: {$data['display_id']}";
 
   $text = <<<TXT
 Hallo {$name},
 
-deine Buchung wurde erfolgreich an uns übermittelt. Aktuell steht der Status noch auf Ausstehend. Wir bearbeiten deine Anfrage schnellstmöglich und melden uns dann mit der Bestätigung. Bis dahin musst du nichts weiter tun.
+deine Buchungsanfrage ist bei uns eingegangen. Sie steht auf Ausstehend und ist noch keine verbindliche Buchung. Wir bearbeiten deine Anfrage schnellstmöglich und melden uns dann mit der Bestätigung. Bis dahin musst du nichts weiter tun.
 
 Deine Buchung im Überblick:
 👤 Name: {$name}
