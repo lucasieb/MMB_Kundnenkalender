@@ -53,7 +53,7 @@
     .mmb-calendar-legend .is-busy::before{background:#f87171;}
     .mmb-nav-btn{min-width:44px;min-height:44px;}
     .mmb-day{cursor:default;}
-    @media(max-width:640px){
+    @media(max-width:900px){
       :root{--mmb-shell-padding:0px;}
       #mmb-admin-cal{padding:0;min-width:0;}
       #mmb-admin-cal>.mmb-widget{padding:.75rem;gap:.75rem;min-width:0;}

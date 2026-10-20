@@ -186,7 +186,7 @@
         .mmb-btn-secondary{background:#6b7280;color:#fff;} .mmb-btn-secondary:hover{background:#4b5563;}
         .mmb-reset{background:rgba(255,255,255,.16);color:#f8fafc;border:1px solid rgba(255,255,255,.22);} .mmb-reset:hover{background:rgba(255,255,255,.22);}
         .mmb-modal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;justify-content:center;align-items:center;z-index:11000;font-family:'Poppins',sans-serif;}
-        .mmb-modal-content{background:var(--mmb-bg);color:var(--mmb-text);padding:1.5rem;border-radius:8px;max-width:640px;width:92%;max-height:85vh;overflow:auto;box-shadow:0 10px 25px rgba(0,0,0,.3);}
+        .mmb-modal-content{background:var(--mmb-bg);color:var(--mmb-text);padding:1.5rem;border-radius:8px;max-width:900px;width:92%;max-height:85vh;overflow:auto;box-shadow:0 10px 25px rgba(0,0,0,.3);}
         .mmb-modal h3{margin:0 0 .75rem 0;color:var(--mmb-text);}
         .mmb-modal .mmb-field{display:flex;flex-direction:column;gap:.25rem;margin:.5rem 0;}
         .mmb-modal .mmb-field-switch label{display:flex;align-items:center;gap:.5rem;font-weight:500;}
@@ -253,7 +253,7 @@
         .mmb-detail-header,.mmb-detail-footer{flex-shrink:0;}
         .mmb-detail-footer{position:relative;}
         .mmb-detail-close{min-width:44px;min-height:44px;}
-        @media(max-width:640px){
+        @media(max-width:900px){
           :root{--mmb-shell-padding:0px;}
           #mmb-admin-list{padding:0;min-width:0;}
           #mmb-admin-list>.mmb-widget{padding:.75rem;gap:.75rem;min-width:0;}

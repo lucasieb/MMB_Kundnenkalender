@@ -149,14 +149,14 @@
     try { if (global.parent?.document) host = global.parent; } catch (_) {}
     const header = host.document.querySelector?.('header');
     const headerHeight = header?.getBoundingClientRect().height || 80;
-    const height = Math.max(320, (host.visualViewport?.height || host.innerHeight || 720) - headerHeight - 24);
+    const height = Math.max(240, (host.visualViewport?.height || host.innerHeight || 720) - headerHeight - 24);
     document.documentElement.style.setProperty('--mmb-viewport-height', height + 'px');
   }
 
   function focusPanel(){
     updateViewportHeight();
     try {
-      if (global.parent !== global && global.frameElement && global.parent.innerWidth <= 640) {
+      if (global.parent !== global && global.frameElement && global.parent.innerWidth <= 900) {
         const host = global.parent;
         const header = host.document.querySelector('header');
         host.scrollTo({top:host.scrollY + global.frameElement.getBoundingClientRect().top - (header?.getBoundingClientRect().height || 80) - 12, behavior:'smooth'});
@@ -203,7 +203,7 @@
       .mmb-login-footer{margin-top:1rem;font-size:.85rem;color:#6b7280;text-align:center;}
       .mmb-login-waiting{display:flex;align-items:center;justify-content:center;flex:1;min-height:720px;padding:2rem;box-sizing:border-box;color:#e5e7eb;font-family:system-ui,sans-serif;text-align:center;}
       .mmb-login-waiting[hidden]{display:none;}
-      @media(max-width:640px){
+      @media(max-width:900px){
         html.mmb-admin-document{min-height:0;}
         body.mmb-admin-embed{min-height:600px!important;}
         .mmb-login-overlay{min-height:600px;padding:1rem .75rem;}
