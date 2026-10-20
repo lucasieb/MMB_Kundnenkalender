@@ -151,6 +151,13 @@
     const headerHeight = header?.getBoundingClientRect().height || 80;
     const height = Math.max(240, (host.visualViewport?.height || host.innerHeight || 720) - headerHeight - 24);
     document.documentElement.style.setProperty('--mmb-viewport-height', height + 'px');
+    let panelTop = 0;
+    if (host !== global && global.frameElement) {
+      const frame = global.frameElement.getBoundingClientRect();
+      const headerBottom = header?.getBoundingClientRect().bottom || headerHeight;
+      panelTop = Math.min(Math.max(0, headerBottom + 12 - frame.top), Math.max(0, frame.height - 240));
+    }
+    document.documentElement.style.setProperty('--mmb-panel-top', panelTop + 'px');
   }
 
   function focusPanel(){
@@ -175,7 +182,15 @@
     } catch (_) {}
   }
   global.addEventListener?.('resize', updateViewportHeight);
-  try { global.parent.visualViewport?.addEventListener('resize', updateViewportHeight); } catch (_) {}
+  try {
+    const host = global.parent;
+    host.visualViewport?.addEventListener('resize', updateViewportHeight);
+    host.addEventListener?.('scroll', updateViewportHeight, {passive:true});
+    global.addEventListener?.('pagehide', () => {
+      host.visualViewport?.removeEventListener('resize', updateViewportHeight);
+      host.removeEventListener?.('scroll', updateViewportHeight);
+    }, {once:true});
+  } catch (_) {}
 
   function ensureStyle(){
     if (document.getElementById(STYLE_ID)) {
@@ -204,6 +219,7 @@
       .mmb-login-waiting{display:flex;align-items:center;justify-content:center;flex:1;min-height:720px;padding:2rem;box-sizing:border-box;color:#e5e7eb;font-family:system-ui,sans-serif;text-align:center;}
       .mmb-login-waiting[hidden]{display:none;}
       @media(max-width:900px){
+        .mmb-detail-overlay{top:var(--mmb-panel-top,0px)!important;height:min(calc(100% - var(--mmb-panel-top,0px)),var(--mmb-viewport-height,640px))!important;bottom:auto!important;}
         html.mmb-admin-document{min-height:0;}
         body.mmb-admin-embed{min-height:600px!important;}
         .mmb-login-overlay{min-height:600px;padding:1rem .75rem;}
