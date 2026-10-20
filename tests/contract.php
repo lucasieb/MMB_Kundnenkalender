@@ -142,11 +142,13 @@ try {
     check($status===200 && $list['ok']===true && count($list['items'] ?? [])===4,'Authenticated list failed');
     [$status,$updated]=request('update_booking.php',[
         'id'=>1,'pricing_details'=>['total'=>123],'fulfillment_details'=>['method'=>'pickup','contact_phone'=>'1234']
-    ],true);
-    check($status===200 && $updated['ok']===true,'Admin update failed');
+    ],true,'https://www.mietmichbox.de',$rotatedToken,false);
+    check($status===200 && $updated['ok']===true,'Cookie-free admin update failed');
     $row=$db->query('SELECT * FROM bookings WHERE id=1')->fetch(PDO::FETCH_ASSOC);
     check(json_decode($row['pricing_details_json'],true)['total']===123,'Updated pricing lost');
     check(json_decode($row['fulfillment_details_json'],true)['contact_phone']==='1234','Updated contact lost');
+    [$status,$statusUpdate]=request('update_booking_status.php',['booking_id'=>1,'status'=>'confirmed','send_email'=>0],true,'https://www.mietmichbox.de',$rotatedToken,false);
+    check($status===200 && $statusUpdate['ok']===true && $db->query('SELECT status FROM bookings WHERE id=1')->fetchColumn()==='confirmed','Cookie-free status action failed');
     [$status,$calendar]=request('calendar_unavailable.php?box_id=3&from=2027-01-01&to=2027-01-31');
     check($status===200 && $calendar['ok']===true && count($calendar['unavailable']['bookings'])===3,'Public availability failed');
     file_put_contents($temp . '/admin_users.php', "\n// changed credentials\n", FILE_APPEND);
