@@ -93,11 +93,23 @@
     try {
       if (global.parent && global.parent.document) host = global.parent;
     } catch (_) { /* A standalone/cross-origin embed keeps its own login. */ }
-    const key = '__mmbAdminLoginV2';
+    const key = '__mmbAdminLoginV3';
     let shared = host[key];
     if (!shared || shared.apiBase !== API_BASE || (shared.owner && shared.owner.closed)) {
-      shared = { apiBase: API_BASE, pending: null, owner: null };
+      shared = { apiBase: API_BASE, pending: null, owner: null, authenticated: false };
       host[key] = shared;
+    }
+    // Frames can finish loading in either order. Reserve the login for the
+    // booking list even when the calendar reaches ensureSession first.
+    if (!shared.owner && host !== global) {
+      const frames = host.document.querySelectorAll?.('iframe') || [];
+      for (const frame of frames) {
+        const source = frame.getAttribute('srcdoc') || '';
+        if (source.includes('id="mmb-admin-list"') && source.includes(API_BASE)) {
+          shared.owner = frame.contentWindow;
+          break;
+        }
+      }
     }
     return shared;
   }
@@ -341,14 +353,22 @@
     }
     setPendingLayout(false);
     const shared = getSessionCoordinator();
-    if (shared.pending) {
-      showWaiting();
-      ensurePromise = shared.pending.then(() => {
-        authenticated = true;
-        readyLayout();
+    if (shared.authenticated) {
+      authenticated = true;
+      readyLayout();
+      return;
+    }
+    if (!shared.pending) {
+      shared.owner = shared.owner || global;
+      shared.started = false;
+      shared.pending = new Promise((resolve, reject) => {
+        shared.resolve = resolve;
+        shared.reject = reject;
       });
-    } else {
-      shared.owner = global;
+    }
+    const operation = shared.pending;
+    if (shared.owner === global && !shared.started) {
+      shared.started = true;
       const login = (async () => {
         let initialError = null;
         try {
@@ -362,15 +382,23 @@
           if (initialError) showError('Die Anmeldung konnte noch nicht geladen werden. Bitte erneut anmelden.');
         });
       })();
-      shared.pending = login;
-      ensurePromise = login.finally(() => {
-        if (shared.pending === login) {
-          shared.pending = null;
-          shared.owner = null;
-        }
-        readyLayout();
-      });
+      login.then(shared.resolve, shared.reject);
+    } else {
+      showWaiting();
     }
+    ensurePromise = operation.then(() => {
+      authenticated = true;
+      shared.authenticated = true;
+      readyLayout();
+    }).finally(() => {
+      if (shared.pending === operation && shared.owner === global) {
+        shared.pending = null;
+        shared.owner = null;
+        shared.resolve = null;
+        shared.reject = null;
+        shared.started = false;
+      }
+    });
     try {
       await ensurePromise;
     } finally {
