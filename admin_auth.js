@@ -83,17 +83,18 @@
   let pendingResolve = null;
   let pendingReject = null;
   let csrfToken = null;
+  let sessionToken = null;
   let ensurePromise = null;
   let authenticated = false;
 
-  // Hostinger embeds both tools as same-origin srcdoc frames. Share only the
-  // pending login operation, never credentials or a session token.
+  // Same-origin srcdoc frames share a login and its in-memory bearer. Never
+  // persist credentials or tokens in URLs, localStorage or sessionStorage.
   function getSessionCoordinator(){
     let host = global;
     try {
       if (global.parent && global.parent.document) host = global.parent;
     } catch (_) { /* A standalone/cross-origin embed keeps its own login. */ }
-    const key = '__mmbAdminLoginV3';
+    const key = '__mmbAdminLoginV4';
     let shared = host[key];
     if (!shared || shared.apiBase !== API_BASE || (shared.owner && shared.owner.closed)) {
       shared = { apiBase: API_BASE, pending: null, owner: null, authenticated: false };
@@ -124,6 +125,7 @@
   let waiting;
   function showWaiting(){
     setPendingLayout(true);
+    document.body.classList.add('mmb-auth-waiting');
     if (!waiting) {
       waiting = document.createElement('div');
       waiting.className = 'mmb-login-waiting';
@@ -135,10 +137,45 @@
   }
 
   function readyLayout(){
+    document.body.classList.remove('mmb-auth-waiting');
     if (waiting) waiting.hidden = true;
     hideOverlay();
     setPendingLayout(false);
+    updateViewportHeight();
   }
+
+  function updateViewportHeight(){
+    let host = global;
+    try { if (global.parent?.document) host = global.parent; } catch (_) {}
+    const header = host.document.querySelector?.('header');
+    const headerHeight = header?.getBoundingClientRect().height || 80;
+    const height = Math.max(320, (host.visualViewport?.height || host.innerHeight || 720) - headerHeight - 24);
+    document.documentElement.style.setProperty('--mmb-viewport-height', height + 'px');
+  }
+
+  function focusPanel(){
+    updateViewportHeight();
+    try {
+      if (global.parent !== global && global.frameElement && global.parent.innerWidth <= 640) {
+        const host = global.parent;
+        const header = host.document.querySelector('header');
+        host.scrollTo({top:host.scrollY + global.frameElement.getBoundingClientRect().top - (header?.getBoundingClientRect().height || 80) - 12, behavior:'smooth'});
+      }
+    } catch (_) {}
+  }
+  function focusSection(id){
+    if (!['mmb-admin-list','mmb-admin-cal'].includes(id)) return;
+    try {
+      const host = global.parent;
+      const frame = Array.from(host.document.querySelectorAll('iframe')).find(el=>(el.getAttribute('srcdoc') || '').includes('id="' + id + '"'));
+      if (frame) {
+        const header = host.document.querySelector('header');
+        host.scrollTo({top:host.scrollY + frame.getBoundingClientRect().top - (header?.getBoundingClientRect().height || 80) - 12, behavior:'smooth'});
+      }
+    } catch (_) {}
+  }
+  global.addEventListener?.('resize', updateViewportHeight);
+  try { global.parent.visualViewport?.addEventListener('resize', updateViewportHeight); } catch (_) {}
 
   function ensureStyle(){
     if (document.getElementById(STYLE_ID)) {
@@ -166,6 +203,16 @@
       .mmb-login-footer{margin-top:1rem;font-size:.85rem;color:#6b7280;text-align:center;}
       .mmb-login-waiting{display:flex;align-items:center;justify-content:center;flex:1;min-height:720px;padding:2rem;box-sizing:border-box;color:#e5e7eb;font-family:system-ui,sans-serif;text-align:center;}
       .mmb-login-waiting[hidden]{display:none;}
+      @media(max-width:640px){
+        html.mmb-admin-document{min-height:0;}
+        body.mmb-admin-embed{min-height:600px!important;}
+        .mmb-login-overlay{min-height:600px;padding:1rem .75rem;}
+        .mmb-login-dialog{padding:1.25rem;box-sizing:border-box;min-width:0;}
+        .mmb-login-field input{font-size:16px;min-width:0;min-height:44px;}
+        .mmb-login-submit{min-height:48px;}
+        body.mmb-auth-waiting{min-height:160px!important;}
+        .mmb-login-waiting{min-height:160px;padding:1rem;}
+      }
     `;
     document.head.appendChild(style);
   }
@@ -230,8 +277,33 @@
     errorBox.textContent = message;
   }
 
+  function rememberSession(data){
+    if (data.session_token) {
+      sessionToken = data.session_token;
+      getSessionCoordinator().sessionToken = sessionToken;
+    }
+  }
+
+  async function apiFetch(url, options = {}){
+    const target = new URL(url, apiBaseUrl);
+    if (target.origin !== apiBaseUrl.origin || !target.pathname.startsWith(apiBaseUrl.pathname)) {
+      throw new Error('Ungültige Admin-API-Adresse');
+    }
+    const headers = new Headers(options.headers || {});
+    const token = getSessionCoordinator().sessionToken || sessionToken;
+    if (token) headers.set('Authorization', 'Bearer ' + token);
+    return fetch(target.href, {...options, headers, credentials:'include', cache:'no-store'});
+  }
+
   async function fetchState(){
-    const res = await fetch(TOKEN_ENDPOINT, { credentials: 'include' });
+    let res = await apiFetch(TOKEN_ENDPOINT);
+    if (res.status === 401) {
+      sessionToken = null;
+      const shared = getSessionCoordinator();
+      shared.sessionToken = null;
+      shared.authenticated = false;
+      res = await apiFetch(TOKEN_ENDPOINT);
+    }
     const text = await res.text();
     let data;
     try {
@@ -247,6 +319,7 @@
       throw err;
     }
     csrfToken = data.token || null;
+    rememberSession(data);
     authenticated = Boolean(data.authenticated);
     return data;
   }
@@ -269,7 +342,7 @@
   }
 
   async function performLogin(username, password){
-    // Re-read the shared cookie session before submitting: another frame may
+    // Re-read the shared session before submitting: another frame may
     // have refreshed its CSRF token or already completed the login.
     const state = await fetchState();
     if (state.authenticated) return state;
@@ -279,7 +352,7 @@
     if (csrfToken) {
       body.set('csrf_token', csrfToken);
     }
-    const res = await fetch(LOGIN_ENDPOINT, {
+    const res = await apiFetch(LOGIN_ENDPOINT, {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -303,6 +376,7 @@
       throw err;
     }
     authenticated = true;
+    rememberSession(data);
     csrfToken = null;
     return data;
   }
@@ -408,6 +482,9 @@
 
   global.MMBAdminAuth = {
     ensureSession,
+    fetch: apiFetch,
+    focusPanel,
+    focusSection,
     getApiBase: () => API_BASE
   };
 })(window);

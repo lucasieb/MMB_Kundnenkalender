@@ -4,7 +4,7 @@
 
 Work in `main`. The customer calendar on the home page, booking page, and three product pages uses the script and styles restored from `main2` (verified 2026-10-19). The published booking list and admin calendar also use the `main2` scripts; Hostinger adds its own iframe resize script. Updating PHP by SFTP does not update code pasted into the Website Builder. Keep those snippets and their API changes together.
 
-On 2026-10-20 the two admin snippets were manually updated and published in the Website Builder to load `admin_auth.js?v=56c343a0`. Their source copies are `Adminbuchungsliste` and `Adminkalender`. Keep the same version in both embeds. The version bypasses older copies held by browsers and Hostinger's CDN; `.htaccess` now requires revalidation of this script. After future authentication script changes, update the version in both source copies and both Builder code fields, then publish and verify the live page. Publishing GitHub files alone does not perform this step.
+The admin snippets in `Adminbuchungsliste` and `Adminkalender` load `admin_auth.js?v=20261020-mobile1`. Copy both complete snippets into their Website Builder code fields, then publish. Keep the same version in both embeds. The version bypasses older copies held by browsers and Hostinger's CDN; `.htaccess` requires revalidation of this script. After future authentication script changes, update the version in both source copies and both Builder code fields, then publish and verify the live page. Publishing GitHub files alone does not perform this step.
 
 The Builder editor sandboxes its previews with `allow-scripts` only. Its opaque preview origin cannot access the authenticated API or coordinate same-origin frames; verify login on the published website after unlocking its separate guest page gate.
 
@@ -13,6 +13,10 @@ Pushes to `main` deploy automatically after PHP syntax and isolated HTTP contrac
 ## Admin accounts
 
 The backend uses `admin_auth.js` with session authentication. Authentication is enabled by default; the Website Builder page password alone does not authenticate PHP requests. Keep `DISABLE_ADMIN_AUTH=false` in production.
+
+The website and API use different sites. To support browsers that block third-party cookies, the token endpoint returns a session bearer consisting of a PHP session ID plus a separate random 256-bit secret. The client holds it only in memory and sends it as `Authorization: Bearer ...` to the configured API origin. Both same-origin embeds share the current bearer; it is never persisted in browser storage or URLs. Login still requires the session's CSRF token and a valid password, and rotates both the session ID and bearer secret. Inactivity and account-configuration changes invalidate both cookie and bearer sessions. Never log Authorization headers or authentication response bodies.
+
+Below 640px the booking table becomes compact cards with one Details action. The detail form keeps its header and footer visible while fields scroll; secondary actions are available through “Weitere Aktionen”. Navigation buttons move between the two embeds. The calendar is a read-only view of bookings and availability blocks; manual blocking and the former local availability override are not enabled.
 
 The existing server's `admin_users.php` is retained and is deliberately excluded from Git and uploads. For a new installation, copy `admin_users.example.php` to `admin_users.php` on the server and populate password hashes privately. Do not commit real account passwords. An admin login is required after switching from the old password-header backend.
 

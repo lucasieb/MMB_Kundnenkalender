@@ -57,11 +57,11 @@ if ($allowedOrigins) {
     }
 }
 
+$authenticated = is_admin_authenticated();
 if (empty($_SESSION['admin_csrf_token'])) {
     $_SESSION['admin_csrf_token'] = bin2hex(random_bytes(32));
 }
 
-$authenticated = is_admin_authenticated();
 $user = null;
 if ($authenticated) {
     $user = [
@@ -73,6 +73,7 @@ if ($authenticated) {
 echo json_encode([
     'ok' => true,
     'token' => $_SESSION['admin_csrf_token'],
+    'session_token' => admin_transport_token(),
     'authenticated' => $authenticated,
     'user' => $user,
 ]);

@@ -44,6 +44,30 @@
     .mmb-day--other-month{color:var(--mmb-text-light);opacity:.5;}
     .mmb-day--available{background:var(--mmb-bg);} .mmb-day--busy{background:#fee2e2;color:#991b1b;} .mmb-day--blocked{background:#f3f4f6;color:var(--mmb-text-light);cursor:not-allowed;}
     .mmb-error{margin-top:1rem;padding:1rem;border-radius:6px;background:#fee2e2;color:#b91c1c;font-weight:600;}
+
+    .mmb-calendar-heading{font-size:1.25rem;margin:0;}
+    .mmb-calendar-note{margin:0;line-height:1.45;font-size:.85rem;color:var(--mmb-text-light);}
+    .mmb-box-select,.mmb-back-link{display:none;}
+    .mmb-calendar-legend{display:flex;gap:1rem;font-size:.85rem;}
+    .mmb-calendar-legend span::before{content:'';display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:.4rem;background:var(--mmb-accent);}
+    .mmb-calendar-legend .is-busy::before{background:#f87171;}
+    .mmb-nav-btn{min-width:44px;min-height:44px;}
+    .mmb-day{cursor:default;}
+    @media(max-width:640px){
+      :root{--mmb-shell-padding:0px;}
+      #mmb-admin-cal{padding:0;min-width:0;}
+      #mmb-admin-cal>.mmb-widget{padding:.75rem;gap:.75rem;min-width:0;}
+      .mmb-admin-controls{display:block;min-width:0;}
+      .mmb-back-link{display:block;min-height:44px;padding:0;border:0;background:transparent;color:#bae6fd;font:inherit;text-align:left;cursor:pointer;}
+      .mmb-box-buttons{display:none;}
+      .mmb-box-select{display:flex;flex-direction:column;gap:.35rem;font-size:.85rem;}
+      .mmb-box-select select{width:100%;min-width:0;min-height:44px;font-size:16px;padding:.5rem;background:var(--mmb-bg);color:var(--mmb-text);border:1px solid var(--mmb-border);border-radius:8px;}
+      .mmb-nav{margin:.75rem 0 0;justify-content:space-between;gap:.25rem;}
+      .mmb-month-title{font-size:.95rem;}
+      .mmb-day{min-height:44px;min-width:0;font-size:.9rem;}
+      .mmb-day-header{padding:.5rem 0;font-size:.8rem;}
+      .mmb-calendar-note,.mmb-calendar-legend{font-size:.8rem;}
+    }
   </style>
 </head>
 <body>
@@ -51,7 +75,7 @@
     <div id="mmb-admin-cal"></div>
   </div>
 
-  <script src="https://firebrick-squirrel-568721.hostingersite.com/admin_auth.js?v=56c343a0" data-api-base="https://firebrick-squirrel-568721.hostingersite.com/"></script>
+  <script src="https://firebrick-squirrel-568721.hostingersite.com/admin_auth.js?v=20261020-mobile1" data-api-base="https://firebrick-squirrel-568721.hostingersite.com/"></script>
   <script>
   /* ============ CORE ============ */
   (function(global){'use strict';
@@ -71,126 +95,89 @@
     global.MMBCore={events:new EventEmitter(),Utils};
   })(window);
 
-  /* ============ API ============ */
+  /* ============ Belegungsübersicht – nur Anzeige ============ */
   const MMB_API_BASE = MMBAdminAuth.getApiBase();
-  async function mmbApiPost(path,body){
-    const res=await fetch(MMB_API_BASE+path,{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(body||{})});
-    const t=await res.text(); let d; try{d=JSON.parse(t);}catch{d={ok:false,raw:t};}
-    if(!res.ok||!d.ok) throw new Error('API Fehler'); return d;
-  }
-  const MMBApi={ async blockDays({box_id,start_date,end_date,reason='admin_block'}){ return mmbApiPost('block_days.php',{box_id,start_date,end_date,reason}); } };
-
-  /* ============ Admin-Kalender mit Switch ============ */
   (function(global){'use strict';
-    const AVAILABILITY_MODE_KEY='MMB_AVAILABILITY_MODE'; // 'enforce' | 'ignore'
-    const AVAIL={ENFORCE:'enforce',IGNORE:'ignore'};
-    const getMode=()=>localStorage.getItem(AVAILABILITY_MODE_KEY)||AVAIL.ENFORCE;
-    const setMode=(m)=>{ localStorage.setItem(AVAILABILITY_MODE_KEY,m); window.dispatchEvent(new CustomEvent('mmb:availabilityModeChanged',{detail:{mode:m}})); };
-
     class AdminCalendar{
       constructor(sel){
-        this.root = typeof sel==='string'? document.querySelector(sel) : sel;
-        if(!this.root) throw new Error('Container nicht gefunden');
-        this.state={ month:new Date(), boxes:[], box:null, availability:{}, loading:false, blockMode:false, mode:getMode() };
-        this.init();
+        this.root=document.querySelector(sel);
+        this.state={month:new Date(),box:'1',availability:{},loading:false,error:''};
+        this.boxes=[{id:'1',name:'Marshall Bromley 750'},{id:'2',name:'Teufel Rockster Neo'},{id:'3',name:'Soundboks 4'}];
+        this.revision=0;
+        this.root.addEventListener('click',e=>{
+          const el=e.target.closest('[data-act]'); if(!el) return;
+          if(el.dataset.act==='prev') this.changeMonth(-1);
+          if(el.dataset.act==='next') this.changeMonth(1);
+          if(el.dataset.act==='box'){this.state.box=el.dataset.id;void this.reload();}
+          if(el.dataset.act==='retry') void this.reload();
+          if(el.dataset.act==='bookings') MMBAdminAuth.focusSection('mmb-admin-list');
+        });
+        this.root.addEventListener('change',e=>{
+          if(e.target.matches('[data-box-select]')){this.state.box=e.target.value;void this.reload();}
+        });
+        void this.reload();
       }
-      async init(){ this.renderLoading('Lade...'); this.state.boxes=[{id:'1',name:'Marshall Bromley 750',quantity:1},{id:'2',name:'Teufel Rockster Neo',quantity:1},{id:'3',name:'Soundboks 4',quantity:1}]; this.state.box=this.state.boxes[0]; await this.loadAvailability(); this.render(); this.wire(); }
-      renderLoading(t){ this.root.innerHTML=`<div class="mmb-widget"><div class="mmb-loading">${t}</div></div>`; }
-      async loadAvailability(){
-        const start=new Date(this.state.month.getFullYear(),this.state.month.getMonth(),1);
-        const end=new Date(this.state.month.getFullYear(),this.state.month.getMonth()+1,0);
-        const fmt=MMBCore.Utils.formatDate; const avail={};
-        for(let d=new Date(start); d<=end; d.setDate(d.getDate()+1)){ avail[fmt(d)]={available:this.state.box.quantity,status:'available'}; }
-        this.state.availability=avail;
+      async reload(){
+        const revision=++this.revision;
+        this.state.loading=true;this.state.error='';this.render();
+        const month=this.state.month, box=this.state.box;
+        const from=MMBCore.Utils.formatDate(new Date(month.getFullYear(),month.getMonth(),1));
+        const to=MMBCore.Utils.formatDate(new Date(month.getFullYear(),month.getMonth()+1,0));
+        try{
+          const query=new URLSearchParams({box_id:box,from,to});
+          const response=await fetch(MMB_API_BASE+'calendar_unavailable.php?'+query,{credentials:'omit',cache:'no-store'});
+          const data=await response.json();
+          if(!response.ok||!data.ok) throw new Error('availability');
+          if(revision!==this.revision) return;
+          const ranges=[...(data.unavailable?.bookings||[]),...(data.unavailable?.blocks||[])];
+          const availability={};
+          for(const day of MMBCore.Utils.generateCalendarDays(month)){
+            const key=MMBCore.Utils.formatDate(day.date);
+            availability[key]=ranges.some(range=>key>=range.start_date&&key<=(range.end_date||range.start_date));
+          }
+          this.state.availability=availability;
+        }catch(_){
+          if(revision!==this.revision) return;
+          this.state.error='Die Belegung konnte nicht geladen werden.';
+        }
+        if(revision===this.revision){this.state.loading=false;this.render();}
+      }
+      changeMonth(offset){
+        const date=new Date(this.state.month.getFullYear(),this.state.month.getMonth()+offset,1);
+        this.state.month=date;void this.reload();
       }
       render(){
-        this.root.innerHTML=`
-          <div class="mmb-widget">
-            <div class="mmb-admin-controls">
-              <div class="mmb-box-buttons">
-                ${this.state.boxes.map(b=>`<button class="mmb-box-btn ${this.state.box?.id===b.id?'mmb-box-btn--active':''}" data-act="box" data-id="${b.id}">${b.name}</button>`).join('')}
-              </div>
-
-              <div class="mmb-nav">
-                <button class="mmb-nav-btn" data-act="prev">←</button>
-                <div class="mmb-month-title">${MMBCore.Utils.formatMonthYear(this.state.month)}</div>
-                <button class="mmb-nav-btn" data-act="next">→</button>
-              </div>
-
-              <div class="mmb-right">
-                <div class="mmb-block-mode">
-                  <label>Blocking-Modus:</label>
-                  <button class="mmb-block-toggle ${this.state.blockMode?'mmb-block-toggle--active':''}" data-act="block">${this.state.blockMode?'Freigeben':'Belegen'}</button>
-                </div>
-                <div class="mmb-switch-row">
-                  <span>Verfügbarkeiten</span>
-                  <label class="mmb-switch">
-                    <input type="checkbox" id="mmb-switch-availability" ${this.state.mode===AVAIL.ENFORCE?'checked':''}>
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            ${this.renderCalendar()}
-          </div>`;
+        const title=MMBCore.Utils.formatMonthYear(this.state.month);
+        this.root.innerHTML=`<div class="mmb-widget">
+          <button class="mmb-back-link" data-act="bookings">↑ Zur Buchungsliste</button>
+          <h2 class="mmb-calendar-heading">Belegungsübersicht</h2>
+          <p class="mmb-calendar-note">Aus Buchungen und Sperrzeiten · nur Anzeige. Manuelle Belegung bleibt deaktiviert.</p>
+          <div class="mmb-admin-controls">
+            <div class="mmb-box-buttons">${this.boxes.map(box=>`<button class="mmb-box-btn ${box.id===this.state.box?'mmb-box-btn--active':''}" data-act="box" data-id="${box.id}" aria-pressed="${box.id===this.state.box}">${box.name}</button>`).join('')}</div>
+            <label class="mmb-box-select">Musikbox<select data-box-select>${this.boxes.map(box=>`<option value="${box.id}" ${box.id===this.state.box?'selected':''}>${box.name}</option>`).join('')}</select></label>
+            <div class="mmb-nav"><button class="mmb-nav-btn" data-act="prev" aria-label="Vorheriger Monat">←</button><div class="mmb-month-title" aria-live="polite">${title}</div><button class="mmb-nav-btn" data-act="next" aria-label="Nächster Monat">→</button></div>
+          </div>
+          ${this.state.loading?'<div class="mmb-loading" role="status">Belegung wird geladen…</div>':this.state.error?`<div class="mmb-error" role="alert">${this.state.error}<button class="mmb-nav-btn" data-act="retry">Erneut laden</button></div>`:this.renderCalendar()}
+          <div class="mmb-calendar-legend"><span>Frei</span><span class="is-busy">Belegt / gesperrt</span></div>
+        </div>`;
       }
       renderCalendar(){
         const days=MMBCore.Utils.generateCalendarDays(this.state.month);
-        return `
-          <div class="mmb-calendar">
-            <div class="mmb-calendar-header">${MMBCore.Utils.DAY_NAMES.map(d=>`<div class="mmb-day-header">${d}</div>`).join('')}</div>
-            <div class="mmb-calendar-body">
-              ${days.map(day=>{
-                const key=MMBCore.Utils.formatDate(day.date), av=this.state.availability[key];
-                const isPast=day.date<new Date().setHours(0,0,0,0);
-                let cls=['mmb-day']; if(day.otherMonth) cls.push('mmb-day--other-month');
-                if(isPast) cls.push('mmb-day--blocked');
-                else if(av){ if(av.available===0) cls.push('mmb-day--busy'); else cls.push('mmb-day--available'); }
-                return `<div class="${cls.join(' ')}" data-act="toggle-day" data-date="${key}">${day.date.getDate()}</div>`;
-              }).join('')}
-            </div>
-          </div>`;
-      }
-      wire(){
-        this.root.addEventListener('click',e=>{
-          const el=e.target.closest('[data-act]'); if(!el) return; e.preventDefault();
-          const act=el.dataset.act;
-          if(act==='prev') this.changeMonth(-1);
-          if(act==='next') this.changeMonth(1);
-          if(act==='box'){ this.state.box=this.state.boxes.find(x=>x.id===el.dataset.id); this.loadAvailability().then(()=>this.render()); }
-          if(act==='block'){ this.state.blockMode=!this.state.blockMode; this.render(); }
-          if(act==='toggle-day'){ this.toggleDay(el.dataset.date); }
-        });
-        this.root.addEventListener('change',e=>{
-          if(e.target.id==='mmb-switch-availability'){
-            const mode=e.target.checked?AVAIL.ENFORCE:AVAIL.IGNORE; setMode(mode); this.state.mode=mode;
-          }
-        });
-      }
-      changeMonth(d){ const m=new Date(this.state.month); m.setMonth(m.getMonth()+d); const today=new Date(); if(m<new Date(today.getFullYear(),today.getMonth(),1)) return; this.state.month=m; this.loadAvailability().then(()=>this.render()); }
-      toggleDay(dateStr){
-        if(!this.state.box) return; const today=new Date(); if(new Date(dateStr)<new Date(today.getFullYear(),today.getMonth(),today.getDate())) return;
-        const cur=this.state.availability[dateStr]||{available:this.state.box.quantity,status:'available'};
-        const next=this.state.blockMode?{...cur,available:0,status:'busy'}:{...cur,available:this.state.box.quantity,status:'available'};
-        this.state.availability[dateStr]=next; this.render();
-        // Optional persist:
-        // MMBApi.blockDays({box_id:this.state.box.id,start_date:dateStr,end_date:dateStr,reason:'admin_toggle'}).catch(()=>{/* Admin darf Meldungen sehen – optional */});
+        return `<div class="mmb-calendar" role="group" aria-label="Belegung ${MMBCore.Utils.formatMonthYear(this.state.month)}">
+          <div class="mmb-calendar-header">${MMBCore.Utils.DAY_NAMES.map(day=>`<div class="mmb-day-header">${day}</div>`).join('')}</div>
+          <div class="mmb-calendar-body">${days.map(day=>{
+            const key=MMBCore.Utils.formatDate(day.date), busy=!!this.state.availability[key];
+            const classes=['mmb-day',busy?'mmb-day--busy':'mmb-day--available'];
+            if(day.otherMonth) classes.push('mmb-day--other-month');
+            return `<div class="${classes.join(' ')}" aria-label="${day.date.toLocaleDateString('de-DE')}: ${day.otherMonth?'anderer Monat':busy?'belegt oder gesperrt':'frei'}">${day.date.getDate()}</div>`;
+          }).join('')}</div></div>`;
       }
     }
-
     async function start(){
-      try {
-        await MMBAdminAuth.ensureSession();
-        new AdminCalendar('#mmb-admin-cal');
-      } catch (error) {
-        console.error('Admin-Login konnte nicht initialisiert werden', error);
-        const container = document.querySelector('#mmb-admin-cal');
-        if (container) {
-          container.innerHTML = '<p class="mmb-error">Der Admin-Login konnte nicht initialisiert werden. Bitte prüfen Sie die HTTPS-Verbindung oder wenden Sie sich an den Support.</p>';
-        }
-      }
+      try{await MMBAdminAuth.ensureSession();new AdminCalendar('#mmb-admin-cal');}
+      catch(_){document.querySelector('#mmb-admin-cal').innerHTML='<p class="mmb-error">Die Verwaltung konnte nicht geladen werden. Bitte die Seite neu laden.</p>';}
     }
-    if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded', start); } else { void start(); }
+    if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else void start();
   })(window);
   </script>
 </body>

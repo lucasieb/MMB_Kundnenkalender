@@ -20,7 +20,7 @@
   </div>
 
   <!-- ======================= MMB CORE ======================= -->
-  <script src="https://firebrick-squirrel-568721.hostingersite.com/admin_auth.js?v=56c343a0" data-api-base="https://firebrick-squirrel-568721.hostingersite.com/"></script>
+  <script src="https://firebrick-squirrel-568721.hostingersite.com/admin_auth.js?v=20261020-mobile1" data-api-base="https://firebrick-squirrel-568721.hostingersite.com/"></script>
   <script>
   (function(global){'use strict';
 
@@ -86,14 +86,14 @@
     const MMB_API_BASE = MMBAdminAuth.getApiBase();
 
     async function mmbApiGet(path){
-      const res=await fetch(MMB_API_BASE+path,{credentials:'include'});
+      const res=await MMBAdminAuth.fetch(MMB_API_BASE+path,{credentials:'include'});
       const text=await res.text(); let data;
       try{ data=JSON.parse(text);}catch{ data={ok:false,error:'Keine JSON-Antwort',raw:text};}
       if(!res.ok||!data.ok) throw new Error(data.error||('HTTP '+res.status+'\n'+(data.raw||'')));
       return data;
     }
     async function mmbApiPost(path,body){
-      const res=await fetch(MMB_API_BASE+path,{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(body||{})});
+      const res=await MMBAdminAuth.fetch(MMB_API_BASE+path,{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(body||{})});
       const text=await res.text(); let data;
       try{ data=JSON.parse(text);}catch{ data={ok:false,error:'Keine JSON-Antwort',raw:text};}
       if(!res.ok||!data.ok) throw new Error(data.error||('HTTP '+res.status+'\n'+(data.raw||'')));
@@ -241,6 +241,81 @@
           .mmb-detail-header,.mmb-detail-footer{padding:1rem 1.25rem;}
           .mmb-detail-body{padding:1.25rem;}
         }
+        .mmb-admin-heading{padding:0 1.25rem;}
+        .mmb-admin-heading h1{font-size:1.3rem;margin:0;color:#f8fafc;}
+        .mmb-admin-heading p{display:none;}
+        .mmb-action-label,.mmb-toggle-actions,.mmb-jump{display:none;}
+        .mmb-secondary-actions{display:flex;gap:.5rem;flex-wrap:wrap;}
+        .mmb-detail-form{display:flex;flex-direction:column;flex:1;min-height:0;}
+        .mmb-detail-overlay{height:100%;overflow:hidden;}
+        .mmb-detail-panel{height:100%;min-height:0;}
+        .mmb-detail-body{min-height:0;overscroll-behavior-y:contain;-webkit-overflow-scrolling:touch;}
+        .mmb-detail-header,.mmb-detail-footer{flex-shrink:0;}
+        .mmb-detail-footer{position:relative;}
+        .mmb-detail-close{min-width:44px;min-height:44px;}
+        @media(max-width:640px){
+          :root{--mmb-shell-padding:0px;}
+          #mmb-admin-list{padding:0;min-width:0;}
+          #mmb-admin-list>.mmb-widget{padding:.75rem;gap:.75rem;min-width:0;}
+          .mmb-admin-heading{padding:0 .25rem;}
+          .mmb-admin-heading p{display:block;margin:.35rem 0 0;font-size:.85rem;color:#cbd5e1;line-height:1.45;}
+          .mmb-admin-filters{grid-template-columns:minmax(0,1fr) minmax(0,1fr);padding:.75rem;gap:.5rem;}
+          .mmb-admin-filters select,.mmb-admin-filters input{min-width:0;width:100%;min-height:44px;font-size:16px;box-sizing:border-box;}
+          .mmb-admin-filters input[placeholder="Name oder E-Mail"]{grid-column:1/-1;grid-row:2;}
+          .mmb-admin-filters>div{width:100%;}
+          .mmb-reset{min-height:44px;width:100%;font-size:.8rem;}
+          .mmb-admin-list-wrap{flex:none;height:420px;max-height:420px;overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-y:auto;touch-action:pan-y;border-radius:12px;}
+          .mmb-bookings-table,.mmb-bookings-table tbody{display:block;width:100%;}
+          .mmb-bookings-table thead{display:none;}
+          .mmb-bookings-table tbody{display:grid;gap:.75rem;}
+          .mmb-bookings-table tbody tr{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.55rem .75rem;padding:1rem;border:1px solid rgba(255,255,255,.14);border-radius:12px;background:#343434;}
+          .mmb-bookings-table td{border:0;padding:0!important;width:auto!important;min-width:0!important;white-space:normal!important;}
+          .mmb-bookings-table .cell--id{grid-column:1;grid-row:1;color:#cbd5e1;}
+          .mmb-bookings-table .cell--status{grid-column:2;grid-row:1;text-align:right;}
+          .mmb-bookings-table .cell--customer{grid-column:1/-1;grid-row:2;overflow-wrap:anywhere;}
+          .mmb-bookings-table .cell--name{font-size:1rem;}
+          .mmb-bookings-table .cell--email,.mmb-bookings-table .cell--fulfillment{display:none;}
+          .mmb-bookings-table .cell--box{grid-column:1/-1;grid-row:3;font-size:.85rem;color:#cbd5e1;}
+          .mmb-bookings-table .cell--date{grid-column:1;grid-row:4;font-size:.85rem;}
+          .mmb-bookings-table .date-range{display:flex;flex-direction:row;flex-wrap:wrap;gap:.25rem;}
+          .mmb-bookings-table .date-range span+span::before{content:'– ';}
+          .mmb-bookings-table .cell--total{grid-column:2;grid-row:4;font-size:1rem;font-weight:600;align-self:center;}
+          .mmb-bookings-table .cell--actions{grid-column:1/-1;grid-row:5;}
+          .cell--actions-row button:not([data-action="viewDetails"]){display:none;}
+          .cell--actions-row button[data-action="viewDetails"]{width:100%;min-height:44px;gap:.5rem;font-size:.9rem;}
+          .mmb-action-label{display:inline;}
+          .mmb-bookings-table .mmb-empty{display:block;}
+          .mmb-footer{font-size:.8rem;padding:0 .25rem;flex-shrink:0;height:auto;min-height:44px;justify-content:space-between;gap:.5rem;flex-wrap:wrap;}
+          .mmb-jump{display:inline-flex;align-items:center;justify-content:center;min-height:44px;border:0;background:transparent;color:#bae6fd;font:inherit;cursor:pointer;}
+          .mmb-btn-danger-light{color:#fca5a5;}
+          .mmb-detail-actions>button[type="submit"]{background:#0369a1;}
+          .mmb-detail-overlay{height:min(100%,var(--mmb-viewport-height,640px));bottom:auto;}
+          .mmb-detail-header{padding:.75rem;flex-wrap:wrap;gap:.5rem;}
+          .mmb-detail-header>div:first-child{flex:1;min-width:0;}
+          .mmb-detail-title{font-size:1.15rem;}
+          .mmb-detail-sub{font-size:.75rem;}
+          .mmb-detail-meta{order:3;justify-content:flex-start;width:100%;}
+          .mmb-chip{font-size:.7rem;padding:.25rem .5rem;max-width:100%;overflow-wrap:anywhere;}
+          .mmb-detail-body{padding:.75rem;gap:1rem;}
+          .mmb-detail-grid,.mmb-grid-2{grid-template-columns:minmax(0,1fr);}
+          .mmb-detail-field{min-width:0;}
+          .mmb-detail-field input:not([type="checkbox"]),.mmb-detail-field select,.mmb-detail-field textarea,.mmb-modal input,.mmb-modal select,.mmb-modal textarea{font-size:16px;min-height:44px;min-width:0;width:100%;box-sizing:border-box;}
+          .mmb-detail-checkbox{align-items:flex-start;line-height:1.45;}
+          .mmb-detail-checkbox input{flex-shrink:0;width:24px;height:24px;}
+          .mmb-detail-footer{padding:.75rem;gap:.5rem;}
+          .mmb-detail-footer>[data-close]{display:none;}
+          .mmb-detail-actions{width:100%;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:.5rem;}
+          .mmb-detail-actions>.mmb-toggle-actions{display:block;grid-column:1;grid-row:2;}
+          .mmb-detail-actions>button[type="submit"]{grid-column:2;grid-row:2;}
+          .mmb-detail-actions .mmb-btn{min-height:44px;padding:.6rem .5rem;font-size:.85rem;}
+          .mmb-secondary-actions{display:none;grid-column:1/-1;grid-row:1;grid-template-columns:1fr 1fr;}
+          .mmb-detail-actions.is-expanded .mmb-secondary-actions{display:grid;}
+          .mmb-modal{padding:.75rem;box-sizing:border-box;align-items:flex-start;overflow:auto;}
+          .mmb-modal-content{width:100%;max-height:calc(var(--mmb-viewport-height,640px) - 24px);padding:1rem;box-sizing:border-box;}
+          .mmb-modal-actions{flex-wrap:wrap;}
+          .mmb-modal-btn{min-height:44px;flex:1;}
+        }
+
       `; document.head.appendChild(s);
     }
 
@@ -354,11 +429,13 @@
         const f = this.state.filters;
         this.container.innerHTML=`
           <div class="mmb-widget">
+            <div class="mmb-admin-heading"><h1>Buchungen</h1><p>In der Liste wischen, für alle Angaben und Aktionen die Details öffnen.</p></div>
             ${this.renderFilters(f)}
-            <div class="mmb-admin-list-wrap">${this.renderTable()}</div>
+            <div class="mmb-admin-list-wrap" role="region" aria-label="Buchungen, scrollbar" tabindex="0">${this.renderTable()}</div>
             ${this.renderFooter()}
           </div>`;
         this.bindTableActions();
+        this.container.querySelector('[data-jump-calendar]')?.addEventListener('click',()=>MMBAdminAuth.focusSection('mmb-admin-cal'));
         const btn = document.getElementById(`btn-reset-${this.instanceId}`);
         if(btn && !btn._bound){ btn.addEventListener('click', ()=> this.resetFilters()); btn._bound=true; }
       }
@@ -366,19 +443,19 @@
       renderFilters(f){
         return `
         <div class="mmb-admin-filters">
-          <select id="filter-status-${this.instanceId}">
+          <select aria-label="Buchungsstatus filtern" id="filter-status-${this.instanceId}">
             <option value="">Status: Alle</option>
             <option value="pending"   ${f.status==='pending'?'selected':''}>Ausstehend</option>
             <option value="confirmed" ${f.status==='confirmed'?'selected':''}>Bestätigt</option>
             <option value="rejected"  ${f.status==='rejected'?'selected':''}>Abgelehnt</option>
             <option value="cancelled" ${f.status==='cancelled'?'selected':''}>Storniert</option>
           </select>
-          <select id="filter-box-${this.instanceId}">
+          <select aria-label="Musikbox filtern" id="filter-box-${this.instanceId}">
             <option value="">Box: Alle</option>
             ${this.state.boxes.map(b=>`<option value="${b.id}" ${f.box===b.id?'selected':''}>${b.name}</option>`).join('')}
           </select>
-          <input id="filter-id-${this.instanceId}" inputmode="numeric" pattern="[0-9]*" placeholder="ID (z. B. 00123)" value="${this.escape(f.id)}"/>
-          <input id="filter-name-${this.instanceId}" placeholder="Name oder E-Mail" value="${this.escape(f.name)}"/>
+          <input id="filter-id-${this.instanceId}" aria-label="Buchungs-ID suchen" inputmode="numeric" pattern="[0-9]*" placeholder="ID (z. B. 00123)" value="${this.escape(f.id)}"/>
+          <input id="filter-name-${this.instanceId}" aria-label="Kunde suchen" placeholder="Name oder E-Mail" value="${this.escape(f.name)}"/>
           <div style="justify-self:end;">
             <button class="mmb-btn mmb-reset" id="btn-reset-${this.instanceId}">Alle Filter löschen</button>
           </div>
@@ -393,7 +470,7 @@
               <thead>
                 <tr><th class="cell-head-id">ID</th><th class="cell-head-customer">Kunde</th><th class="cell-head-box">Box</th><th class="cell-head-date">Zeitraum</th><th class="cell-head-fulfillment">Abwicklung</th><th class="cell-head-price">Preis</th><th class="cell-head-status">Status</th><th class="cell-head-actions">Aktionen</th></tr>
               </thead>
-              <tbody><tr><td colspan="8" style="padding:1rem;color:var(--mmb-text-light);">Keine Buchungen vorhanden</td></tr></tbody>
+              <tbody><tr class="mmb-empty"><td colspan="8" style="padding:1rem;color:var(--mmb-text-light);">Keine Buchungen vorhanden</td></tr></tbody>
             </table>`;
         }
         return `
@@ -433,7 +510,7 @@
             <div class="cell--actions-row">
               <button class="mmb-btn mmb-btn-small mmb-btn-secondary"
                       data-action="viewDetails" data-id="${b.id}"
-                      title="Details anzeigen">ℹ️</button>
+                      title="Details anzeigen" aria-label="Buchung ${displayId(b.id)} – Details und Aktionen"><span aria-hidden="true">ℹ️</span><span class="mmb-action-label">Details &amp; Aktionen</span></button>
               <button class="mmb-btn mmb-btn-small mmb-btn-success"
                       data-action="confirmBooking" data-id="${b.id}"
                       title="${isConfirmed?'Bereits bestätigt':'Buchung bestätigen'}"
@@ -477,7 +554,7 @@
       renderFooter(){
         const shown = (this.state.bookings||[]).filter(r=>r && r.id).length;
         const total = (this.state.originalBookings||[]).length;
-        return `<div class="mmb-footer">${shown} von ${total} Buchungen</div>`;
+        return `<div class="mmb-footer"><button type="button" class="mmb-jump" data-jump-calendar>Zum Kalender ↓</button><span>${shown} von ${total} Buchungen</span></div>`;
       }
 
       // ---------- Events ----------
@@ -1207,6 +1284,7 @@
         overlay.querySelectorAll('[data-close]').forEach(btn=>btn.addEventListener('click', close));
         // Vollständige Detailansicht wird im weiteren Verlauf aufgebaut
         this.renderDetailOverlay(booking, overlay, close);
+        MMBAdminAuth.focusPanel?.();
       }
 
       renderDetailOverlay(booking, overlay, closeOverlay){
@@ -1260,7 +1338,7 @@
               </div>
               <button type="button" class="mmb-detail-close" data-close aria-label="Detailansicht schließen">×</button>
             </div>
-            <form class="mmb-detail-body" autocomplete="off">
+            <form class="mmb-detail-form" autocomplete="off"><div class="mmb-detail-body">
               <div class="mmb-detail-section">
                 <h3>Allgemein</h3>
                 <div class="mmb-detail-grid">
@@ -1456,14 +1534,16 @@
                 <div class="mmb-detail-note">Nur kundenrelevante Felder werden in der E-Mail angezeigt.</div>
               </div>
 
-              <div class="mmb-detail-footer">
+              </div><div class="mmb-detail-footer">
                 <button type="button" class="mmb-btn mmb-btn-secondary" data-close>Schließen</button>
                 <div class="mmb-detail-actions">
+                  <button type="button" class="mmb-btn mmb-btn-secondary mmb-toggle-actions" data-toggle-actions aria-expanded="false">Weitere Aktionen</button>
+                  <div class="mmb-secondary-actions">
                   <button type="button" class="mmb-btn mmb-btn-warning" data-action="offerAlternative">Alternative</button>
                   <button type="button" class="mmb-btn mmb-btn-danger" data-action="declineBooking">Ablehnen</button>
                   <button type="button" class="mmb-btn mmb-btn-success" data-action="confirmBooking">Bestätigen</button>
                   <button type="button" class="mmb-btn mmb-btn-danger-light" data-action="deleteBooking">Löschen</button>
-                  <button type="submit" class="mmb-btn">Speichern</button>
+                  </div><button type="submit" class="mmb-btn">Speichern</button>
                 </div>
               </div>
             </form>
@@ -1472,6 +1552,11 @@
 
         const form = overlay.querySelector('form');
         if(!form) return;
+        overlay.querySelector('[data-toggle-actions]')?.addEventListener('click',event=>{
+          const actions=event.currentTarget.closest('.mmb-detail-actions');
+          const expanded=actions.classList.toggle('is-expanded');
+          event.currentTarget.setAttribute('aria-expanded',String(expanded));
+        });
 
         overlay.querySelectorAll('[data-close]').forEach(btn=>btn.addEventListener('click', closeOverlay));
 
