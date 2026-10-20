@@ -40,7 +40,7 @@ function admin_logout(): void {
   if (is_admin_auth_disabled()) {
     return;
   }
-  unset($_SESSION['admin_username'], $_SESSION['admin_display_name'], $_SESSION['admin_last_activity']);
+  unset($_SESSION['admin_username'], $_SESSION['admin_display_name'], $_SESSION['admin_last_activity'], $_SESSION['admin_credentials_version']);
   if (session_status() === PHP_SESSION_ACTIVE) {
     session_regenerate_id(true);
   }
@@ -54,6 +54,12 @@ function is_admin_authenticated(): bool {
     return false;
   }
 
+  $version = admin_credentials_version();
+  if ($version === '' || !hash_equals($version, (string)($_SESSION['admin_credentials_version'] ?? ''))) {
+    admin_logout();
+    return false;
+  }
+
   $lastActivity = isset($_SESSION['admin_last_activity']) ? (int) $_SESSION['admin_last_activity'] : 0;
   if ($lastActivity > 0 && (time() - $lastActivity) > ADMIN_SESSION_TIMEOUT) {
     admin_logout();
@@ -62,6 +68,11 @@ function is_admin_authenticated(): bool {
 
   $_SESSION['admin_last_activity'] = time();
   return true;
+}
+
+function admin_credentials_version(): string {
+  $file = __DIR__ . '/admin_users.php';
+  return is_file($file) ? (string)hash_file('sha256', $file) : '';
 }
 
 function require_admin(): void {

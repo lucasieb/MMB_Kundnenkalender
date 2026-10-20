@@ -23,6 +23,7 @@ jobs:
         run: |
           find . -name '*.php' -not -path './.git/*' -print0 | xargs -0 -n1 php -l
           php tests/contract.php
+          node --test tests/admin_auth.test.mjs
       - name: Prepare runtime files and revision marker
         run: |
           php -r 'file_put_contents("deployment.json", json_encode(["commit" => getenv("GITHUB_SHA"), "branch" => getenv("GITHUB_REF_NAME"), "run_id" => getenv("GITHUB_RUN_ID")], JSON_PRETTY_PRINT) . PHP_EOL);'

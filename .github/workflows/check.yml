@@ -20,3 +20,5 @@ jobs:
         run: find . -name '*.php' -not -path './.git/*' -print0 | xargs -0 -n1 php -l
       - name: Booking and admin contracts
         run: php tests/contract.php
+      - name: Shared embedded admin login
+        run: node --test tests/admin_auth.test.mjs

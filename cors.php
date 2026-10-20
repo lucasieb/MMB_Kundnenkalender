@@ -6,6 +6,7 @@ if (!function_exists('mmb_admin_allowed_origins')) {
         $origins = [
             'https://www.mietmichbox.de',
             'https://mietmichbox.de',
+            'https://builder.hostinger.com',
         ];
 
         if (!empty($_SERVER['HTTP_HOST'])) {
