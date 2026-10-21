@@ -88,6 +88,7 @@ function mmb_order_quote(array $input,string $start,string $end,string $method='
     if($quoteRequired&&$method==='shipping')$shipping=0;
     $labels=['pickup'=>'Abholung in Wesel','shipping'=>$tent?'Speditionsversand / Selbstaufbau':'Versand','delivery'=>'Lieferung','delivery_setup'=>'Lieferung und Montage'];
     $note=$method==='pickup'?'Kostenlos':($method==='delivery_setup'?$c['assembly_note']:($method==='delivery'?$c['delivery_note']:($quoteRequired?'Frachtkosten auf individuelles Angebot; nicht in der Mietsumme enthalten.':'Hin- und Rückversand inklusive Vorbereitung, 80 € je Musikbox.')));
+    if($method==='shipping')$note.=' Geplante Zustellung spätestens zum Mietbeginn, in der Regel ein bis zwei Tage vorher; Termin nach Bestätigung.';
     return ['version'=>$c['version'],'package'=>$package,'package_name'=>$c['packages'][$package]['name'],'cart'=>$cart,'items'=>$lines,'summary'=>implode(', ',array_map(fn($x)=>$x['quantity'].'× '.$x['label'],$lines)),
         'start_date'=>$start,'end_date'=>$end,'days'=>$days,'day_unit'=>'24h','set_discount_percent'=>$setPercent,'set_reference_total'=>$setReference,'set_discount_amount'=>$setSaving,'primary_box_id'=>$speaker?:null,'original'=>round($original,2),'discount_amount'=>round($discount,2),'discount_percent_exact'=>$original?round($discount/$original*100,4):0,'duration_discount_percent'=>$durationDiscount,
         'base_total'=>$rental,'shipping_delta'=>$shipping,'total'=>round($rental+$shipping,2),'avg_per_day'=>round(($rental+$shipping)/$days,2),'deposit'=>0,
