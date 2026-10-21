@@ -1509,7 +1509,7 @@
               </div>
 
               <div class="mmb-detail-section" data-fulfillment-section="address" ${showExtended?'':'hidden'}>
-                <h3>Lieferadresse</h3><div class="mmb-detail-grid"><div class="mmb-detail-field"><label>Unternehmen (bei Gewerbe)</label><input name="shipping_company_name" maxlength="200" value="${this.escape(fulfillmentDetails.company_name||'')}"></div></div>
+                <h3 data-destination-title>${currentFulfillmentMethod==='shipping'?'Versandadresse':'Lieferadresse'}</h3><div class="mmb-detail-grid"><div class="mmb-detail-field"><label>Unternehmen (bei Gewerbe)</label><input name="shipping_company_name" maxlength="200" value="${this.escape(fulfillmentDetails.company_name||'')}"></div></div>
                 <div class="mmb-detail-grid">
                   <div class="mmb-detail-field">
                     <label>Straße &amp; Hausnummer</label>
@@ -1677,6 +1677,7 @@
         const updateFulfillmentUI = ()=>{
           if(!fulfillmentSelect) return;
           const method = fulfillmentSelect.value;
+          const destinationTitle=form.querySelector('[data-destination-title]');if(destinationTitle)destinationTitle.textContent=method==='shipping'?'Versandadresse':'Lieferadresse';
           const timingTitle=form.querySelector('[data-timing-title]'),timingHint=form.querySelector('[data-timing-hint]'),timingLabel=form.querySelector('[data-timing-label]');
           if(timingTitle)timingTitle.textContent=method==='pickup'?'Abholdetails':'Lieferdetails';if(timingHint)timingHint.textContent=method==='pickup'?'Abholhinweis':'Lieferhinweis';if(timingLabel)timingLabel.textContent='Wunschzeit für '+(method==='pickup'?'Abholung':'Lieferung')+' am '+(form.elements.start_date?.value||booking.start_date);
           detailSections.forEach(section=>{

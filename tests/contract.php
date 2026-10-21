@@ -212,7 +212,7 @@ try {
     $badDelivery=$business;$badDelivery['fulfillment_details_json']['customer_type']='business';$badDelivery['fulfillment_details_json']['company_name']='';[$status]=request('create_booking.php',$badDelivery);check($status===422,'Business delivery without company accepted');
     $pickupTiming=array_replace($valid,['fulfillment_method'=>'pickup','fulfillment_details_json'=>['method'=>'pickup','preferred_time'=>'08:45','meeting_point'=>'TEST Abholhinweis']]);
     [$status,$timed]=request('create_booking.php',$pickupTiming,true);check($status===200,'Pickup desired time failed');$timedId=$timed['booking']['id'];$timedRow=$db->query('SELECT * FROM bookings WHERE id='.(int)$timedId)->fetch(PDO::FETCH_ASSOC);check(json_decode($timedRow['fulfillment_details_json'],true)['preferred_time']==='08:45','Pickup time lost');
-    $timeMails=file_get_contents($temp.'/mail-capture.jsonl');check(str_contains($timeMails,'08:45')&&str_contains($timeMails,'TEST Abholhinweis'),'Pickup details missing in mails');
+    $timeMails=file_get_contents($temp.'/mail-capture.jsonl');check(str_contains($timeMails,'08:45')&&str_contains($timeMails,'TEST Abholhinweis'),'Pickup details missing in mails');$latestCapture=json_decode(array_slice(file($temp.'/mail-capture.jsonl'),-2,1)[0],true);check(!str_contains($latestCapture[2],'Lieferadresse:'),'Pickup mail must not claim a delivery address');
     // New multi-product path: prices come from the server, not the submitted total.
     foreach([
       ['photo'=>'print200'],['tent'=>1,'walls'=>1],['controller'=>1],['package'=>'dj','batteries'=>3,'controller'=>1],['package'=>'party','photo'=>'print700'],['package'=>'event','walls'=>1]
