@@ -241,6 +241,27 @@
   .mmb-dialog-contact-options{border:1px solid #dcdccf; border-radius:10px; padding:.75rem .85rem; background:#f9f9f2; margin-top:.4rem;}
   .mmb-dialog-contact-options p{margin:0 0 .5rem 0; font-weight:500;}
   .mmb-dialog-contact-options .mmb-checkbox{margin-bottom:.35rem;}
+
+  .mmb-booking-form form{display:flex;flex-direction:column;gap:14px;min-width:0;width:100%;}
+  .mmb-booking-form label{display:block;min-width:0;overflow-wrap:anywhere;}
+  .mmb-booking-form input:not([type="checkbox"]),.mmb-booking-form textarea{display:block;width:100%;max-width:100%;min-width:0;min-height:46px;padding:10px;border:1px solid #666;border-radius:7px;background:#292929;color:#fff;font:inherit;font-size:16px;box-sizing:border-box;}
+  .mmb-booking-form fieldset{padding:12px;border:1px solid #666;border-radius:8px;min-width:0;margin:0;display:grid;gap:12px;}
+  .mmb-booking-form legend{font-weight:600;padding:0 5px;}
+  .mmb-address-row{display:grid;grid-template-columns:100px minmax(0,1fr);gap:10px;}
+  .mmb-booking-form .mmb-check-row{display:flex;align-items:flex-start;gap:10px;font-size:14px;}
+  .mmb-check-row input{flex:0 0 20px;width:20px;height:20px;margin:2px 0;}
+  .mmb-booking-form small{display:block;font-size:12px;line-height:1.5;opacity:.9;}
+  .mmb-booking-form a{color:#a5e0ff;}
+  .mmb-step-label{font-weight:600;font-size:13px;margin:0;}
+  .mmb-form-note,.mmb-privacy-note{font-size:13px;line-height:1.6;overflow-wrap:anywhere;}
+  .mmb-privacy-note{padding:12px;background:#343434;border-radius:8px;}
+  .mmb-privacy-note p{margin:8px 0;}
+  .mmb-privacy-note summary{min-height:44px;display:flex;align-items:center;cursor:pointer;font-weight:600;}
+  .mmb-review{background:#343434;border-left:3px solid #0ea5e9;padding:12px;overflow-wrap:anywhere;font-size:14px;}
+  .mmb-back{background:#52525b;}
+  [data-target-address][hidden]{display:none!important;}
+  [data-role="error"]{color:#fecaca;overflow-wrap:anywhere;}
+  @media(max-width:360px){.mmb-address-row{grid-template-columns:1fr;}}
 </style>
 </head>
 <body>
@@ -738,6 +759,9 @@ class Calendar{
   }
 
   renderSide(){
+    const previous=this.root.querySelector('form[data-act="submit"]');
+    if(previous) this.customerDraft=Object.fromEntries(new FormData(previous).entries());
+    const draft=this.customerDraft||{}; const esc=v=>this.escapeHtml(v);
     const s=this.state.sel.start, e=this.state.sel.end; const hasRange=!!(s&&e);
     const selectedFulfillment=this.getFulfillmentOption(this.state.fulfillment?.id);
     this.state.fulfillment=selectedFulfillment;
@@ -767,14 +791,13 @@ class Calendar{
     if(summaryHtml) html+=summaryHtml;
 
     html+=`<form data-act="submit">
-      <label>Name *<br><input class="mmb-input" name="customer_name" required></label><br>
-      <label>E-Mail *<br><input type="email" class="mmb-input" name="customer_email" required></label><br>
-      <label>Telefon<br><input class="mmb-input" name="customer_phone"></label><br>
-      <label>Anmerkungen<br><textarea class="mmb-input" name="note" style="min-height:70px;"></textarea></label><br>
-      <div class="mmb-form-actions">
-        <label class="mmb-terms"><input type="checkbox" name="accept_terms" required> Ich akzeptiere <a href="https://www.mietmichbox.de/allgemeine-geschaftsbedingungen" target="_blank" rel="noopener">AGB</a> & <a href="https://www.mietmichbox.de/datenschutzerklarung" target="_blank" rel="noopener">Datenschutz</a>*</label>
-        <button class="mmb-btn" ${s?'':'disabled'}>Buchungsanfrage senden</button>
-      </div>
+      <p class="mmb-step-label">Schritt 1 von 2 · Kontakt</p>
+      <label>Vollständiger Name *<input class="mmb-input" name="customer_name" autocomplete="name" maxlength="140" value="${esc(draft.customer_name)}" required></label>
+      <label>E-Mail *<input type="email" class="mmb-input" name="customer_email" autocomplete="email" maxlength="200" value="${esc(draft.customer_email)}" required></label>
+      <label>Telefon mit Vorwahl *<input type="tel" class="mmb-input" name="customer_phone" autocomplete="tel" minlength="7" maxlength="50" value="${esc(draft.customer_phone)}" required></label>
+      <label>Anmerkungen (optional)<textarea class="mmb-input" name="note" maxlength="2000" style="min-height:70px;">${esc(draft.note)}</textarea></label>
+      <p class="mmb-form-note">Wir nutzen deine Angaben zur Bearbeitung deiner Anfrage. Im nächsten Schritt ergänzt und prüfst du die Adresse. Es entsteht noch kein Mietvertrag.</p>
+      <button class="mmb-btn" ${s?'':'disabled'}>Weiter: Adresse &amp; Prüfen</button>
     </form>
     <div style="margin-top:6px;color:#cfcfcf;font-size:.9rem;">${
       hasRange?`${s.toLocaleDateString('de-DE')} – ${e.toLocaleDateString('de-DE')} (${this.pricedTotal(this.state.box.id,s,e).days} Tage)`
@@ -857,7 +880,7 @@ class Calendar{
         const act=nav.dataset.act;
         if(act==='prev'){ this.changeMonth(-1); return; }
         if(act==='next'){ this.changeMonth(1); return; }
-        if(act==='box'){ const b=this.state.boxes.find(x=>x.id===nav.dataset.id); this.state.box=b; this.state.sel={start:null,end:null}; this.avgCache=null; this.renderHeader(); this.renderCalendar(); this.renderSide(); return; }
+        if(act==='box'){ const b=this.state.boxes.find(x=>x.id===nav.dataset.id); this.state.box=b; this.avgCache=null; this.renderHeader(); this.renderCalendar(); this.renderSide(); return; }
       }
       const add = e.target.closest('[data-act="extend"]');
       if(add){
@@ -889,9 +912,11 @@ class Calendar{
       e.preventDefault();
       const fd=new FormData(e.target);
       const data=Object.fromEntries(fd.entries());
-      if(!data.customer_name || !data.customer_email || !data.accept_terms){ return this.modal('Bitte prüfen','Bitte alle Pflichtfelder ausfüllen und AGB/Datenschutz akzeptieren.'); }
+      this.customerDraft=data;
+      if(!data.customer_name?.trim() || !data.customer_email?.trim() || !data.customer_phone?.trim()){ return this.modal('Bitte prüfen','Bitte Name, E-Mail und Telefonnummer ausfüllen.'); }
       if(!this.state.sel.start){ return this.modal('Zeitraum fehlt','Bitte einen Zeitraum im Kalender wählen.'); }
 
+      if(!/^\+?[0-9 ()\/.\-]+$/.test(data.customer_phone.trim()) || data.customer_phone.replace(/\D/g,'').length<7 || data.customer_phone.replace(/\D/g,'').length>15) return this.modal('Telefonnummer prüfen','Bitte eine erreichbare Telefonnummer mit Vorwahl angeben.');
       const start=this.state.sel.start, end=this.state.sel.end || this.state.sel.start;
 
       // >>> NEU: Summen aus dem State (Fallback: on-the-fly berechnen)
@@ -937,18 +962,12 @@ class Calendar{
 
       const btn=e.target.querySelector('button'); const orig=btn.textContent; btn.disabled=true; btn.textContent='Senden…';
       try{
-        const needsDetails = fulfillmentMethod === 'shipping' || fulfillmentMethod === 'delivery';
-        if(needsDetails){
-          const details = await this.promptFulfillmentDetails(fulfillmentMethod, contactDefaults);
-          if(!details){ return; }
-          const serialized = JSON.stringify(details);
-          contactDefaults.contact_pref_phone = !!details.allow_contact_phone;
-          contactDefaults.contact_pref_whatsapp = !!details.allow_contact_whatsapp;
-          contactDefaults.customer_name = details.contact_name || contactDefaults.customer_name;
-          contactDefaults.customer_email = details.contact_email || contactDefaults.customer_email;
-          contactDefaults.customer_phone = details.contact_phone || contactDefaults.customer_phone;
-          payload.fulfillment_details_json = serialized;
-          payload.fulfillment_details = serialized;
+        const details = await this.promptFulfillmentDetails(fulfillmentMethod, contactDefaults, payload);
+        if(!details){ this.renderSide(); return; }
+        Object.assign(payload,details.customer);
+        payload.accept_terms=1; payload.privacy_acknowledged=1;
+        if(details.fulfillment){
+          payload.fulfillment_details_json=JSON.stringify(details.fulfillment);
         }
 
         if(summaryInfo){
@@ -964,11 +983,17 @@ class Calendar{
         const res=await sendBooking(BOOKING_URLS, payload);
         const bookingInfo = res?.booking || null;
         const dispId = bookingInfo?.display_id ? String(bookingInfo.display_id) : '–';
-        this.modal('Buchungsanfrage gesendet',`Danke! Deine Anfrage ist eingegangen.\n\nBuchungs-ID: ${dispId}`);
-        e.target.reset(); this.state.sel={start:null,end:null}; this.avgCache=null; this.state.summary=null; this.state.fulfillment=FULFILLMENT_OPTIONS[0]; this.hideFulfillmentInfo();
-        this.renderCalendar(); this.renderSide(); this.updateVisuals();
+        const mailSent=res?.mail?.sent===true;
+        const resultMarkup=`<div class="mmb-booking-form" role="status"><h3>Anfrage eingegangen</h3><p>Buchungs-ID: <strong>${this.escapeHtml(dispId)}</strong></p><p>${mailSent?'Bitte bestätige deine E-Mail-Adresse über den Link in der Eingangsmail. Schau gegebenenfalls im Spamordner nach.':'Deine Anfrage ist gespeichert. Die E-Mail konnte gerade nicht versendet werden. Bitte sende keine zweite Anfrage; melde dich bei Bedarf unter info@mietmichbox.de oder 0174 2015500.'}</p><p>Unser Team prüft die Anfrage. Sie ist noch keine verbindliche Buchung.</p><button class="mmb-btn" type="button" data-new-request>Neue Anfrage</button></div>`;
+        this.customerDraft={};this.detailsDraft={}; this.state.sel={start:null,end:null}; this.avgCache=null; this.state.summary=null; this.state.fulfillment=FULFILLMENT_OPTIONS[0]; this.hideFulfillmentInfo();
+        this.renderCalendar(); this.updateVisuals();
+        this.root.querySelector('.side').innerHTML=resultMarkup;
+        this.root.querySelector('[data-new-request]').addEventListener('click',()=>this.renderSide());
       }catch(err){
         console.error(err);
+        const errorEl=this.root.querySelector('[data-role="error"]');
+        if(errorEl) errorEl.textContent=err?.message||'Senden nicht möglich. Bitte erneut versuchen.';
+        this.renderSide();
         this.modal('Fehler beim Senden', (err && err.message)? err.message : String(err));
       }finally{ btn.disabled=false; btn.textContent=orig; }
     });
@@ -1003,172 +1028,63 @@ class Calendar{
   }
 
   modal(title,text){
-    document.getElementById('mmb-modal-title').textContent=title;
-    document.getElementById('mmb-modal-text').textContent=text;
-    document.getElementById('mmb-modal').style.display='flex';
+    const panel=this.root.querySelector('.mmb-booking-form');if(!panel)return;
+    panel.querySelector('[data-inline-feedback]')?.remove();
+    const feedback=document.createElement('div');feedback.dataset.inlineFeedback='1';feedback.setAttribute('role','alert');feedback.tabIndex=-1;
+    feedback.style.cssText='padding:12px;border:1px solid #fda4af;background:#7f1d1d;color:white;border-radius:8px;white-space:pre-wrap;overflow-wrap:anywhere';
+    feedback.textContent=title+'\n'+text;panel.prepend(feedback);feedback.focus({preventScroll:true});
+    try {const frame=window.frameElement;window.parent.scrollBy({top:frame.getBoundingClientRect().top+feedback.getBoundingClientRect().top-120,behavior:'smooth'});}catch{feedback.scrollIntoView({block:'center'});}
   }
 
-  async promptFulfillmentDetails(method, defaults){
-    const opt = this.getFulfillmentOption(method || '');
-    const baseName = (defaults?.customer_name || '').trim();
-    const baseEmail = (defaults?.customer_email || '').trim();
-    const basePhone = (defaults?.customer_phone || '').trim();
-    const prefPhone = defaults?.contact_pref_phone !== false;
-    const prefWhatsApp = defaults?.contact_pref_whatsapp === true;
-    const escapeAttr = (value)=>String(value ?? '').replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
-    const isShipping = opt.id === 'shipping';
-    const isDelivery = opt.id === 'delivery';
-
-    return new Promise((resolve)=>{
-      const backdrop = document.createElement('div');
-      backdrop.className = 'mmb-dialog-backdrop';
-      const shippingFields = isShipping ? `
-        <div class="mmb-dialog-row">
-          <label>Straße & Hausnummer *<input name="address_line1" required placeholder="z. B. Musterstraße 12" autocomplete="address-line1"></label>
-        </div>
-        <div class="mmb-dialog-row">
-          <label>PLZ *<input name="postal_code" required inputmode="numeric" autocomplete="postal-code" placeholder="z. B. 12345"></label>
-          <label>Ort *<input name="city" required autocomplete="address-level2" placeholder="z. B. Wesel"></label>
-        </div>
-        <label>Adresszusatz (optional)<input name="address_extra" placeholder="Etage, Besonderheiten"></label>
-      ` : '';
-      const deliveryFields = isDelivery ? `
-        <label>Treffpunkt oder Adresse *<textarea name="meeting_point" required placeholder="z. B. Vereinsheim Musterweg 5, Eingang rückseitig"></textarea></label>
-        <label>Bevorzugte Uhrzeit am Mittag *
-          <select name="preferred_time" required>
-            ${['11:00','11:30','12:00','12:30','13:00','13:30','14:00','14:30','15:00','15:30','16:00'].map(time=>`<option value="${time}">${time} Uhr</option>`).join('')}
-          </select>
-          <small>Wir bestätigen dir deine Wunschzeit oder schlagen eine Alternative vor.</small>
-        </label>
-      ` : '';
-
-      const title = `Zusätzliche Angaben – ${opt.displayTitle || opt.label}`;
-      const intro = isShipping
-        ? 'Fast geschafft! Damit wir den Versand vorbereiten können, benötigen wir jetzt deine Lieferadresse.'
-        : 'Fast geschafft! Damit wir die Lieferung planen können, benötigen wir jetzt deinen Treffpunkt und deine Wunschzeit.';
-      const note = 'Bitte fülle die Angaben aus. Erst danach können wir deine Buchung absenden.';
-
-      backdrop.innerHTML = `
-        <div class="mmb-dialog" role="dialog" aria-modal="true">
-          <h3>${title}</h3>
-          <p>${intro}</p>
-          <p>${note}</p>
-          <div class="mmb-dialog-error" data-role="error" aria-live="assertive"></div>
-          <form>
-            <div class="mmb-dialog-row">
-              <label>Kontaktname *<input name="contact_name" required value="${escapeAttr(baseName)}" autocomplete="name"></label>
-            </div>
-            <div class="mmb-dialog-row">
-              <label>E-Mail *<input type="email" name="contact_email" required value="${escapeAttr(baseEmail)}" autocomplete="email"></label>
-              <label>Telefon *<input name="contact_phone" required value="${escapeAttr(basePhone)}" autocomplete="tel"></label>
-            </div>
-            ${shippingFields}
-            ${deliveryFields}
-            <div class="mmb-dialog-contact-options">
-              <p>Wie dürfen wir dich kontaktieren? *</p>
-              <label class="mmb-checkbox"><input type="checkbox" name="contact_pref_phone" value="1" ${prefPhone ? 'checked' : ''}> <span>Telefonisch</span></label>
-              <label class="mmb-checkbox"><input type="checkbox" name="contact_pref_whatsapp" value="1" ${prefWhatsApp ? 'checked' : ''}> <span>Per WhatsApp</span></label>
-              <small>Mindestens eine Option muss ausgewählt sein.</small>
-            </div>
-            <div class="mmb-dialog-actions">
-              <button type="button" data-act="cancel">Abbrechen</button>
-              <button type="submit">Angaben übermitteln</button>
-            </div>
-          </form>
-        </div>
-      `;
-
-      const form = backdrop.querySelector('form');
-      const errorEl = backdrop.querySelector('[data-role="error"]');
-      const submitBtn = form.querySelector('button[type="submit"]');
-      const cancelBtn = form.querySelector('[data-act="cancel"]');
-
-      const close = (details)=>{
-        backdrop.remove();
-        resolve(details);
-      };
-
-      if(cancelBtn){
-        cancelBtn.addEventListener('click', ()=>{
-          close(null);
-        });
-      }
-
-      form.addEventListener('submit', async (event)=>{
-        event.preventDefault();
-        errorEl.textContent='';
-        submitBtn.disabled=true;
-        const originalLabel = submitBtn.textContent;
-        submitBtn.textContent='Senden…';
-        try{
-          const formData = new FormData(form);
-          const contactName = String(formData.get('contact_name')||'').trim();
-          const contactEmail = String(formData.get('contact_email')||'').trim();
-          const contactPhone = String(formData.get('contact_phone')||'').trim();
-          const allowPhone = formData.get('contact_pref_phone') === '1';
-          const allowWhatsApp = formData.get('contact_pref_whatsapp') === '1';
-
-          if(!contactName || !contactEmail || !contactPhone){
-            throw new Error('Bitte alle Kontaktfelder ausfüllen.');
-          }
-          if(!allowPhone && !allowWhatsApp){
-            throw new Error('Bitte wähle mindestens eine Kontaktoption.');
-          }
-
-          const details = {
-            method: opt.id,
-            contact_name: contactName,
-            contact_email: contactEmail,
-            contact_phone: contactPhone,
-            allow_contact_phone: allowPhone,
-            allow_contact_whatsapp: allowWhatsApp,
-            contact_preferences: {
-              phone: allowPhone,
-              whatsapp: allowWhatsApp
-            },
-            submitted_via: 'customer_portal'
-          };
-
-          if(isShipping){
-            const addressLine1 = String(formData.get('address_line1')||'').trim();
-            const postalCode = String(formData.get('postal_code')||'').trim();
-            const city = String(formData.get('city')||'').trim();
-            const addressExtra = String(formData.get('address_extra')||'').trim();
-            if(!addressLine1 || !postalCode || !city){
-              throw new Error('Bitte vollständige Lieferadresse angeben.');
-            }
-            details.address_line1 = addressLine1;
-            details.postal_code = postalCode;
-            details.city = city;
-            if(addressExtra){ details.address_extra = addressExtra; }
-          }
-
-          if(isDelivery){
-            const meetingPoint = String(formData.get('meeting_point')||'').trim();
-            const preferredTime = String(formData.get('preferred_time')||'').trim();
-            if(!meetingPoint || !preferredTime){
-              throw new Error('Bitte Treffpunkt und Wunschzeit angeben.');
-            }
-            details.meeting_point = meetingPoint;
-            details.preferred_time = preferredTime;
-          }
-
-          close(details);
-          return;
-        }catch(err){
-          console.error(err);
-          errorEl.textContent = err && err.message ? err.message : String(err);
-        }finally{
-          submitBtn.disabled=false;
-          submitBtn.textContent=originalLabel;
+  async promptFulfillmentDetails(method, defaults, booking){
+    const opt=this.getFulfillmentOption(method), extended=method==='shipping'||method==='delivery';
+    const draft=this.detailsDraft||{}, esc=v=>this.escapeHtml(v);
+    const addressFields=(prefix,title)=>`<fieldset><legend>${title}</legend>
+      <label>Straße &amp; Hausnummer *<input name="${prefix}address_line1" autocomplete="${prefix==='billing_'?'billing':'shipping'} address-line1" maxlength="200" value="${esc(draft[prefix+'address_line1'])}" required></label>
+      <div class="mmb-address-row"><label>PLZ *<input name="${prefix}postal_code" autocomplete="${prefix==='billing_'?'billing':'shipping'} postal-code" maxlength="20" value="${esc(draft[prefix+'postal_code'])}" required></label>
+      <label>Ort *<input name="${prefix}city" autocomplete="${prefix==='billing_'?'billing':'shipping'} address-level2" maxlength="120" value="${esc(draft[prefix+'city'])}" required></label></div></fieldset>`;
+    const range=this.formatRangeLabel ? this.formatRangeLabel(this.state.sel.start,this.state.sel.end) : `${this.state.sel.start.toLocaleDateString('de-DE')} – ${(this.state.sel.end||this.state.sel.start).toLocaleDateString('de-DE')}`;
+    return new Promise(resolve=>{
+      const side=this.root.querySelector('.side');
+      side.innerHTML=`<div class="mmb-booking-form"><h3>Adresse &amp; Anfrage prüfen</h3><p class="mmb-step-label">Schritt 2 von 2</p>
+      <div class="mmb-review"><strong>${esc(this.state.box.name)}</strong><br>${esc(range)}<br>${esc(opt.shortLabel)} · ${esc(String(booking.total_amount))} €${method==='delivery'?' vorläufig, zzgl. individueller Lieferkosten':''}<br>${esc(defaults.customer_name)}<br>${esc(defaults.customer_email)} · ${esc(defaults.customer_phone)}</div>
+      <form data-customer-details>
+      ${addressFields('billing_','Rechnungsadresse')}
+      <label>Geburtsdatum (freiwillig)<input name="customer_birthdate" type="date" autocomplete="bday" min="1900-01-01" max="${Utils.formatDate(new Date())}" value="${esc(draft.customer_birthdate)}"><small>Für die spätere Vertragsvorbereitung. Du kannst die Anfrage ohne Geburtsdatum senden.</small></label>
+      ${extended?`<label class="mmb-check-row"><input name="same_address" type="checkbox" ${draft.same_address===false?'':'checked'}> Zieladresse wie Rechnungsadresse</label><div data-target-address ${draft.same_address===false?'':'hidden'}>${addressFields('target_',method==='shipping'?'Versandadresse':'Lieferadresse')}</div>`:''}
+      ${method==='delivery'?`<label>Hinweis zum Treffpunkt (optional)<input name="meeting_point" maxlength="400" value="${esc(draft.meeting_point)}"></label><label>Wunschzeit (optional)<input type="time" name="preferred_time" value="${esc(draft.preferred_time)}"><small>Die tatsächliche Lieferzeit stimmen wir mit dir ab.</small></label>`:''}
+      <details class="mmb-privacy-note"><summary>Deine Daten: Nutzung &amp; Speicherdauer</summary><p>Wir verwenden sie zur Bearbeitung deiner Anfrage sowie zur Vorbereitung und Abwicklung von Vertrag und Rechnung (Art. 6 Abs. 1 lit. b DSGVO). Keine Werbung und kein Verkauf deiner Daten. Notwendige technische Dienstleister sind Hostinger und IONOS; bei Versand/Lieferung erhält der beauftragte Transportdienst die dafür nötigen Angaben.</p><p>Speicherung nur solange für Anfrage und Vertrag erforderlich oder gesetzlich vorgeschrieben. Rechnungsbelege sind grundsätzlich acht Jahre aufzubewahren; je Unterlage können andere gesetzliche Fristen gelten. Einzelheiten und deine Rechte findest du im <a href="https://www.mietmichbox.de/datenschutzerklarung" target="_blank" rel="noopener">Datenschutzhinweis</a>.</p></details>
+      <label class="mmb-check-row"><input type="checkbox" name="accept_terms" required> <span>Ich habe die <a href="https://www.mietmichbox.de/agb" target="_blank" rel="noopener">AGB</a> gelesen und akzeptiere sie. *</span></label>
+      <label class="mmb-check-row"><input type="checkbox" name="privacy_acknowledged" required> <span>Ich habe den Datenschutzhinweis zur Kenntnis genommen und meine Angaben geprüft. *</span></label>
+      <p class="mmb-form-note">Nach dem Absenden erhältst du eine Eingangsmail mit Bestätigungslink für deine E-Mail-Adresse. Das bestätigt die Erreichbarkeit, nicht deine Identität. Deine Anfrage wird anschließend von uns geprüft.</p>
+      <div data-role="error" role="alert"></div>
+      <button type="submit" class="mmb-btn">Buchungsanfrage senden</button><button type="button" class="mmb-btn mmb-back" data-back>Zurück zu Kontakt &amp; Auswahl</button>
+      </form></div>`;
+      const form=side.querySelector('form'), same=form.querySelector('[name="same_address"]'), target=form.querySelector('[data-target-address]');
+      const sync=()=>{if(target){target.hidden=same.checked;target.querySelectorAll('input').forEach(i=>i.disabled=same.checked);}};
+      sync(); if(same)same.addEventListener('change',sync);
+      const saveDraft=()=>{this.detailsDraft=Object.fromEntries([...form.querySelectorAll('input')].filter(i=>i.type!=='checkbox').map(i=>[i.name,i.value]));this.detailsDraft.same_address=same?same.checked:true;};
+      form.addEventListener('input',saveDraft);
+      form.querySelector('[data-back]').addEventListener('click',()=>{saveDraft();resolve(null);});
+      form.addEventListener('submit',event=>{
+        event.preventDefault();saveDraft();const d=this.detailsDraft;
+        const customer={billing_address_line1:d.billing_address_line1.trim(),billing_postal_code:d.billing_postal_code.trim(),billing_city:d.billing_city.trim(),customer_birthdate:d.customer_birthdate||''};
+        let fulfillment=null;
+        if(extended){
+          const prefix=same.checked?'billing_':'target_';
+          fulfillment={method,contact_name:defaults.customer_name,contact_email:defaults.customer_email,contact_phone:defaults.customer_phone,
+            address_line1:d[prefix+'address_line1'].trim(),postal_code:d[prefix+'postal_code'].trim(),city:d[prefix+'city'].trim(),
+            meeting_point:d.meeting_point||'',preferred_time:d.preferred_time||'',allow_contact_phone:true,allow_contact_whatsapp:false,
+            same_as_billing:same.checked,submitted_via:'customer_portal'};
         }
+        form.querySelector('button[type="submit"]').disabled=true;
+        form.querySelector('button[type="submit"]').textContent='Wird gesendet…';
+        resolve({customer,fulfillment});
       });
-
-      document.body.appendChild(backdrop);
-      const firstInput = form.querySelector('input[name="contact_name"]');
-      if(firstInput){ firstInput.focus(); }
+      requestAnimationFrame(()=>side.scrollIntoView({block:'start',behavior:'smooth'}));
     });
   }
+
 }
 document.getElementById('mmb-modal-close').addEventListener('click',()=>{document.getElementById('mmb-modal').style.display='none';});
 function start(){ new Calendar('#mmb-customer'); }

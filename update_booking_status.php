@@ -299,6 +299,9 @@ try {
     exit;
   }
 
+  require_once __DIR__ . '/lib/booking_customer.php';
+  if ($updates) $updates=array_replace($updates,booking_customer_fields($updates,true));
+  $originalCustomerEmail=(string)$bk['customer_email'];
   $pdo->beginTransaction();
 
   // 1) Status-Update (optional)
@@ -330,6 +333,9 @@ try {
       $bk[$col] = $val;
     }
 
+    if (isset($updates['customer_email']) && strcasecmp($originalCustomerEmail,(string)$updates['customer_email'])!==0) {
+      $fields[]='email_verified_at=NULL';$fields[]='email_verification_hash=NULL';$fields[]='email_verification_expires_at=NULL';
+    }
     if ($fields) {
       $vals[] = $id;
       $sql = "UPDATE bookings SET ".implode(', ', $fields)." WHERE id=?";

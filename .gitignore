@@ -3,3 +3,5 @@
 /admin_users.php
 *.log
 .DS_Store
+
+/mail.private.php

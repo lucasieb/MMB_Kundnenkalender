@@ -9,8 +9,9 @@ mkdir($temp . '/lib', 0700);
 mkdir($temp . '/sessions', 0700);
 foreach (glob($root . '/*.php') as $file) copy($file, $temp . '/' . basename($file));
 copy($root . '/lib/env.php', $temp . '/lib/env.php');
+copy($root . '/lib/booking_customer.php', $temp . '/lib/booking_customer.php');
 copy(__DIR__ . '/fixtures/db.php', $temp . '/db.php');
-file_put_contents($temp . '/mailer.php', '<?php function sendMail(...$args): bool { return false; } function get_last_mail_error(): string { return "SMTP stub unavailable"; }');
+file_put_contents($temp . '/mailer.php', '<?php function sendMail(...$args): bool { file_put_contents(__DIR__."/mail-capture.jsonl",json_encode($args).PHP_EOL,FILE_APPEND);return is_file(__DIR__."/mail-success"); } function get_last_mail_error(): string { return "SMTP stub unavailable"; }');
 file_put_contents($temp . '/admin_users.php', '<?php return ' . var_export([
     'test-admin' => ['password_hash' => password_hash('test-only-password', PASSWORD_DEFAULT)]
 ], true) . ';');
@@ -20,9 +21,14 @@ $db->exec('CREATE TABLE boxes (id INTEGER PRIMARY KEY, name TEXT)');
 $db->exec("INSERT INTO boxes VALUES (1,'Marshall Bromley 750'),(2,'Teufel Rockster Neo'),(3,'Soundboks 4')");
 $db->exec('CREATE TABLE bookings (
  id INTEGER PRIMARY KEY AUTOINCREMENT, box_id INTEGER, start_date TEXT, end_date TEXT, status TEXT,
- customer_name TEXT, customer_email TEXT, customer_phone TEXT, note TEXT, total_amount REAL, deposit_eur REAL,
- fulfillment_method TEXT, fulfillment_label TEXT, fulfillment_note TEXT, fulfillment_price_delta REAL,
- fulfillment_details_json TEXT, pricing_details_json TEXT, created_at TEXT)');
+ customer_name TEXT, customer_email TEXT, total_amount REAL, created_at TEXT)');
+$db->exec("INSERT INTO bookings (id,customer_name,total_amount) VALUES (999,'Historical preserved',44)");
+exec(escapeshellarg(PHP_BINARY).' '.escapeshellarg($temp.'/migrate_booking_fields.php'),$migrationOutput,$migrationCode);
+if($migrationCode!==0 || $db->query("SELECT customer_name FROM bookings WHERE id=999")->fetchColumn()!=='Historical preserved') throw new RuntimeException('Additive migration failed');
+exec(escapeshellarg(PHP_BINARY).' '.escapeshellarg($temp.'/migrate_booking_fields.php'),$repeatOutput,$repeatCode);
+if($repeatCode!==0 || count($repeatOutput)!==1) throw new RuntimeException('Migration must be idempotent');
+$db->exec('DELETE FROM bookings WHERE id=999');
+$db->exec("DELETE FROM sqlite_sequence WHERE name='bookings'");
 $db->exec('CREATE TABLE availability_blocks (id INTEGER PRIMARY KEY, box_id INTEGER, start_date TEXT, end_date TEXT, reason TEXT)');
 $socket = stream_socket_server('tcp://127.0.0.1:0', $errno, $error);
 if (!$socket) throw new RuntimeException($error);
@@ -118,7 +124,7 @@ try {
             'fulfillment_price_delta'=>$method==='shipping'?80:0];
         [$status, $created] = request('create_booking.php', [
             'box_id'=>3,'start_date'=>'2027-01-08','end_date'=>'2027-01-10','customer_name'=>'TEST',
-            'customer_email'=>'test@example.invalid','total_amount'=>$total,'fulfillment_method'=>$method,
+            'customer_email'=>'test@example.invalid','customer_phone'=>'+49 174 0000000','billing_address_line1'=>'Rechnungsweg 7','billing_postal_code'=>'46485','billing_city'=>'Wesel','customer_birthdate'=>'1995-03-04','accept_terms'=>1,'privacy_acknowledged'=>1,'total_amount'=>$total,'fulfillment_method'=>$method,
             'fulfillment_details_json'=>json_encode($details),'pricing_details_json'=>json_encode($pricing)
         ]);
         check($status===200 && $created['ok']===true, $method.': creation failed');
@@ -128,16 +134,28 @@ try {
         check(json_decode($row['pricing_details_json'],true)['discount_amount']===40, 'Pricing details lost');
         $stored=json_decode($row['fulfillment_details_json'],true);
         check($stored['contact_phone']==='0000','Contact lost');
+        check($row['customer_phone']==='+49 174 0000000' && $row['billing_address_line1']==='Rechnungsweg 7' && $row['billing_city']==='Wesel' && $row['customer_birthdate']==='1995-03-04','Customer contract details lost');
+        check($row['privacy_notice_version']==='2026-10-20' && $row['privacy_acknowledged_at']!==null,'Privacy acknowledgement lost');
+        check($row['customer_mail_sent_at']===null && $row['internal_mail_sent_at']===null,'Failed mail marked sent');
         if ($method==='shipping') check($stored['city']==='Teststadt','Shipping address lost');
         if ($method==='delivery') check($stored['meeting_point']==='Testpunkt','Delivery details lost');
     }
     [$status,$created]=request('create_booking.php',[
         'box_id'=>1,'start_date'=>'2027-01-12','customer_name'=>'LEGACY TEST',
-        'customer_email'=>'legacy@example.invalid','total_amount'=>39
+        'customer_email'=>'legacy@example.invalid','customer_phone'=>'+49 174 0000000','billing_address_line1'=>'Rechnungsweg 7','billing_postal_code'=>'46485','billing_city'=>'Wesel','accept_terms'=>1,'privacy_acknowledged'=>1,'total_amount'=>39
     ]);
     check($status===200 && $created['ok']===true && $created['booking']['fulfillment_method']==='pickup','Legacy request failed');
     [$status]=request('create_booking.php',['box_id'=>1,'start_date'=>'2027-01-12']);
     check($status===422 && (int)$db->query('SELECT COUNT(*) FROM bookings')->fetchColumn()===4,'Invalid request inserted');
+    $valid=['box_id'=>1,'start_date'=>'2027-01-20','customer_name'=>'Test Person','customer_email'=>'verify@example.invalid','customer_phone'=>'+49 174 0000000','billing_address_line1'=>'Rechnungsweg 7','billing_postal_code'=>'46485','billing_city'=>'Wesel','accept_terms'=>1,'privacy_acknowledged'=>1,'total_amount'=>39];
+    foreach (['customer_phone'=>'','billing_city'=>'','customer_email'=>'bad','customer_birthdate'=>'2030-01-01','privacy_acknowledged'=>0] as $key=>$invalid) {
+      [$status]=request('create_booking.php',array_replace($valid,[$key=>$invalid]));
+      check($status===422,'Invalid field accepted: '.$key);
+    }
+    foreach (['shipping','delivery'] as $method) {
+      [$status]=request('create_booking.php',array_replace($valid,['fulfillment_method'=>$method]));
+      check($status===422,'Missing destination address accepted: '.$method);
+    }
     [$status,$list]=request('list_bookings.php');
     check($status===200 && $list['ok']===true && count($list['items'] ?? [])===4,'Authenticated list failed');
     [$status,$updated]=request('update_booking.php',[
@@ -151,6 +169,34 @@ try {
     check($status===200 && $statusUpdate['ok']===true && $db->query('SELECT status FROM bookings WHERE id=1')->fetchColumn()==='confirmed','Cookie-free status action failed');
     [$status,$calendar]=request('calendar_unavailable.php?box_id=3&from=2027-01-01&to=2027-01-31');
     check($status===200 && $calendar['ok']===true && count($calendar['unavailable']['bookings'])===3,'Public availability failed');
+    touch($temp.'/mail-success');
+    [$status,$created]=request('create_booking.php',$valid);
+    check($status===200 && $created['mail']['sent'] && $created['internal_mail']['sent'],'Both mail recipients must be attempted');
+    $verifyId=$created['booking']['id'];
+    $captures=array_map(fn($line)=>json_decode($line,true),file($temp.'/mail-capture.jsonl',FILE_IGNORE_NEW_LINES));
+    $customerMail=$captures[count($captures)-2]; $internalMail=$captures[count($captures)-1];
+    check($customerMail[0]==='verify@example.invalid' && $internalMail[0]==='info@mietmichbox.de','Wrong mail recipients');
+    check(str_contains($internalMail[2],'Rechnungsweg 7') && str_contains($internalMail[2],'+49 174 0000000'),'Internal mail missing customer details');
+    preg_match('/verify_booking_email\.php\?id=(\d+)&token=([a-f0-9]{64})/',$customerMail[2],$match);
+    check(isset($match[2]),'Customer confirmation link missing');
+    $verifyToken=$match[2];
+    $verificationUrl='http://'.$address.'/verify_booking_email.php?id='.$verifyId.'&token='.$verifyToken;
+    $get=file_get_contents($verificationUrl);
+    check(str_contains($get,'E-Mail-Adresse bestätigen') && !$db->query('SELECT email_verified_at FROM bookings WHERE id='.$verifyId)->fetchColumn(),'Email scanners must not verify on GET');
+    $wrongPage=file_get_contents('http://'.$address.'/verify_booking_email.php?id='.$verifyId.'&token='.str_repeat('0',64));
+    check(str_contains($wrongPage,'Link ist ungültig'),'Forged verification token accepted');
+    $db->exec("UPDATE bookings SET email_verification_expires_at='2000-01-01 00:00:00' WHERE id=".$verifyId);
+    $expired=file_get_contents($verificationUrl);check(str_contains($expired,'Link ist ungültig'),'Expired verification accepted');
+    $db->exec("UPDATE bookings SET email_verification_expires_at='2099-01-01 00:00:00' WHERE id=".$verifyId);
+    $postOptions=['http'=>['method'=>'POST','header'=>'Content-Type: application/x-www-form-urlencoded','content'=>http_build_query(['id'=>$verifyId,'token'=>$verifyToken])]];
+    $posted=file_get_contents('http://'.$address.'/verify_booking_email.php',false,stream_context_create($postOptions));
+    check(str_contains($posted,'E-Mail-Adresse bestätigt') && $db->query('SELECT email_verified_at FROM bookings WHERE id='.$verifyId)->fetchColumn(),'Confirmation POST failed');
+    [$status,$edited]=request('update_booking.php',['id'=>$verifyId,'billing_city'=>'Testort','customer_birthdate'=>''],true);
+    check($status===200 && $db->query('SELECT billing_city FROM bookings WHERE id='.$verifyId)->fetchColumn()==='Testort','Admin address edit failed');
+    [$status]=request('update_booking.php',['id'=>$verifyId,'customer_email'=>'changed@example.invalid'],true);
+    check($status===200 && !$db->query('SELECT email_verified_at FROM bookings WHERE id='.$verifyId)->fetchColumn(),'Changed email must lose verification');
+    $invalidPage=file_get_contents($verificationUrl);
+    check(str_contains($invalidPage,'Link ist ungültig'),'Old email token must be revoked');
     file_put_contents($temp . '/admin_users.php', "\n// changed credentials\n", FILE_APPEND);
     [$status,$state]=request('admin_login_token.php');
     check($status===200 && $state['authenticated']===false,'Changed credentials must expire existing sessions');
@@ -158,7 +204,7 @@ try {
     check($status===401,'Expired session must not read bookings');
     [$status]=request('list_bookings.php',null,false,'https://www.mietmichbox.de',$rotatedToken,false);
     check($status===401,'Credential changes must also expire bearer sessions');
-    echo "PASS: authenticated admin, pickup/shipping/delivery, pricing/address persistence, legacy requests, validation, updates, availability, SMTP failure isolation\n";
+    echo "PASS: authenticated admin, pickup/shipping/delivery, pricing/address persistence, schema migration, customer/billing validation, email verification/revocation, updates, availability, separate SMTP outcomes\n";
 } finally {
     proc_terminate($process);
     proc_close($process);

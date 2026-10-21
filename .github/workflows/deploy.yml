@@ -28,7 +28,7 @@ jobs:
         run: |
           php -r 'file_put_contents("deployment.json", json_encode(["commit" => getenv("GITHUB_SHA"), "branch" => getenv("GITHUB_REF_NAME"), "run_id" => getenv("GITHUB_RUN_ID")], JSON_PRETTY_PRINT) . PHP_EOL);'
           rm -rf .git .github tests node_modules
-          rm -f .env.dist .env .env.local admin_users.php admin_users.example.php php-error.log DEPLOYMENT.md .gitignore
+          rm -f .env.dist .env .env.local admin_users.php admin_users.example.php mail.private.php php-error.log DEPLOYMENT.md .gitignore
           find . -name '*.map' -type f -delete
           find . -name '.DS_Store' -type f -delete
       - name: Deploy to Hostinger via SFTP

@@ -131,7 +131,8 @@
     const FULFILLMENT_CHOICES = [
       { id:'pickup',   label:'Abholung', full:'Abholung in Wesel', note:'', priceDelta:0, addsToTotal:true },
       { id:'shipping', label:'Versand',  full:'Versand (deutschlandweit)', note:'inkl. Express-Hin- & Rückversand sowie Vorbereitungspauschale', priceDelta:80, addsToTotal:true },
-      { id:'delivery', label:'Lieferung', full:'Lieferung (NRW-weit)', note:'zzgl. individueller Lieferpauschale – wir melden uns mit einem Angebot', priceDelta:0, addsToTotal:false }
+      { id:'delivery', label:'Lieferung', full:'Lieferung (NRW-weit)', note:'zzgl. individueller Lieferpauschale – wir melden uns mit einem Angebot', priceDelta:0, addsToTotal:false },
+      { id:'unknown', label:'Nicht erfasst', full:'Nicht erfasst', note:'Bei älteren Anfragen wurde die Abwicklung nicht gespeichert. Bitte mit der Kundschaft klären.', priceDelta:0, addsToTotal:false }
     ];
     const FULFILLMENT_LOOKUP = Object.fromEntries(FULFILLMENT_CHOICES.map(opt=>[opt.id,opt]));
 
@@ -369,6 +370,13 @@
             customer_name:r.customer_name||'',
             customer_email:r.customer_email||'',
             customer_phone:r.customer_phone||'',
+            billing_address_line1:r.billing_address_line1||'',
+            billing_postal_code:r.billing_postal_code||'',
+            billing_city:r.billing_city||'',
+            customer_birthdate:r.customer_birthdate||'',
+            email_verified_at:r.email_verified_at||'',
+            customer_mail_sent_at:r.customer_mail_sent_at||'',
+            internal_mail_sent_at:r.internal_mail_sent_at||'',
             note:r.note ?? '',
             price_total:Number.isFinite(totalAmount)?totalAmount:0,
             deposit_eur:Number.isFinite(deposit)?deposit:0,
@@ -1386,6 +1394,18 @@
               </div>
 
               <div class="mmb-detail-section">
+                <h3>Rechnungsadresse &amp; Vertragsvorbereitung</h3>
+                <div class="mmb-detail-grid">
+                  <div class="mmb-detail-field"><label>Straße &amp; Hausnummer<input name="billing_address_line1" maxlength="200" value="${this.escape(booking.billing_address_line1||'')}"></label></div>
+                  <div class="mmb-detail-field"><label>PLZ<input name="billing_postal_code" maxlength="20" value="${this.escape(booking.billing_postal_code||'')}"></label></div>
+                  <div class="mmb-detail-field"><label>Ort<input name="billing_city" maxlength="120" value="${this.escape(booking.billing_city||'')}"></label></div>
+                  <div class="mmb-detail-field"><label>Geburtsdatum (freiwillig)<input type="date" name="customer_birthdate" value="${this.escape(booking.customer_birthdate||'')}"></label></div>
+                </div>
+                <p class="mmb-detail-note">E-Mail-Adresse: ${booking.email_verified_at?'Bestätigt am '+this.escape(this.formatDateTimeLabel(booking.email_verified_at)):'Noch nicht bestätigt / bei Altanfragen nicht erfasst'}. Dies ist keine Identitätsprüfung.</p>
+                <p class="mmb-detail-note">Eingangsmail: ${booking.customer_mail_sent_at?'vom Mailserver angenommen':'nicht als versendet erfasst'} · Interne Benachrichtigung: ${booking.internal_mail_sent_at?'vom Mailserver angenommen':'nicht als versendet erfasst'}. Der tatsächliche Posteingang ist damit nicht garantiert.</p>
+              </div>
+
+              <div class="mmb-detail-section">
                 <h3>Abwicklung</h3>
                 <div class="mmb-detail-grid">
                   <div class="mmb-detail-field">
@@ -1425,8 +1445,8 @@
                 </div>
               </div>
 
-              <div class="mmb-detail-section" data-fulfillment-section="shipping" ${currentFulfillmentMethod==='shipping'?'':'hidden'}>
-                <h3>Versandadresse</h3>
+              <div class="mmb-detail-section" data-fulfillment-section="address" ${showExtended?'':'hidden'}>
+                <h3>Versand- / Lieferadresse</h3>
                 <div class="mmb-detail-grid">
                   <div class="mmb-detail-field">
                     <label>Straße &amp; Hausnummer</label>
@@ -1611,7 +1631,7 @@
           const method = fulfillmentSelect.value;
           detailSections.forEach(section=>{
             const target = section.dataset.fulfillmentSection;
-            if(target==='extended'){
+            if(target==='extended' || target==='address'){
               section.hidden = !(method==='shipping' || method==='delivery');
             }else{
               section.hidden = target !== method;
@@ -1752,6 +1772,10 @@
             customer_name: (getValue('customer_name') || booking.customer_name || '').trim(),
             customer_email: (getValue('customer_email') || booking.customer_email || '').trim(),
             customer_phone: (getValue('customer_phone') || booking.customer_phone || '').trim(),
+            customer_birthdate: getValue('customer_birthdate').trim(),
+            billing_city: getValue('billing_city').trim(),
+            billing_postal_code: getValue('billing_postal_code').trim(),
+            billing_address_line1: getValue('billing_address_line1').trim(),
             box_id: finalBoxId,
             start_date: startDate,
             end_date: endDate,
@@ -1770,6 +1794,10 @@
             customer_name: (booking.customer_name || '').trim(),
             customer_email: (booking.customer_email || '').trim(),
             customer_phone: (booking.customer_phone || '').trim(),
+            customer_birthdate: (booking.customer_birthdate || '').trim(),
+            billing_city: (booking.billing_city || '').trim(),
+            billing_postal_code: (booking.billing_postal_code || '').trim(),
+            billing_address_line1: (booking.billing_address_line1 || '').trim(),
             box_id: Number(booking.box_id),
             start_date: (booking.start_date || '').trim(),
             end_date: (booking.end_date || '').trim(),
@@ -1801,6 +1829,10 @@
           markIfChanged('customer_name', sanitized.customer_name, originalNormalized.customer_name);
           markIfChanged('customer_email', sanitized.customer_email, originalNormalized.customer_email);
           markIfChanged('customer_phone', sanitized.customer_phone, originalNormalized.customer_phone);
+          markIfChanged('customer_birthdate', sanitized.customer_birthdate, originalNormalized.customer_birthdate);
+          markIfChanged('billing_city', sanitized.billing_city, originalNormalized.billing_city);
+          markIfChanged('billing_postal_code', sanitized.billing_postal_code, originalNormalized.billing_postal_code);
+          markIfChanged('billing_address_line1', sanitized.billing_address_line1, originalNormalized.billing_address_line1);
           markIfChanged('box_id', sanitized.box_id, originalNormalized.box_id);
           markIfChanged('start_date', sanitized.start_date, originalNormalized.start_date);
           markIfChanged('end_date', sanitized.end_date, originalNormalized.end_date);
@@ -2161,6 +2193,7 @@
         };
 
         const payload = {
+          ...(existing && typeof existing==='object'?existing:{}),
           method,
           submitted_via: (existing && typeof existing === 'object' && existing.submitted_via)
             ? existing.submitted_via
@@ -2180,7 +2213,7 @@
         payload.allow_contact_whatsapp = allowWhatsApp;
         payload.contact_preferences = { phone: allowPhone, whatsapp: allowWhatsApp };
 
-        if(method === 'shipping'){
+        if(method === 'shipping' || method === 'delivery'){
           const line1 = getValue('shipping_address_line1');
           const postal = getValue('shipping_postal_code');
           const city = getValue('shipping_city');
@@ -2243,7 +2276,7 @@ Telefon: 01742015500`;
 vielen Dank für deine Buchung (${displayId(b.id)}) für den Zeitraum ${range}.
 Leider können wir diese Buchung nicht annehmen, da zu deinem gewählten Zeitraum bereits alle unsere Musikboxen vermietet sind.
 
-Du kannst gerne direkt in unserem <a href="https://www.mietmichbox.de/buchungskalender" target="_blank" rel="noopener">Buchungskalender</a> eine neue Buchung zu einem anderen Zeitraum anfragen oder uns als Antwort auf diese E-Mail alternative Zeiträume nennen, sodass wir gemeinsam eine Lösung finden können. Wir helfen dir gerne schnellstmöglich weiter.
+Du kannst gerne direkt in unserem Buchungskalender (https://www.mietmichbox.de/musikbox-online-buchen) eine neue Buchung zu einem anderen Zeitraum anfragen oder uns als Antwort auf diese E-Mail alternative Zeiträume nennen, sodass wir gemeinsam eine Lösung finden können. Wir helfen dir gerne schnellstmöglich weiter.
 
 Falls du noch offene Fragen hast, kannst du uns jederzeit kontaktieren.
 
@@ -2278,7 +2311,7 @@ tut uns leid, aber unsere Musikboxen sind sehr gefragt 🔥
 
 Für deine Buchung (${displayId(b.id)}) ist die Musikbox ${b.box_name} für den Zeitraum ${range} leider nicht mehr verfügbar. ${altSentence}
 
-Du kannst gerne direkt in unserem <a href="https://www.mietmichbox.de/buchungskalender" target="_blank" rel="noopener">Buchungskalender</a> eine neue Buchung mit einer anderen Musikbox oder zu einem anderen Zeitraum anfragen. Alternativ kannst du uns auch als Antwort auf diese E-Mail die alternative Musikbox oder den alternativen Zeitraum nennen, sodass wir deine Buchung aktualisieren können. Wir helfen dir gerne schnellstmöglich weiter.
+Du kannst gerne direkt in unserem Buchungskalender (https://www.mietmichbox.de/musikbox-online-buchen) eine neue Buchung mit einer anderen Musikbox oder zu einem anderen Zeitraum anfragen. Alternativ kannst du uns auch als Antwort auf diese E-Mail die alternative Musikbox oder den alternativen Zeitraum nennen, sodass wir deine Buchung aktualisieren können. Wir helfen dir gerne schnellstmöglich weiter.
 
 Falls du noch offene Fragen hast, kannst du uns jederzeit kontaktieren.
 

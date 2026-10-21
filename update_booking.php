@@ -4,6 +4,7 @@ require __DIR__ . '/cors.php';        // <-- NEU: muss vor jeglicher Ausgabe ste
 require __DIR__ . '/db.php';
 require __DIR__ . '/auth.php';        // falls genutzt
 require_admin();
+require_once __DIR__ . '/lib/booking_customer.php';
 
 $pdo = null;
 
@@ -51,6 +52,7 @@ try {
   $id = isset($data['id']) ? (int)$data['id'] : 0;
   if ($id <= 0) throw new Exception('Ungültige ID');
 
+  try { $validatedCustomer=booking_customer_fields($data,true); $data=array_replace($data,$validatedCustomer); } catch(InvalidArgumentException $e) { http_response_code(422); echo json_encode(['ok'=>false,'error'=>$e->getMessage()]); exit; }
   $columns = bookings_columns($pdo);
   $hasColumn = function(string $field) use ($columns): bool {
     return isset($columns[strtolower($field)]);
@@ -64,7 +66,7 @@ try {
   }
 
   // Whitelist erlaubter Felder
-  $allow = ['customer_name','customer_email','customer_phone','box_id','start_date','end_date','status','total_amount','fulfillment_method','fulfillment_label','fulfillment_note','fulfillment_price_delta','note','deposit_eur','pricing_details_json','pricing_details','fulfillment_details_json','fulfillment_details'];
+  $allow = ['customer_name','customer_email','customer_phone','billing_address_line1','billing_postal_code','billing_city','customer_birthdate','box_id','start_date','end_date','status','total_amount','fulfillment_method','fulfillment_label','fulfillment_note','fulfillment_price_delta','note','deposit_eur','pricing_details_json','pricing_details','fulfillment_details_json','fulfillment_details'];
   $columns = bookings_columns($pdo);
   $processed = [];
   $sets = [];
@@ -99,6 +101,12 @@ try {
   }
   if (!$sets) throw new Exception('Keine Änderungen übergeben');
 
+  if (array_key_exists('customer_email',$data)) {
+    $previous=$pdo->prepare('SELECT customer_email FROM bookings WHERE id=?');$previous->execute([$id]);
+    if (strcasecmp((string)$previous->fetchColumn(),$data['customer_email'])!==0) {
+      $sets[]='email_verified_at = NULL';$sets[]='email_verification_hash = NULL';$sets[]='email_verification_expires_at = NULL';
+    }
+  }
   $sql = "UPDATE bookings SET ".implode(', ', $sets)." WHERE id = :id";
   $stmt = $pdo->prepare($sql);
   $stmt->execute($params);

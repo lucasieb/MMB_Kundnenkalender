@@ -49,3 +49,13 @@ Set the following environment variables on the target system before deploying th
 ## Post-Deployment Action
 
 After deploying the changes that move credentials to environment variables, rotate the database and SMTP credentials to invalidate any previously exposed values.
+
+## Booking data release 2026-10-20
+
+Before publishing the new form, preserve a private database backup and run `php migrate_booking_fields.php` from the backend directory over SSH. This CLI-only additive migration is idempotent. It preserves historical rows and does not guess their missing fulfillment choice. Creation fails explicitly if required storage columns are absent.
+
+Copy the complete `Kundenkalender` snippet into all five Builder embeds (home, central booking page and three product pages), and `Adminbuchungsliste` into the internal booking list. Publish the Builder only together with the corresponding PHP release. Required contact/address fields are checked server-side too. Birthdate is optional. Email confirmation verifies reachability, not identity, a contract or booking status; link GETs do not verify automatically. Changing the email revokes its previous verification.
+
+SMTP credentials belong in `mail.private.php` one directory above `public_html`, with permissions 0600. The file returns the SMTP configuration array. It is outside HTTP access, excluded from the repository and retained across deployments. Environment variables remain available when no private file is present. There is no repository password fallback. Use existing mailbox credentials; never put them in logs, issues or commits. Successful SMTP acceptance and actual inbox receipt are separate checks.
+
+The creation response reports customer and internal mail outcomes separately, and stores acceptance timestamps. A mail failure leaves the booking intact and the customer sees a clear warning. No bulk resending, invoice automation or automatic data deletion is introduced by this release.

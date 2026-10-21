@@ -152,11 +152,13 @@ foreach ($rows as &$row) {
     }
   }
   if ($method === null) {
-    $method = 'pickup';
+    $method = 'unknown';
   }
 
   $row['fulfillment_method'] = $method;
   $row['resolved_fulfillment_method'] = $method;
+  if ($method === 'unknown') $row['fulfillment_label'] = 'Nicht erfasst';
+  unset($row['email_verification_hash'], $row['email_verification_expires_at']);
 
   if (!isset($row['fulfillment_label']) || trim((string)$row['fulfillment_label']) === '') {
     $candidates = [];

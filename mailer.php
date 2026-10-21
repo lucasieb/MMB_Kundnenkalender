@@ -92,7 +92,8 @@ function sendMail(string $to, string $subject, string $body, string $toName = ''
         $mailer = build_mailer();
         $mailer->addAddress($to, $toName);
         $mailer->Subject = $subject;
-        $mailer->Body    = nl2br($body, false);
+        $mailer->Body    = nl2br(htmlspecialchars($body, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'), false);
+        $mailer->Body = preg_replace('~https://firebrick-squirrel-568721\.hostingersite\.com/verify_booking_email\.php\?id=[0-9]+&amp;token=[a-f0-9]{64}~', '<a href="$0">E-Mail-Adresse bestätigen</a>', $mailer->Body);
         $mailer->AltBody = $body;
         $mailer->send();
         return true;

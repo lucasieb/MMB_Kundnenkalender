@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 require __DIR__ . '/cors.php';
 header('Content-Type: application/json; charset=utf-8');
+require_once __DIR__ . '/lib/booking_customer.php';
 
 $HAS_MAILER = is_file(__DIR__ . '/mailer.php');
 if ($HAS_MAILER) {
@@ -397,6 +398,7 @@ function booking_mail_context(array $data): array {
   $email     = trim($data['customer_email']);
   $boxName   = box_name_by_id((int)$data['box_id']);
   $totalDisp = format_price((float)$data['total_amount']);
+  if (($data['fulfillment_method']??'')==='delivery') $totalDisp .= ' vorläufig, zzgl. individueller Lieferkosten';
 
   $fulfillmentDetails = null;
   if (isset($data['fulfillment_details'])) {
@@ -462,22 +464,27 @@ function build_submission_mail(array $data): array {
   $totalDisp = $ctx['totalDisp'];
   $fulfillment = $ctx['fulfillment'];
 
-  $subject = "Deine Buchung wurde übermittelt 🚀 – Buchungs-ID: {$data['display_id']}";
+  $subject = "Deine Buchungsanfrage ist eingegangen – Buchungs-ID: {$data['display_id']}";
 
   $text = <<<TXT
 Hallo {$name},
 
-deine Buchung wurde erfolgreich an uns übermittelt. Aktuell steht der Status noch auf Ausstehend. Wir bearbeiten deine Anfrage schnellstmöglich und melden uns dann mit der Bestätigung. Bis dahin musst du nichts weiter tun.
+deine Buchungsanfrage ist bei uns eingegangen. Sie steht auf Ausstehend und ist noch keine verbindliche Buchung. Wir bearbeiten deine Anfrage schnellstmöglich und melden uns dann mit der Bestätigung. Bis dahin musst du nichts weiter tun.
 
 Deine Buchung im Überblick:
 👤 Name: {$name}
 📧 E-Mail: {$email}
+📞 Telefon: {$data['customer_phone']}
+🏠 Rechnungsadresse: {$data['billing_address_line1']}, {$data['billing_postal_code']} {$data['billing_city']}
 🎵 Musikbox: {$boxName}
 🕰️ Zeitraum: {$range}
 🚚 Abwicklung: {$fulfillment}
-💶 Gesamtkosten: {$totalDisp}
+💶 Mietsumme: {$totalDisp}
 
-Bitte überprüfe einmal, ob deine Buchung korrekt bei uns eingegangen ist.
+Bitte bestätige innerhalb von 48 Stunden deine E-Mail-Adresse:
+{$data['verification_url']}
+
+Der Link bestätigt nur deine E-Mail-Adresse. Er ist keine Buchungsbestätigung und schließt keinen Mietvertrag ab.
 
 Falls du noch offene Fragen hast, kannst du uns jederzeit kontaktieren.
 
@@ -492,7 +499,7 @@ TXT;
   return [
     'subject' => $subject,
     'text'    => $text,
-    'html'    => nl2br($text, false),
+    'html'    => nl2br(htmlspecialchars($text,ENT_QUOTES | ENT_SUBSTITUTE,'UTF-8'), false),
   ];
 }
 
@@ -551,7 +558,7 @@ function build_internal_submission_mail(array $data): array {
       $extraHtmlLines[] = '☎️ Kontaktwege: ' . $escHtml($channels);
     }
 
-    if ($method === 'shipping') {
+    if ($method === 'shipping' || $method === 'delivery') {
       $addressParts = [];
       $addressLine = trim((string)($fulfillmentDetails['address_line1'] ?? ''));
       $postalCode = trim((string)($fulfillmentDetails['postal_code'] ?? ''));
@@ -597,10 +604,12 @@ eine neue Buchungsanfrage ist eingegangen. Der Status steht bislang auf Ausstehe
 Buchung im Überblick:
 👤 Name: {$name}
 📧 E-Mail: {$email}
+📞 Telefon: {$data['customer_phone']}
+🏠 Rechnungsadresse: {$data['billing_address_line1']}, {$data['billing_postal_code']} {$data['billing_city']}
 🎵 Musikbox: {$boxName}
 🕰️ Zeitraum: {$range}
 🚚 Abwicklung: {$fulfillment}
-💶 Gesamtkosten: {$totalDisp}
+💶 Mietsumme: {$totalDisp}
 TXT;
 
   $text = $textBase . "\n";
@@ -630,7 +639,7 @@ HTML;
   return [
     'subject' => $subject,
     'text'    => $text,
-    'html'    => $html,
+    'html'    => nl2br(htmlspecialchars($text,ENT_QUOTES | ENT_SUBSTITUTE,'UTF-8'), false),
   ];
 }
 
@@ -698,6 +707,14 @@ try {
 
   $in = read_input();
 
+  if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') json_response(['ok'=>false,'error'=>'POST erforderlich'], 405);
+  try { $customer = booking_customer_fields($in); } catch (InvalidArgumentException $e) { json_response(['ok'=>false,'error'=>$e->getMessage(),'code'=>'validation'],422); }
+  if (!is_truthy($in['accept_terms']??false) || !is_truthy($in['privacy_acknowledged']??false)) json_response(['ok'=>false,'error'=>'Bitte AGB und Datenschutzhinweis bestätigen.','code'=>'validation'],422);
+  // Fail explicitly instead of silently losing data when migration is missing.
+  foreach (['customer_phone','billing_address_line1','billing_postal_code','billing_city','customer_birthdate','fulfillment_method','fulfillment_details_json','pricing_details_json','email_verification_hash','privacy_notice_version','privacy_acknowledged_at','email_verification_expires_at','email_verified_at','customer_mail_sent_at','internal_mail_sent_at','note','deposit_eur','fulfillment_label','fulfillment_note','fulfillment_price_delta'] as $column) {
+    if (!has_col($pdo,$column)) json_response(['ok'=>false,'error'=>'Buchungssystem wird aktualisiert. Bitte später erneut versuchen.','code'=>'schema_missing'],503);
+  }
+
   // Pflichtfelder
   $box_id = isset($in['box_id']) ? (int)$in['box_id'] : 0;
   $start  = (string)($in['start_date'] ?? '');
@@ -762,6 +779,17 @@ try {
   } elseif ($fulfillmentDetailsJson === null && $fulfillmentDetailsArray !== null) {
     $fulfillmentDetailsJson = json_encode($fulfillmentDetailsArray, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
   }
+
+  if (in_array($fulfillmentMethod,['shipping','delivery'],true)) {
+    foreach (['address_line1','postal_code','city'] as $key) {
+      if (empty($fulfillmentDetailsArray[$key]) || !is_scalar($fulfillmentDetailsArray[$key]) || strlen((string)$fulfillmentDetailsArray[$key])>400) json_response(['ok'=>false,'error'=>'Bitte eine vollständige Zieladresse angeben.','code'=>'validation'],422);
+    }
+  }
+  $verificationToken=bin2hex(random_bytes(32));
+  $customer['privacy_notice_version']=BOOKING_PRIVACY_VERSION;
+  $customer['privacy_acknowledged_at']=date('Y-m-d H:i:s');
+  $customer['email_verification_hash']=hash('sha256',$verificationToken);
+  $customer['email_verification_expires_at']=date('Y-m-d H:i:s',time()+48*3600);
 
   // Overlap-Flag: nur TRUE zählt; FALSE wird ignoriert (Server-Default bleibt)
   $force = null;
@@ -836,6 +864,11 @@ try {
   if (has_col($pdo,'fulfillment_note'))   { $fields[]='fulfillment_note';   $place[]=':fulfillment_note';   $params[':fulfillment_note']=$fulfillmentNote; }
   if (has_col($pdo,'fulfillment_price_delta')) { $fields[]='fulfillment_price_delta'; $place[]=':fulfillment_price_delta'; $params[':fulfillment_price_delta']=$fulfillmentPrice; }
 
+  foreach ($customer as $column=>$value) {
+    if (in_array($column,['customer_name','customer_email','customer_phone'],true)) continue;
+    $fields[]=$column; $place[]=':'.$column; $params[':'.$column]=$value;
+  }
+
   // created_at → NOW() (nur wenn Spalte existiert)
   if (has_col($pdo,'created_at')) { $fields[]='created_at'; $place[]='NOW()'; }
 
@@ -864,6 +897,11 @@ try {
     $payload = [
       'customer_name'  => $name,
       'customer_email' => $email,
+      'customer_phone' => $phone,
+      'billing_address_line1'=>$customer['billing_address_line1'],
+      'billing_postal_code'=>$customer['billing_postal_code'],
+      'billing_city'=>$customer['billing_city'],
+      'verification_url'=>'https://firebrick-squirrel-568721.hostingersite.com/verify_booking_email.php?id='.$newId.'&token='.$verificationToken,
       'box_id'         => $box_id,
       'start_date'     => $start,
       'end_date'       => $end,
@@ -896,6 +934,9 @@ try {
       error_log('[create_booking][MAIL ERROR internal] ' . $mailEx->getMessage());
     }
   }
+
+  $mailStatus=$pdo->prepare('UPDATE bookings SET customer_mail_sent_at=?,internal_mail_sent_at=? WHERE id=?');
+  $mailStatus->execute([$mailInfo['sent']?date('Y-m-d H:i:s'):null,$internalMailInfo['sent']?date('Y-m-d H:i:s'):null,$newId]);
 
   json_response([
     'ok'=>true,
