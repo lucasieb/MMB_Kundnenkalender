@@ -25,7 +25,7 @@ function mmb_order_options(array $cart,string $start,string $end,string $method,
         if($p==='single'){
             $candidates=[array_merge($v,['speaker'=>3,'speaker_qty'=>1]),array_merge($v,['controller'=>1]),array_merge($v,['photo'=>'digital']),array_merge($v,['tent'=>1])];
             $singlePrices=array_map(fn($x)=>mmb_order_quote($x,$start,$end,'pickup')['total'],$candidates);$options['packages'][$p]=min($singlePrices);$options['standalone']=array_combine(['speaker','controller','photo','tent'],$singlePrices);
-        }else $q=mmb_order_quote($v,$start,$end,'pickup');$options['packages'][$p]=['total'=>$q['total'],'saving_percent'=>$q['set_discount_percent'],'reference_total'=>$q['set_reference_total']];
+        }else {$q=mmb_order_quote($v,$start,$end,'pickup');$options['packages'][$p]=['total'=>$q['total'],'saving_percent'=>$q['set_discount_percent'],'reference_total'=>$q['set_reference_total']];}
     }
     foreach(['speaker','controller','photo','tent'] as $id){
         $v=$cart;if(!empty($cart[$id])){$options['categories'][$id]=0;continue;}if($id==='speaker'){$v['speaker']=3;$v['speaker_qty']=1;}elseif($id==='photo')$v['photo']='digital';else $v[$id]=1;

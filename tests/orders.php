@@ -35,3 +35,5 @@ $empty=mmb_order_options([],'2030-01-07','2030-01-10','pickup');assert_order($em
 foreach([['speaker'=>1,'batteries'=>1],['speaker'=>2,'backpack'=>1],['speaker'=>1,'speaker_qty'=>2],['speaker'=>3,'batteries'=>4],['speaker'=>3,'microphone'=>3],['walls'=>1],[]]as$invalid)expect_invalid(fn()=>mmb_order_quote($invalid,'2030-01-07','2030-01-08'),'cart');
 foreach([['2030-01-07','2030-01-07'],['2030-02-30','2030-03-01'],['2030-01-08','2030-01-07'],['2030-01-01','2032-01-01']]as[$a,$b])expect_invalid(fn()=>mmb_order_quote(['speaker'=>3],$a,$b),'date range');
 echo 'PASS: '.$count." combinations, 24-hour boundaries, DST, half-price second speaker, 10/15/20 percent exact basket comparisons, rounded sets, photo package duration, extension anchors, fulfillment and invalid carts\n";
+
+assert_order(is_numeric($empty['offers']['packages']['single']),'Standalone minimum must not be overwritten by set metadata');foreach(['dj','party','event']as$id)assert_order(is_numeric($empty['offers']['packages'][$id]['total'])&&$empty['offers']['packages'][$id]['saving_percent']===$c['set_discounts'][$id],'Set offer metadata invalid');
