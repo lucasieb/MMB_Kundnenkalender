@@ -203,6 +203,7 @@
       body.mmb-admin-embed{height:auto!important;min-height:720px!important;min-width:0;}
       body.mmb-auth-pending #mmb-admin-shell{display:none;}
       body.mmb-admin-embed #mmb-admin-shell{min-width:0;}
+      body.mmb-detail-open #mmb-admin-shell{visibility:hidden;}
       .mmb-login-overlay{position:relative;background:rgba(17,24,39,.65);display:flex;align-items:center;justify-content:center;flex:1;width:100%;min-height:720px;box-sizing:border-box;padding:2rem 1rem;}
       .mmb-login-overlay[hidden]{display:none;}
       .mmb-login-dialog{background:#fff;border-radius:10px;box-shadow:0 20px 45px rgba(15,23,42,.35);max-width:420px;width:100%;padding:2rem;font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
@@ -219,6 +220,7 @@
       .mmb-login-waiting{display:flex;align-items:center;justify-content:center;flex:1;min-height:720px;padding:2rem;box-sizing:border-box;color:#e5e7eb;font-family:system-ui,sans-serif;text-align:center;}
       .mmb-login-waiting[hidden]{display:none;}
       @media(max-width:900px){
+        .mmb-detail-footer{padding-left:1.5rem!important;}
         .mmb-detail-overlay{top:var(--mmb-panel-top,0px)!important;height:min(calc(100% - var(--mmb-panel-top,0px)),var(--mmb-viewport-height,640px))!important;bottom:auto!important;}
         html.mmb-admin-document{min-height:0;}
         body.mmb-admin-embed{min-height:600px!important;}
