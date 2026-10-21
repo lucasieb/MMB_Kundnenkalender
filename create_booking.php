@@ -474,6 +474,7 @@ function build_submission_mail(array $data): array {
   $fulfillment = $ctx['fulfillment'];
   $delivery=$ctx['fulfillment_details']??[];
   $deliveryLine=implode(', ',array_filter([$delivery['company_name']??'', $delivery['contact_name']??'', $delivery['address_line1']??'',trim(($delivery['postal_code']??'').' '.($delivery['city']??''))]));
+  $deliveryText=($ctx['fulfillment_info']['method']??'pickup')==='pickup'?'':(($ctx['fulfillment_info']['method']??'')==='shipping'?'Versandadresse: ':'Lieferadresse: ').$deliveryLine;
 
   $subject = "Deine Buchungsanfrage ist eingegangen – Buchungs-ID: {$data['display_id']}";
 
@@ -490,7 +491,7 @@ Deine Buchung im Überblick:
 Ausstattung: {$boxName}
 🕰️ Zeitraum: {$range}
 🚚 Abwicklung: {$fulfillment}
-Lieferadresse: {$deliveryLine}
+{$deliveryText}
 💶 Mietsumme: {$totalDisp}
 
 Bitte bestätige innerhalb von 48 Stunden deine E-Mail-Adresse:
