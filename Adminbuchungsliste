@@ -175,7 +175,7 @@
   (function(global){'use strict';
 
     const BOX_MAP = { '1':'Marshall Bromley 750', '2':'Teufel Rockster Neo', '3':'Soundboks 4' };
-    const EURO_FORMATTER = new Intl.NumberFormat('de-DE', {maximumFractionDigits:0});
+    const EURO_FORMATTER = new Intl.NumberFormat('de-DE', {maximumFractionDigits:2});
     const FULFILLMENT_CHOICES = [
       { id:'pickup',   label:'Abholung', full:'Abholung in Wesel', note:'', priceDelta:0, addsToTotal:true },
       { id:'shipping', label:'Versand',  full:'Versand (deutschlandweit)', note:'inkl. Express-Hin- & Rückversand sowie Vorbereitungspauschale', priceDelta:80, addsToTotal:true },
@@ -548,7 +548,7 @@
       }
 
       formatEuro(value){
-        const amount = Math.round(Number(value) || 0);
+        const amount = Number(value) || 0;
         return `${EURO_FORMATTER.format(amount)} €`;
       }
 
@@ -564,7 +564,7 @@
         <tr>
           <td class="cell--id"><span class="badge-id">${displayId(b.id)}</span></td>
           <td class="cell--customer"><span class="cell--name">${this.escape(b.customer_name)}</span>${emailLine}</td>
-          <td class="cell--box">${b.order?`<strong>${this.escape(b.order.package_name)}</strong><div class="mmb-order-mini">${b.order.items.map(x=>`<span>${MMBIcons.icon({music:'speaker',photo:'camera',tent:'tent',accessory:'package'}[x.category])}${x.quantity}× ${this.escape(x.label)}</span>`).join('')}</div>`:MMBIcons.icon('speaker')+' '+this.escape(b.box_name)}</td>
+          <td class="cell--box">${b.order?`<strong>${this.escape(b.order.package_name)}</strong><div class="mmb-order-mini">${b.order.items.map(x=>`<span>${MMBIcons.icon({music:'speaker',photo:'camera',tent:'tent',accessory:'package',service:'truck'}[x.category])}${x.quantity}× ${this.escape(x.label)}</span>`).join('')}</div>`:MMBIcons.icon('speaker')+' '+this.escape(b.box_name)}</td>
           <td class="cell--date">${this.renderDateCell(b)}</td>
           <td class="cell--fulfillment"${fulfillmentNoteAttr}>${this.escape(this.formatFulfillmentCell(b))}</td>
           <td class="cell--total">${this.formatEuro(b.price_total)}</td>
@@ -1307,9 +1307,10 @@
       formatEuro(amount){
         const num = Number(amount||0);
         const safe = Number.isFinite(num) ? num : 0;
-        return safe.toLocaleString('de-DE', {minimumFractionDigits:0, maximumFractionDigits:0}) + '€';
+        return safe.toLocaleString('de-DE', {minimumFractionDigits:0, maximumFractionDigits:2}) + ' €';
       }
       fulfillmentEmailLine(b){
+        if(b.order)return b.order.fulfillment_label+' — '+b.order.fulfillment_note;
         const info = this.getFulfillmentInfo(b);
         if(info.method==='pickup'){
           return info.priceDelta>0 ? `${info.full} +${this.formatEuro(info.priceDelta)}` : `${info.full} (gratis)`;
@@ -1540,7 +1541,7 @@
               <div class="mmb-detail-section">
                 <h3>Rechnungsübersicht</h3>
                 <div class="mmb-invoice-rows">
-                  ${[['pricing_original','Miete vor Rabatt',originalValue],['pricing_discount_amount','Rabatt',discountAmountValue],['pricing_base_total','Miete nach Rabatt',baseTotalValue],['pricing_shipping_delta','Versand / Lieferung',shippingDeltaValue],['total_amount','Gesamtpreis',totalValue],['deposit_eur','Kaution (zusätzlich)',depositValue]].map(([name,label,value])=>`<div class="mmb-detail-field mmb-invoice-row ${name==='total_amount'?'mmb-invoice-total':''}"><label>${label}</label><div class="mmb-money-input"><input inputmode="decimal" name="${name}" value="${this.escape(this.formatNumberInput(value))}"><span aria-hidden="true">€</span></div></div>`).join('')}
+                  ${[['pricing_original','Miete vor Rabatt',originalValue],['pricing_discount_amount','Rabatt',discountAmountValue],['pricing_base_total','Zwischensumme nach Rabatt',baseTotalValue],['pricing_shipping_delta','Versand / Lieferung',shippingDeltaValue],['total_amount','Gesamtpreis',totalValue],['deposit_eur','Kaution (zusätzlich)',depositValue]].map(([name,label,value])=>`<div class="mmb-detail-field mmb-invoice-row ${name==='total_amount'?'mmb-invoice-total':''}"><label>${label}</label><div class="mmb-money-input"><input inputmode="decimal" name="${name}" value="${this.escape(this.formatNumberInput(value))}"><span aria-hidden="true">€</span></div></div>`).join('')}
                 </div>
                 <details class="mmb-price-calculation"><summary>Berechnungsdetails bearbeiten</summary><div class="mmb-detail-grid">
                   <div class="mmb-detail-field"><label>Rabatt (%)</label><input inputmode="decimal" name="pricing_discount_percent_exact" value="${this.escape(this.formatNumberInput(discountPercentExactValue))}"></div>
@@ -1675,7 +1676,7 @@
             if(target==='extended' || target==='address'){
               section.hidden = !(method==='shipping' || method.startsWith('delivery'));
             }else{
-              section.hidden = target !== method;
+              section.hidden = target==='delivery'?!method.startsWith('delivery'):target!==method;
             }
           });
           if(hintEl){
@@ -1713,7 +1714,8 @@
             customer_email: vals.customer_email ?? booking.customer_email,
             customer_phone: vals.customer_phone ?? booking.customer_phone,
             box_id: boxId,
-            box_name: BOX_MAP[boxId] || BOX_MAP[String(booking.box_id)] || booking.box_name,
+            order: form._mmbOrder?.quote||booking.order,
+            box_name: booking.order?(form._mmbOrder?.quote?.summary||booking.order.summary):(BOX_MAP[boxId] || BOX_MAP[String(booking.box_id)] || booking.box_name),
             start_date: vals.start_date ?? booking.start_date,
             end_date: vals.end_date ?? booking.end_date,
             status: vals.status ?? booking.status,
@@ -1762,9 +1764,9 @@
           });
         }
 
-        syncEmailFields(true);
-
         form._mmbOrder=MMBOrderAdmin.mount(form,booking,mmbApiPost);
+        syncEmailFields(true);
+        form.addEventListener('mmb-order-quoted',()=>syncEmailFields());
         form.addEventListener('submit', async (event)=>{
           event.preventDefault();
           await this.handleDetailSubmit(form, booking, closeOverlay, { baseSubject });
@@ -1993,6 +1995,8 @@
           }else if(updatesApplied){
             MMBCore.Utils.showNotification('Buchung aktualisiert');
           }
+        }catch(err){
+          MMBCore.Utils.showNotification('Speichern fehlgeschlagen: '+(err.message||'Bitte Angaben prüfen.'),'error');
         }finally{
           if(submitBtn){ submitBtn.disabled = false; submitBtn.textContent = originalLabel; }
         }
@@ -2392,7 +2396,7 @@ wir haben Details in deiner Buchung (${displayId(b.id)}) aktualisiert.
 Deine aktualisierte Buchung im Überblick:
 👤 Name: ${name}
 📧 E-Mail: ${email}
-🎵 Musikbox: ${box}
+Ausstattung: ${b.order?b.order.items.map(x=>`${x.quantity}× ${x.label} — ${this.formatEuro(x.total)}`).join('\n'):box}
 🕰️ Zeitraum: ${range}
 🚚 Abwicklung: ${fulfillment}
 💶 Preis: ${priceLabel}€

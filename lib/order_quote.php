@@ -56,8 +56,9 @@ function mmb_order_quote(array $input,string $start,string $end,string $method='
         $included=$id==='stands'&&$package!=='single';
         $add($id,$x['name'],'accessory',$qty,$included?0:$base*$qty,$included?0:$base*$qty,$included?'Im Set enthalten':'Bis 3 Tage inklusive; danach +'.$x['extra_day'].' € je Stück/Tag');
     }
-    if($photo!==''){$base=$c['photo'][$photo]['price']+max(0,$days-$c['photo_included_days'])*$c['photo_extra_day'];$net=$base-(in_array($package,['party','event'],true)?$c['set_photo_discount']:0);$add('photo-'.$photo,'Fotobox '.$c['photo'][$photo]['name'],'photo',1,$base,$net,'Bis 5 Kalendertage; danach +40 €/Tag');}
+    if($photo!==''){$base=$c['photo'][$photo]['price']+max(0,$days-$c['photo_included_days'])*$c['photo_extra_day'];$net=$base-(in_array($package,['party','event'],true)?$c['set_photo_discount']:0);$add('photo-'.$photo,'Fotobox '.$c['photo'][$photo]['name'],'photo',1,$base,$net,'Bis 5 Kalendertage; danach +40 €/Tag');$lines[count($lines)-1]['included']=array_merge(['Fotobox','Stativ','Requisiten','Unbegrenzt Fotos','Fotocloud-Download 60 Tage'],$photo==='digital'?[]:['Drucker',$photo==='print200'?'200 Ausdrucke, 2 Layouts':'700 Ausdrucke, 3 Layouts','Formate 5×15 / 10×15 cm, Filter']);}
     if($tent){$base=$c['tent']['first_day']+($days-1)*$c['tent']['extra_day'];$add('tent',$c['tent']['name'],'tent',1,$base,$base-($package==='event'?$c['event_tent_discount']:0),'1. Tag 99 €, jeder weitere Tag 25 €');if($walls)$add('walls','Seitenwände für das Zelt','accessory',1,$c['tent']['walls'],$c['tent']['walls'],'Einmalig je Miete');}
+    if($method==='delivery_setup'){$assembly=$c['assembly_setup']+$c['assembly_teardown'];$add('assembly','Zelt Auf- und Abbau','service',1,$assembly,$assembly,'Aufbau 80 € + Abbau 80 €; je 2 Personen × ca. 1 Stunde');}
     $rental=round(array_sum(array_column($lines,'total')),2);
     $shipping=$method==='shipping'&&!$tent?$c['shipping_per_speaker']*max(1,$quantity):0;
     // Standalone controller shipping needs a freight offer, rather than assuming a speaker parcel.
@@ -76,6 +77,6 @@ function mmb_order_decode($raw): array {
     $decoded=json_decode($raw,true);if(!is_array($decoded))throw new InvalidArgumentException('Ungültige Produktauswahl.');return $decoded;
 }
 function mmb_order_mail_lines(array $order): string {
-    $rows=[];foreach($order['items']??[] as $line)$rows[]=$line['quantity'].'× '.$line['label'].' — '.number_format((float)$line['total'],2,',','.').' €';
+    $rows=[];foreach($order['items']??[] as $line)$rows[]=$line['quantity'].'× '.$line['label'].' — '.number_format((float)$line['total'],2,',','.').' €'.(!empty($line['included'])?' ('.implode(', ',$line['included']).')':'');
     return implode("\n",$rows).(!empty($order['quote_required'])?"\nZzgl. noch anzubietender Transport-/Montagekosten.":'');
 }

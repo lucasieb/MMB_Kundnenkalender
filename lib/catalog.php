@@ -27,7 +27,8 @@ function mmb_catalog(): array {
         'photo_included_days'=>5,'photo_extra_day'=>40,
         'set_music_discount_percent'=>10,'set_photo_discount'=>20,'event_tent_discount'=>20,
         'shipping_per_speaker'=>80,
+        'assembly_setup'=>80,'assembly_teardown'=>80,
         'delivery_note'=>'Lieferkosten nach Entfernung auf Angebot. Abholung in Wesel kostenlos.',
-        'assembly_note'=>'Lieferung und Montage auf Angebot: zwei Personen, etwa eine Stunde Aufbau vor Ort; Anfahrt und Abbau werden separat kalkuliert.',
+        'assembly_note'=>'Auf- und Abbau des Zelts: 160 € (jeweils zwei Personen und rund eine Stunde kalkuliert), bereits enthalten. Lieferfahrt nach Entfernung zusätzlich auf Angebot.',
     ];
 }

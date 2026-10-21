@@ -232,6 +232,7 @@ Dein MIETMICHBOX Team
 TXT;
   }
 
+  if($order){foreach($bodies as &$body)$body.="\n\nMietsumme: ".number_format((float)$bk['total_amount'],2,',','.').' €'.(!empty($order['quote_required'])?' zzgl. offener Angebotskosten.':'');unset($body);}
   return [$subjects, $bodies];
 }
 
@@ -388,6 +389,9 @@ try {
 
       $subject = $customSubject !== '' ? $customSubject : ($subjects[$mode] ?? 'Buchung');
       $bodyTxt = $customMsg     !== '' ? $customMsg     : ($bodies[$mode]    ?? 'Hallo, deine Buchung wurde aktualisiert.');
+
+      $currentOrder=json_decode((string)($bk['order_json']??''),true);
+      if($currentOrder&&$customMsg!=='')$bodyTxt.="\n\nAktueller gespeicherter Buchungsstand:\n".mmb_order_mail_lines($currentOrder)."\nAbwicklung: ".$currentOrder['fulfillment_label'].' — '.$currentOrder['fulfillment_note']."\nMietsumme: ".number_format((float)$bk['total_amount'],2,',','.').' €';
 
       $toEmail = (string)($bk['customer_email'] ?? '');
       $toName  = (string)($bk['customer_name'] ?? 'Kunde');

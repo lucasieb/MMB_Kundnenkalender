@@ -68,6 +68,7 @@ try {
 
   $previousStatement=$pdo->prepare('SELECT * FROM bookings WHERE id=?');$previousStatement->execute([$id]);$existing=$previousStatement->fetch(PDO::FETCH_ASSOC);
   if(!$existing)throw new InvalidArgumentException('Buchung nicht gefunden.');
+  unset($data['order_json'],$data['package_id']); // Canonical components are generated exclusively from a validated cart.
   $oldOrder=json_decode((string)($existing['order_json']??''),true);
   if($oldOrder){
     $changed=isset($data['cart'])||array_intersect(['start_date','end_date','fulfillment_method','box_id'],array_keys($data));
@@ -78,6 +79,11 @@ try {
       $data['box_id']=$order['primary_box_id'];$data['package_id']=$order['package'];
       $data['fulfillment_method']=$order['fulfillment_id'];$data['fulfillment_label']=$order['fulfillment_label'];$data['fulfillment_note']=$order['fulfillment_note'];$data['fulfillment_price_delta']=$order['shipping_delta'];
       if(!empty($data['manual_price_override'])&&isset($data['total_amount'])){$order['manual_total']=(float)$data['total_amount'];}else{$data['total_amount']=$order['total'];$data['pricing_details_json']=$order;unset($data['pricing_details']);}
+      $details=$data['fulfillment_details_json']??$data['fulfillment_details']??$existing['fulfillment_details_json']??null;
+      $details=is_array($details)?$details:json_decode((string)$details,true);
+      $data['fulfillment_details_json']=array_replace($details??[],['method'=>$order['fulfillment_id'],'label'=>$order['fulfillment_label'],'note'=>$order['fulfillment_note'],'price_delta'=>$order['shipping_delta'],'adds_to_total'=>$order['fulfillment_adds_to_total'],'quote_required'=>$order['quote_required']]);
+      if($order['fulfillment_id']!=='pickup'){foreach(['address_line1','postal_code','city'] as $key)if(empty($data['fulfillment_details_json'][$key])||!is_scalar($data['fulfillment_details_json'][$key]))throw new InvalidArgumentException('Bitte vollständige Zieladresse für die Abwicklung angeben.');}
+      unset($data['fulfillment_details']);
       $data['order_json']=$order;
     }elseif(isset($data['total_amount'])){$oldOrder['manual_total']=(float)$data['total_amount'];$data['order_json']=$oldOrder;}
   }elseif(isset($data['cart']))throw new InvalidArgumentException('Diese Altbuchung wird weiterhin über ihre bisherigen Felder verwaltet.');

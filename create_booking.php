@@ -61,7 +61,7 @@ function box_name_by_id(int $id): string {
 }
 
 function format_price(float $amount): string {
-  return number_format($amount, 0, ',', '.') . '€';
+  return number_format($amount, 2, ',', '.') . ' €';
 }
 
 const FULFILLMENT_DEFS = [
