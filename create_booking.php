@@ -12,6 +12,7 @@ declare(strict_types=1);
 require __DIR__ . '/cors.php';
 header('Content-Type: application/json; charset=utf-8');
 require_once __DIR__ . '/lib/booking_customer.php';
+require_once __DIR__ . '/lib/order_quote.php';
 
 $HAS_MAILER = is_file(__DIR__ . '/mailer.php');
 if ($HAS_MAILER) {
@@ -60,10 +61,11 @@ function box_name_by_id(int $id): string {
 }
 
 function format_price(float $amount): string {
-  return number_format($amount, 0, ',', '.') . '€';
+  return number_format($amount, 2, ',', '.') . ' €';
 }
 
 const FULFILLMENT_DEFS = [
+  'delivery_setup'=>['label'=>'Lieferung und Montage','full'=>'Lieferung und Montage','price_delta'=>0.0,'adds_to_total'=>false,'note'=>'Fahrt, Aufbau mit zwei Personen und Abbau auf individuelles Angebot.'],
   'pickup' => [
     'label' => 'Abholung',
     'full' => 'Abholung in Wesel',
@@ -106,6 +108,7 @@ function map_fulfillment_method($value): ?string {
     case 'versand':
     case 'lieferungperversand':
       return 'shipping';
+    case 'delivery_setup': return 'delivery_setup';
     case 'delivery':
     case 'lieferung':
       return 'delivery';
@@ -396,9 +399,9 @@ function fulfillment_email_line(array $info): string {
 function booking_mail_context(array $data): array {
   $name      = trim($data['customer_name']) ?: 'Guten Tag';
   $email     = trim($data['customer_email']);
-  $boxName   = box_name_by_id((int)$data['box_id']);
+  $boxName   = !empty($data['order']) ? $data['order']['package_name']."\n".mmb_order_mail_lines($data['order']) : box_name_by_id((int)$data['box_id']);
   $totalDisp = format_price((float)$data['total_amount']);
-  if (($data['fulfillment_method']??'')==='delivery') $totalDisp .= ' vorläufig, zzgl. individueller Lieferkosten';
+  if (!empty($data['order']['quote_required']) || ($data['fulfillment_method']??'')==='delivery') $totalDisp .= ' vorläufig, zzgl. individueller Lieferkosten';
 
   $fulfillmentDetails = null;
   if (isset($data['fulfillment_details'])) {
@@ -435,7 +438,7 @@ function booking_mail_context(array $data): array {
   }
 
   $fulfillmentInfo = normalize_fulfillment_from_request($data, $fulfillmentDetails, $pricingDetails);
-  $fulfillmentLine = fulfillment_email_line($fulfillmentInfo);
+  $fulfillmentLine = !empty($data['order']) ? $data['order']['fulfillment_label'].' — '.$data['order']['fulfillment_note'] : fulfillment_email_line($fulfillmentInfo);
 
   $startDate = new DateTimeImmutable($data['start_date']);
   $endDate   = new DateTimeImmutable($data['end_date']);
@@ -476,7 +479,7 @@ Deine Buchung im Überblick:
 📧 E-Mail: {$email}
 📞 Telefon: {$data['customer_phone']}
 🏠 Rechnungsadresse: {$data['billing_address_line1']}, {$data['billing_postal_code']} {$data['billing_city']}
-🎵 Musikbox: {$boxName}
+Ausstattung: {$boxName}
 🕰️ Zeitraum: {$range}
 🚚 Abwicklung: {$fulfillment}
 💶 Mietsumme: {$totalDisp}
@@ -606,7 +609,7 @@ Buchung im Überblick:
 📧 E-Mail: {$email}
 📞 Telefon: {$data['customer_phone']}
 🏠 Rechnungsadresse: {$data['billing_address_line1']}, {$data['billing_postal_code']} {$data['billing_city']}
-🎵 Musikbox: {$boxName}
+Ausstattung: {$boxName}
 🕰️ Zeitraum: {$range}
 🚚 Abwicklung: {$fulfillment}
 💶 Mietsumme: {$totalDisp}
@@ -624,7 +627,7 @@ TXT;
 <p>Buchung im Überblick:<br>
 👤 Name: {$name}<br>
 📧 E-Mail: {$email}<br>
-🎵 Musikbox: {$boxName}<br>
+Ausstattung: {$boxName}<br>
 🕰️ Zeitraum: {$range}<br>
 🚚 Abwicklung: {$fulfillment}<br>
 💶 Gesamtkosten: {$totalDisp}</p>
@@ -780,7 +783,24 @@ try {
     $fulfillmentDetailsJson = json_encode($fulfillmentDetailsArray, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
   }
 
-  if (in_array($fulfillmentMethod,['shipping','delivery'],true)) {
+  $order = null;
+  if (array_key_exists('cart',$in)) {
+    if(!has_col($pdo,'order_json')||!has_col($pdo,'package_id')) json_response(['ok'=>false,'error'=>'Katalog wird aktualisiert. Bitte später erneut versuchen.','code'=>'schema_missing'],503);
+    try {
+      $order=mmb_order_quote(mmb_order_decode($in['cart']),$start,$end?:$start,(string)($in['fulfillment_method']??'pickup'));
+    } catch(InvalidArgumentException $e) { json_response(['ok'=>false,'error'=>$e->getMessage(),'code'=>'validation'],422); }
+    if($start<(new DateTimeImmutable('today',new DateTimeZone('Europe/Berlin')))->format('Y-m-d')) json_response(['ok'=>false,'error'=>'Bitte einen zukünftigen Mietbeginn wählen.','code'=>'validation'],422);
+    if(isset($in['quote_version'])&&$in['quote_version']!==$order['version']) json_response(['ok'=>false,'error'=>'Die Preisliste wurde aktualisiert. Bitte die Zusammenfassung neu laden.','code'=>'price_changed'],409);
+    if(isset($in['quoted_total'])&&(!is_numeric($in['quoted_total'])||abs((float)$in['quoted_total']-$order['total'])>0.01)) json_response(['ok'=>false,'error'=>'Der Preis hat sich geändert. Bitte die Zusammenfassung erneut prüfen.','code'=>'price_changed'],409);
+    $box_id=$order['primary_box_id'];
+    $fulfillmentMethod=$order['fulfillment_id'];$fulfillmentLabel=$order['fulfillment_label'];$fulfillmentNote=$order['fulfillment_note'];$fulfillmentPrice=$order['fulfillment_price_delta'];
+    $fulfillment=['method'=>$fulfillmentMethod,'label'=>$fulfillmentLabel,'full'=>$fulfillmentLabel,'note'=>$fulfillmentNote,'price_delta'=>$fulfillmentPrice,'adds_to_total'=>$order['fulfillment_adds_to_total']];
+    $fulfillmentDetailsArray=array_replace($fulfillmentDetailsArray??[],['method'=>$fulfillmentMethod,'label'=>$fulfillmentLabel,'note'=>$fulfillmentNote,'quote_required'=>$order['quote_required']]);
+    $fulfillmentDetailsJson=json_encode($fulfillmentDetailsArray,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
+    $pricingDetailsArray=$order;$pricingDetailsJson=json_encode($order,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
+  }
+
+  if (in_array($fulfillmentMethod,['shipping','delivery','delivery_setup'],true)) {
     foreach (['address_line1','postal_code','city'] as $key) {
       if (empty($fulfillmentDetailsArray[$key]) || !is_scalar($fulfillmentDetailsArray[$key]) || strlen((string)$fulfillmentDetailsArray[$key])>400) json_response(['ok'=>false,'error'=>'Bitte eine vollständige Zieladresse angeben.','code'=>'validation'],422);
     }
@@ -808,8 +828,10 @@ try {
   if ($total === null)   $total = 0.0;
   if ($deposit === null) $deposit = 0.0;
 
+  if($order!==null){$total=$order['total'];$deposit=$order['deposit'];}
+
   // Validierung
-  if ($box_id <= 0) json_response(['ok'=>false,'error'=>'box_id fehlt oder ungültig','code'=>'validation'], 422);
+  if ($order===null && $box_id <= 0) json_response(['ok'=>false,'error'=>'box_id fehlt oder ungültig','code'=>'validation'], 422);
   if ($start === '' || !valid_date($start)) json_response(['ok'=>false,'error'=>'start_date fehlt/ungültig (YYYY-MM-DD)','code'=>'validation'], 422);
   if ($end === '') $end = $start;
   if (!valid_date($end)) json_response(['ok'=>false,'error'=>'end_date ungültig (YYYY-MM-DD)','code'=>'validation'], 422);
@@ -869,6 +891,8 @@ try {
     $fields[]=$column; $place[]=':'.$column; $params[':'.$column]=$value;
   }
 
+  if($order!==null){foreach(['order_json'=>json_encode($order,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES),'package_id'=>$order['package']] as $column=>$value){$fields[]=$column;$place[]=':'.$column;$params[':'.$column]=$value;}}
+
   // created_at → NOW() (nur wenn Spalte existiert)
   if (has_col($pdo,'created_at')) { $fields[]='created_at'; $place[]='NOW()'; }
 
@@ -902,6 +926,7 @@ try {
       'billing_postal_code'=>$customer['billing_postal_code'],
       'billing_city'=>$customer['billing_city'],
       'verification_url'=>'https://firebrick-squirrel-568721.hostingersite.com/verify_booking_email.php?id='.$newId.'&token='.$verificationToken,
+      'order'          => $order,
       'box_id'         => $box_id,
       'start_date'     => $start,
       'end_date'       => $end,
@@ -944,6 +969,7 @@ try {
       'id'=>$newId,
       'display_id'=>$dispId,
       'status'=>'pending',
+      'order'=>$order,
       'overlap'=>$conflicts ? 'allowed' : 'none',
       'total_amount'=>$total,
       'deposit_eur'=>$deposit,

@@ -23,6 +23,7 @@ jobs:
         run: |
           find . -name '*.php' -not -path './.git/*' -print0 | xargs -0 -n1 php -l
           php tests/contract.php
+          php tests/orders.php
           node --test tests/*.test.mjs
       - name: Prepare runtime files and revision marker
         run: |

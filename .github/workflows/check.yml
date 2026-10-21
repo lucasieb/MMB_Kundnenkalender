@@ -19,6 +19,8 @@ jobs:
       - name: PHP syntax
         run: find . -name '*.php' -not -path './.git/*' -print0 | xargs -0 -n1 php -l
       - name: Booking and admin contracts
-        run: php tests/contract.php
+        run: |
+          php tests/contract.php
+          php tests/orders.php
       - name: Shared embedded admin login
         run: node --test tests/*.test.mjs

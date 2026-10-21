@@ -23,6 +23,7 @@ require __DIR__ . '/api_bootstrap.php';
 
 // Infrastruktur
 require __DIR__ . '/db.php';
+require_once __DIR__.'/lib/order_quote.php';
 
 // Mailer ist optional – nur laden, wenn vorhanden
 $HAS_MAILER = is_file(__DIR__ . '/mailer.php');
@@ -125,13 +126,14 @@ function fulfillmentEmailLine(array $info): string {
 function buildEmailTemplates(array $bk, array $alternativeBoxIds = []): array {
   $name   = trim((string)($bk['customer_name'] ?? ''));
   if ($name === '') $name = 'Guten Tag';
-  $box    = boxNameById((int)$bk['box_id']);
+  $order=json_decode((string)($bk['order_json']??''),true);
+  $box    = $order ? $order['package_name']."\n".mmb_order_mail_lines($order) : boxNameById((int)$bk['box_id']);
   $s      = (new DateTimeImmutable((string)$bk['start_date']))->format('d.m.Y');
   $e      = (new DateTimeImmutable((string)$bk['end_date']))->format('d.m.Y');
   $dispId = displayId((int)$bk['id']);
 
   $fulfillmentInfo = fulfillmentInfoFromBooking($bk);
-  $fulfillmentLine = fulfillmentEmailLine($fulfillmentInfo);
+  $fulfillmentLine = $order ? $order['fulfillment_label'].' — '.$order['fulfillment_note'] : fulfillmentEmailLine($fulfillmentInfo);
 
   $subjects = [
     'confirmed'   => "Buchung bestätigt – {$dispId}",
@@ -146,7 +148,7 @@ Hallo {$name},
 
 gute Nachrichten – wir haben deine Buchung bestätigt.
 
-• Box: {$box}
+• Ausstattung: {$box}
 • Zeitraum: {$s} bis {$e}
 • Abwicklung: {$fulfillmentLine}
 • Buchungs-ID: {$dispId}
@@ -172,7 +174,7 @@ Hallo {$name},
 
 wir haben deine Buchung ({$dispId}) aktualisiert.
 
-• Box: {$box}
+• Ausstattung: {$box}
 • Zeitraum: {$s} bis {$e}
 • Abwicklung: {$fulfillmentLine}
 
@@ -230,6 +232,7 @@ Dein MIETMICHBOX Team
 TXT;
   }
 
+  if($order){foreach($bodies as &$body)$body.="\n\nMietsumme: ".number_format((float)$bk['total_amount'],2,',','.').' €'.(!empty($order['quote_required'])?' zzgl. offener Angebotskosten.':'');unset($body);}
   return [$subjects, $bodies];
 }
 
@@ -319,6 +322,7 @@ try {
     $fields = [];
     $vals   = [];
 
+    if(!empty($bk['order_json'])&&array_intersect(['box_id','start_date','end_date','fulfillment_method'],array_keys($updates))){throw new InvalidArgumentException('Produkt- und Terminänderungen bitte über die Detailansicht speichern.');}
     $whitelist = ['customer_name','customer_email','customer_phone','box_id','start_date','end_date','total_amount','status','fulfillment_method','fulfillment_label','fulfillment_note','fulfillment_price_delta'];
     foreach ($updates as $col => $val) {
       if (!in_array($col, $whitelist, true)) continue;
@@ -360,6 +364,10 @@ try {
   $pdo->commit();
 
   // Frische Daten laden (für Antwort + E-Mail)
+  if(array_key_exists('alternative_proposed_at',$bk)){
+    if($altBoxIds)$pdo->prepare('UPDATE bookings SET alternative_proposed_at=NOW() WHERE id=?')->execute([$id]);
+    elseif($newStatus!==null&&$newStatus!=='')$pdo->prepare('UPDATE bookings SET alternative_proposed_at=NULL WHERE id=?')->execute([$id]);
+  }
   $stmt = $pdo->prepare("SELECT * FROM bookings WHERE id=? LIMIT 1");
   $stmt->execute([$id]);
   $bk = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -381,6 +389,9 @@ try {
 
       $subject = $customSubject !== '' ? $customSubject : ($subjects[$mode] ?? 'Buchung');
       $bodyTxt = $customMsg     !== '' ? $customMsg     : ($bodies[$mode]    ?? 'Hallo, deine Buchung wurde aktualisiert.');
+
+      $currentOrder=json_decode((string)($bk['order_json']??''),true);
+      if($currentOrder&&$customMsg!=='')$bodyTxt.="\n\nAktueller gespeicherter Buchungsstand:\n".mmb_order_mail_lines($currentOrder)."\nAbwicklung: ".$currentOrder['fulfillment_label'].' — '.$currentOrder['fulfillment_note']."\nMietsumme: ".number_format((float)$bk['total_amount'],2,',','.').' €';
 
       $toEmail = (string)($bk['customer_email'] ?? '');
       $toName  = (string)($bk['customer_name'] ?? 'Kunde');
