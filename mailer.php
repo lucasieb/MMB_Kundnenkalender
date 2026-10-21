@@ -84,7 +84,7 @@ function build_mailer(): PHPMailer
 /**
  * Einfache Kompatibilitätsfunktion für bestehende Aufrufer.
  */
-function sendMail(string $to, string $subject, string $body, string $toName = ''): bool
+function sendMail(string $to, string $subject, string $body, string $toName = '', ?string $html = null): bool
 {
     set_last_mail_error('');
 
@@ -94,6 +94,7 @@ function sendMail(string $to, string $subject, string $body, string $toName = ''
         $mailer->Subject = $subject;
         $mailer->Body    = nl2br(htmlspecialchars($body, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'), false);
         $mailer->Body = preg_replace('~https://firebrick-squirrel-568721\.hostingersite\.com/verify_booking_email\.php\?id=[0-9]+&amp;token=[a-f0-9]{64}~', '<a href="$0">E-Mail-Adresse bestätigen</a>', $mailer->Body);
+        if ($html !== null) $mailer->Body = $html;
         $mailer->AltBody = $body;
         $mailer->send();
         return true;

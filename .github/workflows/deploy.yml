@@ -24,13 +24,14 @@ jobs:
           find . -name '*.php' -not -path './.git/*' -print0 | xargs -0 -n1 php -l
           php tests/contract.php
           php tests/orders.php
+          php tests/communication.php
           node --test tests/*.test.mjs
       - name: Prepare runtime files and revision marker
         run: |
           php -r 'file_put_contents("deployment.json", json_encode(["commit" => getenv("GITHUB_SHA"), "branch" => getenv("GITHUB_REF_NAME"), "run_id" => getenv("GITHUB_RUN_ID")], JSON_PRETTY_PRINT) . PHP_EOL);'
           cp .github/hostinger_known_hosts "$RUNNER_TEMP/mmb-known-hosts"
           rm -rf .git .github tests node_modules
-          rm -f .env.dist .env .env.local admin_users.php admin_users.example.php mail.private.php php-error.log DEPLOYMENT.md .gitignore
+          rm -f .env.dist .env .env.local admin_users.php admin_users.example.php communication.private.example.php mail.private.php php-error.log DEPLOYMENT.md .gitignore
           find . -name '*.map' -type f -delete
           find . -name '.DS_Store' -type f -delete
       - name: Deploy to verified Hostinger server and migrate additive fields

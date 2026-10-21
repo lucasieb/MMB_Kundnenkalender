@@ -122,124 +122,7 @@ function fulfillmentEmailLine(array $info): string {
   return $note !== '' ? ($full . ' (' . $note . ')') : $full;
 }
 
-// E-Mail-Vorlagen (werden von Custom-Subject/-Message übersteuert)
-function buildEmailTemplates(array $bk, array $alternativeBoxIds = []): array {
-  $name   = trim((string)($bk['customer_name'] ?? ''));
-  if ($name === '') $name = 'Guten Tag';
-  $order=json_decode((string)($bk['order_json']??''),true);
-  $box    = $order ? $order['package_name']."\n".mmb_order_mail_lines($order) : boxNameById((int)$bk['box_id']);
-  $s      = (new DateTimeImmutable((string)$bk['start_date']))->format('d.m.Y');
-  $e      = (new DateTimeImmutable((string)$bk['end_date']))->format('d.m.Y');
-  $dispId = displayId((int)$bk['id']);
-
-  $fulfillmentInfo = fulfillmentInfoFromBooking($bk);
-  $fulfillmentLine = $order ? $order['fulfillment_label'].' — '.$order['fulfillment_note'] : fulfillmentEmailLine($fulfillmentInfo);
-
-  $timing=json_decode((string)($bk['fulfillment_details_json']??''),true)??[];
-  if(($bk['fulfillment_method']??'pickup')!=='shipping'){
-    if(!empty($timing['preferred_time']))$fulfillmentLine.=' · Wunschzeit: '.$timing['preferred_time'].' Uhr (wird abgestimmt)';
-    if(!empty($timing['meeting_point']))$fulfillmentLine.=' · Hinweis: '.$timing['meeting_point'];
-  }
-  $subjects = [
-    'confirmed'   => "Buchung bestätigt – {$dispId}",
-    'rejected'    => "Buchungsanfrage – {$dispId}",
-    'updated'     => "Buchung aktualisiert – {$dispId}",
-    'alternative' => "Alternative Box verfügbar – {$dispId}",
-  ];
-
-  $bodies = [
-"confirmed" => <<<TXT
-Hallo {$name},
-
-gute Nachrichten – wir haben deine Buchung bestätigt.
-
-• Ausstattung: {$box}
-• Zeitraum: {$s} bis {$e}
-• Abwicklung: {$fulfillmentLine}
-• Buchungs-ID: {$dispId}
-
-Wir melden uns, falls noch Rückfragen bestehen. Ansonsten freuen wir uns auf dich!
-
-Viele Grüße
-Dein MIETMICHBOX Team
-TXT,
-"rejected" => <<<TXT
-Hallo {$name},
-
-vielen Dank für deine Anfrage ({$dispId}) für den Zeitraum {$s} bis {$e}.
-Leider können wir diese Buchung nicht annehmen.
-
-Wenn du magst, schicke uns gern alternative Termine oder melde dich kurz – wir finden eine Lösung.
-
-Viele Grüße
-Dein MIETMICHBOX Team
-TXT,
-"updated" => <<<TXT
-Hallo {$name},
-
-wir haben deine Buchung ({$dispId}) aktualisiert.
-
-• Ausstattung: {$box}
-• Zeitraum: {$s} bis {$e}
-• Abwicklung: {$fulfillmentLine}
-
-Falls etwas nicht passt, antworte einfach auf diese E-Mail.
-
-Viele Grüße
-Dein MIETMICHBOX Team
-TXT
-  ];
-
-  $alternativeBoxIds = array_values(array_unique(array_map('intval', $alternativeBoxIds)));
-  if ($alternativeBoxIds) {
-    $altNames = array_map('boxNameById', $alternativeBoxIds);
-    if (count($altNames) === 1) {
-      $alt = $altNames[0];
-      $subjects['alternative'] = "Alternative Box: {$alt} – {$dispId}";
-      $bodies['alternative'] = <<<TXT
-Hallo {$name},
-
-für deine Anfrage ({$dispId}) vom {$s} bis {$e} schlagen wir dir als Alternative die folgende Box vor:
-
-• Alternative Box: {$alt}
-
-Gib uns kurz Bescheid, ob das für dich passt – dann reservieren wir dir die Alternative.
-
-Viele Grüße
-Dein MIETMICHBOX Team
-TXT;
-    } else {
-      $subjects['alternative'] = "Alternative Boxen verfügbar – {$dispId}";
-      $list = "• " . implode("\n• ", $altNames);
-      $bodies['alternative'] = <<<TXT
-Hallo {$name},
-
-für deine Anfrage ({$dispId}) vom {$s} bis {$e} schlagen wir dir die folgenden Boxen als Alternative vor:
-
-{$list}
-
-Gib uns kurz Bescheid, welche Alternative für dich passt – dann reservieren wir sie dir sehr gerne.
-
-Viele Grüße
-Dein MIETMICHBOX Team
-TXT;
-    }
-  } else {
-    $bodies['alternative'] = <<<TXT
-Hallo {$name},
-
-für deine Anfrage ({$dispId}) vom {$s} bis {$e} schlagen wir dir eine alternative Box vor.
-
-Gib uns kurz Bescheid, ob das für dich passt – dann reservieren wir dir die Alternative.
-
-Viele Grüße
-Dein MIETMICHBOX Team
-TXT;
-  }
-
-  if($order){foreach($bodies as &$body)$body.="\n\nMietsumme: ".number_format((float)$bk['total_amount'],2,',','.').' €'.(!empty($order['quote_required'])?' zzgl. offener Angebotskosten.':'');unset($body);}
-  return [$subjects, $bodies];
-}
+require_once __DIR__.'/lib/booking_mail.php';
 
 /* ========= Hauptlogik ========= */
 try {
@@ -383,35 +266,22 @@ try {
     if (!$HAS_MAILER) {
       $mailInfo = ['sent'=>false,'error'=>'mailer.php missing'];
     } else {
-      [$subjects, $bodies] = buildEmailTemplates($bk, $altBoxIds);
-
-      // Modus bestimmen
       $mode = 'updated';
       $st = strtolower((string)($bk['status'] ?? ''));
-      if (!empty($altBoxIds))            $mode = 'alternative';
-      elseif ($st === 'confirmed')       $mode = 'confirmed';
-      elseif ($st === 'rejected' || $st === 'cancelled') $mode = 'rejected';
-
-      $subject = $customSubject !== '' ? $customSubject : ($subjects[$mode] ?? 'Buchung');
-      $bodyTxt = $customMsg     !== '' ? $customMsg     : ($bodies[$mode]    ?? 'Hallo, deine Buchung wurde aktualisiert.');
-
-      $currentOrder=json_decode((string)($bk['order_json']??''),true);
-      if($currentOrder&&$customMsg!=='')$bodyTxt.="\n\nAktueller gespeicherter Buchungsstand:\n".mmb_order_mail_lines($currentOrder)."\nAbwicklung: ".$currentOrder['fulfillment_label'].' — '.$currentOrder['fulfillment_note']."\nMietsumme: ".number_format((float)$bk['total_amount'],2,',','.').' €';
-
-      if($customMsg!==''){
-        $timing=json_decode((string)($bk['fulfillment_details_json']??''),true)??[];
-        if(($bk['fulfillment_method']??'pickup')!=='shipping'){if(!empty($timing['preferred_time']))$bodyTxt.="\n".'Wunschzeit: '.$timing['preferred_time'].' Uhr (wird abgestimmt)';if(!empty($timing['meeting_point']))$bodyTxt.="\n".'Hinweis: '.$timing['meeting_point'];}
-      }
+      if (!empty($altBoxIds)) $mode='alternative';
+      elseif (in_array($st,['confirmed','rejected','cancelled'],true)) $mode=$st;
+      $message=mmb_booking_message($bk,$mode,['custom_subject'=>$customSubject,'custom_message'=>$customMsg,'alternatives'=>array_map('boxNameById',$altBoxIds)]);
+      $subject=$message['subject'];$bodyTxt=$message['text'];
       $toEmail = (string)($bk['customer_email'] ?? '');
       $toName  = (string)($bk['customer_name'] ?? 'Kunde');
 
       // Kompatibel zu send_mail() oder sendMail()
       $sent = false;
       if (function_exists('send_mail')) {
-        $sent = (bool)send_mail($toEmail, $toName, $subject, nl2br($bodyTxt));
+        $sent = (bool)send_mail($toEmail, $toName, $subject, $message['html']);
       } elseif (function_exists('sendMail')) {
         // falls deine mailer.php sendMail($to, $subject, $body, $toName) nutzt
-        $sent = (bool)sendMail($toEmail, $subject, $bodyTxt, $toName);
+        $sent = (bool)sendMail($toEmail, $subject, $bodyTxt, $toName, $message['html']);
       } else {
         $mailInfo = ['sent'=>false,'error'=>'no mail function'];
       }
