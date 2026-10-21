@@ -78,5 +78,5 @@ function mmb_order_decode($raw): array {
 }
 function mmb_order_mail_lines(array $order): string {
     $rows=[];foreach($order['items']??[] as $line)$rows[]=$line['quantity'].'× '.$line['label'].' — '.number_format((float)$line['total'],2,',','.').' €'.(!empty($line['included'])?' ('.implode(', ',$line['included']).')':'');
-    return implode("\n",$rows).(!empty($order['quote_required'])?"\nZzgl. noch anzubietender Transport-/Montagekosten.":'');
+    return implode("\n",$rows).(!empty($order['quote_required'])?"\nZzgl. individuell anzubietender Fahrt-/Frachtkosten.":'');
 }
