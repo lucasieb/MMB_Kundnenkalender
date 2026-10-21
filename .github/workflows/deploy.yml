@@ -28,21 +28,23 @@ jobs:
       - name: Prepare runtime files and revision marker
         run: |
           php -r 'file_put_contents("deployment.json", json_encode(["commit" => getenv("GITHUB_SHA"), "branch" => getenv("GITHUB_REF_NAME"), "run_id" => getenv("GITHUB_RUN_ID")], JSON_PRETTY_PRINT) . PHP_EOL);'
+          cp .github/hostinger_known_hosts "$RUNNER_TEMP/mmb-known-hosts"
           rm -rf .git .github tests node_modules
           rm -f .env.dist .env .env.local admin_users.php admin_users.example.php mail.private.php php-error.log DEPLOYMENT.md .gitignore
           find . -name '*.map' -type f -delete
           find . -name '.DS_Store' -type f -delete
-      - name: Deploy to Hostinger via SFTP
-        uses: wlixcc/SFTP-Deploy-Action@v1.2.4
-        with:
-          server: ${{ secrets.HOST }}
-          port: ${{ secrets.PORT }}
-          username: ${{ secrets.USER }}
-          ssh_private_key: ${{ secrets.SSH_PRIVATE_KEY }}
-          local_path: './'
-          remote_path: 'domains/firebrick-squirrel-568721.hostingersite.com/public_html/'
-          sftp_only: true
-          delete_remote_files: false
+      - name: Deploy to verified Hostinger server and migrate additive fields
+        env:
+          MMB_DEPLOY_SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          MMB_DEPLOY_USER: ${{ secrets.USER }}
+        run: |
+          set -euo pipefail
+          umask 077
+          printf '%s\n' "$MMB_DEPLOY_SSH_KEY" > "$RUNNER_TEMP/mmb-deploy-key"
+          trap 'rm -f "$RUNNER_TEMP/mmb-deploy-key" "$RUNNER_TEMP/mmb-sftp.batch"' EXIT
+          printf '%s\n' 'put -r lib domains/firebrick-squirrel-568721.hostingersite.com/public_html/' 'put -r . domains/firebrick-squirrel-568721.hostingersite.com/public_html/' > "$RUNNER_TEMP/mmb-sftp.batch"
+          sftp -oBatchMode=yes -oAddressFamily=inet -oConnectTimeout=25 -oConnectionAttempts=2 -oStrictHostKeyChecking=yes -oUserKnownHostsFile="$RUNNER_TEMP/mmb-known-hosts" -P 65002 -i "$RUNNER_TEMP/mmb-deploy-key" -b "$RUNNER_TEMP/mmb-sftp.batch" "$MMB_DEPLOY_USER@srv2024.hstgr.io"
+          ssh -oBatchMode=yes -oAddressFamily=inet -oConnectTimeout=25 -oStrictHostKeyChecking=yes -oUserKnownHostsFile="$RUNNER_TEMP/mmb-known-hosts" -p 65002 -i "$RUNNER_TEMP/mmb-deploy-key" "$MMB_DEPLOY_USER@srv2024.hstgr.io" 'cd domains/firebrick-squirrel-568721.hostingersite.com/public_html && php migrate_booking_fields.php && php migrate_order_fields.php'
       - name: Verify published revision and database health
         env:
           EXPECTED_COMMIT: ${{ github.sha }}
