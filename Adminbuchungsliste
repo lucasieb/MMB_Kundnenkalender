@@ -45,51 +45,6 @@
         .mmb-loading{display:flex;justify-content:center;align-items:center;height:200px;font-size:.875rem;color:var(--mmb-text-light);}
         @media (prefers-reduced-motion: reduce){.mmb-day,.mmb-btn,.mmb-nav-btn{transition:none;}}
 
-        /* Prevent min-content sizing (including Safari date inputs) from widening the dialog. */
-        .mmb-icon{width:1.1em;height:1.1em;stroke-width:2;flex:none;vertical-align:-.15em;display:inline-block}
-        .mmb-order-mini{display:flex;gap:.3rem;flex-wrap:wrap;margin-top:.35rem;font-size:.75rem}.mmb-order-mini span{display:inline-flex;gap:.25rem;align-items:center;max-width:100%;overflow-wrap:anywhere}.mmb-order-section details>summary{cursor:pointer;padding:.65rem 0}.mmb-order-section h3{display:flex;align-items:center;gap:.4rem}
-        .mmb-detail-overlay,.mmb-detail-overlay *{box-sizing:border-box;min-inline-size:0}
-        .mmb-detail-overlay{max-inline-size:100%;overflow-x:hidden}
-        .mmb-detail-panel,.mmb-detail-form,.mmb-detail-body,.mmb-detail-section,.mmb-detail-grid,.mmb-detail-field{max-inline-size:100%;min-width:0}
-        .mmb-detail-body{overflow-x:hidden}
-        .mmb-detail-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr))}
-        .mmb-detail-field>label{display:flex;align-items:center;gap:.4rem;line-height:1.4}
-        .mmb-detail-field input:not([type=checkbox]),.mmb-detail-field select,.mmb-detail-field textarea{width:100%;min-width:0;max-width:100%;box-sizing:border-box}
-        .mmb-detail-field input[type=date]{display:block;appearance:none;-webkit-appearance:none;min-height:40px}
-        .mmb-detail-field input::-webkit-date-and-time-value{text-align:left;min-height:1.2em}
-        .mmb-detail-field input::-webkit-datetime-edit{min-width:0;padding:0}
-        .mmb-detail-header{gap:.75rem}
-        .mmb-detail-summary{flex:1;min-width:0}
-        .mmb-detail-title-row{display:flex;align-items:center;gap:.65rem;flex-wrap:wrap}
-        .mmb-detail-title{display:flex;gap:.5rem;flex-wrap:wrap;font-size:1.25rem;overflow-wrap:anywhere}
-        .mmb-detail-title span{font-weight:400}
-        .mmb-detail-meta{justify-content:flex-start;margin-top:.65rem;gap:.4rem 1rem;font-size:.85rem}
-        .mmb-detail-meta>span,.mmb-detail-meta>strong,.mmb-detail-meta>a{display:flex;align-items:center;gap:.4rem;min-width:0;max-width:100%;overflow-wrap:anywhere;color:inherit;text-decoration:none}
-        .mmb-detail-meta a span{overflow-wrap:anywhere;min-width:0}
-        .mmb-status-pending{background:#fef3c7!important;color:#854d0e!important}
-        .mmb-status-confirmed{background:#dcfce7!important;color:#166534!important}
-        .mmb-status-rejected,.mmb-status-cancelled{background:#fee2e2!important;color:#991b1b!important}
-        .mmb-status-alternative{background:#e0e7ff!important;color:#3730a3!important}
-        .mmb-invoice-rows{max-width:760px;width:100%}
-        .mmb-invoice-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(90px,150px);align-items:center;gap:1rem;border-bottom:1px solid var(--mmb-border);padding:.65rem 0}
-        .mmb-invoice-row label{text-transform:none;font-size:.92rem;letter-spacing:0}
-        .mmb-money-input{display:flex;align-items:center;gap:.5rem}
-        .mmb-money-input input{text-align:right}
-        .mmb-invoice-total{font-weight:700;border-top:2px solid var(--mmb-border);margin-top:.25rem}
-        .mmb-price-calculation summary{cursor:pointer;padding:.75rem 0;font-size:.9rem}
-        .mmb-detail-note{overflow-wrap:anywhere;line-height:1.5;margin:0}
-        @media(max-width:900px){
-          .mmb-detail-grid{grid-template-columns:minmax(0,1fr)}
-          .mmb-detail-meta{width:auto;order:initial;font-size:.78rem;gap:.35rem .75rem}
-          .mmb-detail-title{font-size:1rem;gap:.15rem .4rem}
-          .mmb-detail-title-row{gap:.35rem}
-          .mmb-detail-title-row>.mmb-status-badge{font-size:.68rem}
-          .mmb-detail-header{flex-wrap:nowrap!important;padding:.65rem!important}
-          .mmb-detail-close{padding:0;flex:none}
-          .mmb-detail-meta a{max-width:100%}
-          .mmb-invoice-row{grid-template-columns:minmax(0,1fr) 112px;gap:.5rem}
-          .mmb-detail-section h3{font-size:.85rem;letter-spacing:.04em}
-        }
       `;
       document.head.appendChild(style);
     }
@@ -366,6 +321,54 @@
           .mmb-modal-btn{min-height:44px;flex:1;}
         }
 
+        .mmb-bookings-table td.cell--box{white-space:normal;overflow-wrap:anywhere}
+        .mmb-status-badge{height:auto;min-height:20px;max-width:100%;white-space:normal;line-height:1.3;text-align:center;padding:.2rem .5rem}
+        /* Prevent min-content sizing (including Safari date inputs) from widening the dialog. */
+        .mmb-icon{width:1.1em;height:1.1em;stroke-width:2;flex:none;vertical-align:-.15em;display:inline-block}
+        .mmb-order-mini{display:flex;gap:.3rem;flex-wrap:wrap;margin-top:.35rem;font-size:.75rem}.mmb-order-mini span{display:inline-flex;gap:.25rem;align-items:center;max-width:100%;overflow-wrap:anywhere}.mmb-order-section details>summary{cursor:pointer;padding:.65rem 0}.mmb-order-section h3{display:flex;align-items:center;gap:.4rem}
+        .mmb-detail-overlay,.mmb-detail-overlay *{box-sizing:border-box;min-inline-size:0}
+        .mmb-detail-overlay{max-inline-size:100%;overflow-x:hidden}
+        .mmb-detail-panel,.mmb-detail-form,.mmb-detail-body,.mmb-detail-section,.mmb-detail-grid,.mmb-detail-field{max-inline-size:100%;min-width:0}
+        .mmb-detail-body{overflow-x:hidden}
+        .mmb-detail-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr))}
+        .mmb-detail-field>label{display:flex;align-items:center;gap:.4rem;line-height:1.4}
+        .mmb-detail-field input:not([type=checkbox]),.mmb-detail-field select,.mmb-detail-field textarea{width:100%;min-width:0;max-width:100%;box-sizing:border-box}
+        .mmb-detail-field input[type=date]{display:block;appearance:none;-webkit-appearance:none;min-height:40px}
+        .mmb-detail-field input::-webkit-date-and-time-value{text-align:left;min-height:1.2em}
+        .mmb-detail-field input::-webkit-datetime-edit{min-width:0;padding:0}
+        .mmb-detail-header{gap:.75rem}
+        .mmb-detail-summary{flex:1;min-width:0}
+        .mmb-detail-title-row{display:flex;align-items:center;gap:.65rem;flex-wrap:wrap}
+        .mmb-detail-title{display:flex;gap:.5rem;flex-wrap:wrap;font-size:1.25rem;overflow-wrap:anywhere}
+        .mmb-detail-title span{font-weight:400}
+        .mmb-detail-meta{justify-content:flex-start;margin-top:.65rem;gap:.4rem 1rem;font-size:.85rem}
+        .mmb-detail-meta>span,.mmb-detail-meta>strong,.mmb-detail-meta>a{display:flex;align-items:center;gap:.4rem;min-width:0;max-width:100%;overflow-wrap:anywhere;color:inherit;text-decoration:none}
+        .mmb-detail-meta a span{overflow-wrap:anywhere;min-width:0}
+        .mmb-status-pending{background:#fef3c7!important;color:#854d0e!important}
+        .mmb-status-confirmed{background:#dcfce7!important;color:#166534!important}
+        .mmb-status-rejected,.mmb-status-cancelled{background:#fee2e2!important;color:#991b1b!important}
+        .mmb-status-alternative{background:#e0e7ff!important;color:#3730a3!important}
+        .mmb-invoice-rows{max-width:760px;width:100%}
+        .mmb-invoice-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(90px,150px);align-items:center;gap:1rem;border-bottom:1px solid var(--mmb-border);padding:.65rem 0}
+        .mmb-invoice-row label{text-transform:none;font-size:.92rem;letter-spacing:0}
+        .mmb-money-input{display:flex;align-items:center;gap:.5rem}
+        .mmb-money-input input{text-align:right}
+        .mmb-invoice-total{font-weight:700;border-top:2px solid var(--mmb-border);margin-top:.25rem}
+        .mmb-price-calculation summary{cursor:pointer;padding:.75rem 0;font-size:.9rem}
+        .mmb-detail-note{overflow-wrap:anywhere;line-height:1.5;margin:0}
+        @media(max-width:900px){
+          .mmb-detail-grid{grid-template-columns:minmax(0,1fr)}
+          .mmb-detail-meta{width:auto;order:initial;font-size:.78rem;gap:.35rem .75rem}
+          .mmb-detail-title{font-size:1rem;gap:.15rem .4rem}
+          .mmb-detail-title-row{gap:.35rem}
+          .mmb-detail-title-row>.mmb-status-badge{font-size:.68rem}
+          .mmb-detail-header{flex-wrap:nowrap!important;padding:.65rem!important}
+          .mmb-detail-close{padding:0;flex:none}
+          .mmb-detail-meta a{max-width:100%}
+          .mmb-invoice-row{grid-template-columns:minmax(0,1fr) 112px;gap:.5rem}
+          .mmb-detail-section h3{font-size:.85rem;letter-spacing:.04em}
+        }
+
       `; document.head.appendChild(s);
     }
 
@@ -531,7 +534,7 @@
           return `
             <table class="mmb-bookings-table">
               <thead>
-                <tr><th class="cell-head-id">ID</th><th class="cell-head-customer">Kunde</th><th class="cell-head-box">Box</th><th class="cell-head-date">Zeitraum</th><th class="cell-head-fulfillment">Abwicklung</th><th class="cell-head-price">Preis</th><th class="cell-head-status">Status</th><th class="cell-head-actions">Aktionen</th></tr>
+                <tr><th class="cell-head-id">ID</th><th class="cell-head-customer">Kunde</th><th class="cell-head-box">Ausstattung</th><th class="cell-head-date">Zeitraum</th><th class="cell-head-fulfillment">Abwicklung</th><th class="cell-head-price">Preis</th><th class="cell-head-status">Status</th><th class="cell-head-actions">Aktionen</th></tr>
               </thead>
               <tbody><tr class="mmb-empty"><td colspan="8" style="padding:1rem;color:var(--mmb-text-light);">Keine Buchungen vorhanden</td></tr></tbody>
             </table>`;
@@ -539,7 +542,7 @@
         return `
         <table class="mmb-bookings-table">
           <thead>
-            <tr><th class="cell-head-id">ID</th><th class="cell-head-customer">Kunde</th><th class="cell-head-box">Box</th><th class="cell-head-date">Zeitraum</th><th class="cell-head-fulfillment">Abwicklung</th><th class="cell-head-price">Preis</th><th class="cell-head-status">Status</th><th class="cell-head-actions">Aktionen</th></tr>
+            <tr><th class="cell-head-id">ID</th><th class="cell-head-customer">Kunde</th><th class="cell-head-box">Ausstattung</th><th class="cell-head-date">Zeitraum</th><th class="cell-head-fulfillment">Abwicklung</th><th class="cell-head-price">Preis</th><th class="cell-head-status">Status</th><th class="cell-head-actions">Aktionen</th></tr>
           </thead>
           <tbody>
             ${rows.map(b=>this.renderRow(b)).join('')}
@@ -1471,7 +1474,7 @@
                     <span class="mmb-detail-note" data-fulfillment-hint>${this.escape(fulfillmentChoice.note || 'Keine zusätzlichen Hinweise')}</span>
                   </div>
                   <div class="mmb-detail-field">
-                    <label>Interne Notiz</label>
+                    <label>Abwicklungshinweis (kundenrelevant)</label>
                     <textarea name="fulfillment_note">${this.escape(booking.fulfillment_note || '')}</textarea>
                   </div>
                 </div>

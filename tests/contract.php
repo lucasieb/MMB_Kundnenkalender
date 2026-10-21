@@ -209,7 +209,7 @@ try {
       [$status,$modern]=request('create_booking.php',$payload,true);
       check($status===200&&$modern['ok'],'Modern creation failed: '.json_encode($modern));$modernId=$modern['booking']['id'];
       $row=$db->query('SELECT * FROM bookings WHERE id='.(int)$modernId)->fetch(PDO::FETCH_ASSOC);$order=json_decode($row['order_json'],true);
-      check($order['cart']===$q['cart']&&abs((float)$row['total_amount']-$q['total'])<0.01,'Cart or authoritative total lost');
+      check($order['cart']===$q['cart']&&json_decode($row['fulfillment_details_json'],true)['price_delta']===$q['shipping_delta']&&abs((float)$row['total_amount']-$q['total'])<0.01,'Cart or authoritative total lost');
       check((($order['primary_box_id']===null)===($row['box_id']===null)),'Standalone order needs no speaker');
       $captures=array_map(fn($line)=>json_decode($line,true),file($temp.'/mail-capture.jsonl',FILE_IGNORE_NEW_LINES));
       foreach(array_slice($captures,-2) as $mail)foreach($order['items'] as $item)check(str_contains($mail[2],$item['quantity'].'× '.$item['label']),'Component missing in mail');
@@ -223,6 +223,9 @@ try {
     }
     [$status,$quote]=request('quote_order.php',['cart'=>['tent'=>1],'start_date'=>'2030-01-11','end_date'=>'2030-01-13','fulfillment_method'=>'delivery_setup']);check($status===200&&$quote['quote']['quote_required'],'Assembly quote failed');
     [$status,$setup]=request('create_booking.php',array_replace($valid,['cart'=>['tent'=>1],'start_date'=>'2030-01-11','end_date'=>'2030-01-13','fulfillment_method'=>'delivery_setup','fulfillment_details_json'=>['address_line1'=>'Montageweg 4','postal_code'=>'46485','city'=>'Wesel']]),true);check($status===200&&$setup['booking']['fulfillment_method']==='delivery_setup','Assembly booking lost fulfillment');
+    [$status]=request('update_booking_status.php',['booking_id'=>$modernId,'status'=>'rejected','alternative_box_ids'=>[1],'send_email'=>0],true);check($status===200&&$db->query('SELECT alternative_proposed_at FROM bookings WHERE id='.(int)$modernId)->fetchColumn(),'Alternative status marker lost');
+    [$status]=request('update_booking_status.php',['booking_id'=>$modernId,'status'=>'confirmed','send_email'=>1,'message'=>'Persönliche Nachricht'],true);check($status===200&&!$db->query('SELECT alternative_proposed_at FROM bookings WHERE id='.(int)$modernId)->fetchColumn(),'Confirmed status must clear alternative marker');
+    $captures=array_map(fn($line)=>json_decode($line,true),file($temp.'/mail-capture.jsonl',FILE_IGNORE_NEW_LINES));$lastMail=$captures[count($captures)-1];check(str_contains($lastMail[2],'Aktueller gespeicherter Buchungsstand')&&str_contains($lastMail[2],'Fotobox')&&str_contains($lastMail[2],'77,50'),'Custom update mail missing canonical summary or manual total');
     file_put_contents($temp . '/admin_users.php', "\n// changed credentials\n", FILE_APPEND);
     [$status,$state]=request('admin_login_token.php');
     check($status===200 && $state['authenticated']===false,'Changed credentials must expire existing sessions');

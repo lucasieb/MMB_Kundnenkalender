@@ -795,7 +795,7 @@ try {
     $box_id=$order['primary_box_id'];
     $fulfillmentMethod=$order['fulfillment_id'];$fulfillmentLabel=$order['fulfillment_label'];$fulfillmentNote=$order['fulfillment_note'];$fulfillmentPrice=$order['fulfillment_price_delta'];
     $fulfillment=['method'=>$fulfillmentMethod,'label'=>$fulfillmentLabel,'full'=>$fulfillmentLabel,'note'=>$fulfillmentNote,'price_delta'=>$fulfillmentPrice,'adds_to_total'=>$order['fulfillment_adds_to_total']];
-    $fulfillmentDetailsArray=array_replace($fulfillmentDetailsArray??[],['method'=>$fulfillmentMethod,'label'=>$fulfillmentLabel,'note'=>$fulfillmentNote,'quote_required'=>$order['quote_required']]);
+    $fulfillmentDetailsArray=array_replace($fulfillmentDetailsArray??[],['method'=>$fulfillmentMethod,'label'=>$fulfillmentLabel,'full'=>$fulfillmentLabel,'note'=>$fulfillmentNote,'price_delta'=>$fulfillmentPrice,'adds_to_total'=>$order['fulfillment_adds_to_total'],'quote_required'=>$order['quote_required']]);
     $fulfillmentDetailsJson=json_encode($fulfillmentDetailsArray,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
     $pricingDetailsArray=$order;$pricingDetailsJson=json_encode($order,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
   }

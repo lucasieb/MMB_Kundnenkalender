@@ -81,7 +81,7 @@ try {
       if(!empty($data['manual_price_override'])&&isset($data['total_amount'])){$order['manual_total']=(float)$data['total_amount'];}else{$data['total_amount']=$order['total'];$data['pricing_details_json']=$order;unset($data['pricing_details']);}
       $details=$data['fulfillment_details_json']??$data['fulfillment_details']??$existing['fulfillment_details_json']??null;
       $details=is_array($details)?$details:json_decode((string)$details,true);
-      $data['fulfillment_details_json']=array_replace($details??[],['method'=>$order['fulfillment_id'],'label'=>$order['fulfillment_label'],'note'=>$order['fulfillment_note'],'price_delta'=>$order['shipping_delta'],'adds_to_total'=>$order['fulfillment_adds_to_total'],'quote_required'=>$order['quote_required']]);
+      $data['fulfillment_details_json']=array_replace($details??[],['method'=>$order['fulfillment_id'],'label'=>$order['fulfillment_label'],'full'=>$order['fulfillment_label'],'note'=>$order['fulfillment_note'],'price_delta'=>$order['shipping_delta'],'adds_to_total'=>$order['fulfillment_adds_to_total'],'quote_required'=>$order['quote_required']]);
       if($order['fulfillment_id']!=='pickup'){foreach(['address_line1','postal_code','city'] as $key)if(empty($data['fulfillment_details_json'][$key])||!is_scalar($data['fulfillment_details_json'][$key]))throw new InvalidArgumentException('Bitte vollständige Zieladresse für die Abwicklung angeben.');}
       unset($data['fulfillment_details']);
       $data['order_json']=$order;
