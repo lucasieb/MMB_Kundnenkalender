@@ -84,6 +84,7 @@ function normalize_fulfillment_method($value): ?string {
     case 'lieferungperversand':
     case 'shipment':
       return 'shipping';
+    case 'delivery_setup': return 'delivery_setup';
     case 'delivery':
     case 'lieferung':
     case 'lieferdienst':

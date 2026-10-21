@@ -4,7 +4,7 @@ AddDefaultCharset utf-8
 </IfModule>
 
 # The builder embeds this stable URL, so browsers must revalidate it after deploys.
-<Files "admin_auth.js">
+<FilesMatch "^(admin_auth|admin_order|mmb_icons|configurator)\.(js|css)$">
   <IfModule mod_expires.c>
     ExpiresActive Off
   </IfModule>
@@ -14,7 +14,7 @@ AddDefaultCharset utf-8
     Header set Cache-Control "no-cache, max-age=0, must-revalidate"
     Header always set Cache-Control "no-cache, max-age=0, must-revalidate"
   </IfModule>
-</Files>
+</FilesMatch>
 
 Options -Indexes
 

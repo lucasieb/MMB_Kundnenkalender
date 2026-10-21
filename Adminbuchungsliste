@@ -21,6 +21,8 @@
 
   <!-- ======================= MMB CORE ======================= -->
   <script src="https://firebrick-squirrel-568721.hostingersite.com/admin_auth.js?v=20261020-mobile1" data-api-base="https://firebrick-squirrel-568721.hostingersite.com/"></script>
+  <script src="https://firebrick-squirrel-568721.hostingersite.com/mmb_icons.js?v=20261021"></script>
+  <script src="https://firebrick-squirrel-568721.hostingersite.com/admin_order.js?v=20261021-v1"></script>
   <script>
   (function(global){'use strict';
 
@@ -42,6 +44,52 @@
         .mmb-widget{font-family:'Poppins',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,sans-serif;background:var(--mmb-bg);color:var(--mmb-text);border-radius:18px;overflow:hidden;box-shadow:none;border:1px solid rgba(15,23,42,.06);display:flex;flex-direction:column;}
         .mmb-loading{display:flex;justify-content:center;align-items:center;height:200px;font-size:.875rem;color:var(--mmb-text-light);}
         @media (prefers-reduced-motion: reduce){.mmb-day,.mmb-btn,.mmb-nav-btn{transition:none;}}
+
+        /* Prevent min-content sizing (including Safari date inputs) from widening the dialog. */
+        .mmb-icon{width:1.1em;height:1.1em;stroke-width:2;flex:none;vertical-align:-.15em;display:inline-block}
+        .mmb-order-mini{display:flex;gap:.3rem;flex-wrap:wrap;margin-top:.35rem;font-size:.75rem}.mmb-order-mini span{display:inline-flex;gap:.25rem;align-items:center;max-width:100%;overflow-wrap:anywhere}.mmb-order-section details>summary{cursor:pointer;padding:.65rem 0}.mmb-order-section h3{display:flex;align-items:center;gap:.4rem}
+        .mmb-detail-overlay,.mmb-detail-overlay *{box-sizing:border-box;min-inline-size:0}
+        .mmb-detail-overlay{max-inline-size:100%;overflow-x:hidden}
+        .mmb-detail-panel,.mmb-detail-form,.mmb-detail-body,.mmb-detail-section,.mmb-detail-grid,.mmb-detail-field{max-inline-size:100%;min-width:0}
+        .mmb-detail-body{overflow-x:hidden}
+        .mmb-detail-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr))}
+        .mmb-detail-field>label{display:flex;align-items:center;gap:.4rem;line-height:1.4}
+        .mmb-detail-field input:not([type=checkbox]),.mmb-detail-field select,.mmb-detail-field textarea{width:100%;min-width:0;max-width:100%;box-sizing:border-box}
+        .mmb-detail-field input[type=date]{display:block;appearance:none;-webkit-appearance:none;min-height:40px}
+        .mmb-detail-field input::-webkit-date-and-time-value{text-align:left;min-height:1.2em}
+        .mmb-detail-field input::-webkit-datetime-edit{min-width:0;padding:0}
+        .mmb-detail-header{gap:.75rem}
+        .mmb-detail-summary{flex:1;min-width:0}
+        .mmb-detail-title-row{display:flex;align-items:center;gap:.65rem;flex-wrap:wrap}
+        .mmb-detail-title{display:flex;gap:.5rem;flex-wrap:wrap;font-size:1.25rem;overflow-wrap:anywhere}
+        .mmb-detail-title span{font-weight:400}
+        .mmb-detail-meta{justify-content:flex-start;margin-top:.65rem;gap:.4rem 1rem;font-size:.85rem}
+        .mmb-detail-meta>span,.mmb-detail-meta>strong,.mmb-detail-meta>a{display:flex;align-items:center;gap:.4rem;min-width:0;max-width:100%;overflow-wrap:anywhere;color:inherit;text-decoration:none}
+        .mmb-detail-meta a span{overflow-wrap:anywhere;min-width:0}
+        .mmb-status-pending{background:#fef3c7!important;color:#854d0e!important}
+        .mmb-status-confirmed{background:#dcfce7!important;color:#166534!important}
+        .mmb-status-rejected,.mmb-status-cancelled{background:#fee2e2!important;color:#991b1b!important}
+        .mmb-status-alternative{background:#e0e7ff!important;color:#3730a3!important}
+        .mmb-invoice-rows{max-width:760px;width:100%}
+        .mmb-invoice-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(90px,150px);align-items:center;gap:1rem;border-bottom:1px solid var(--mmb-border);padding:.65rem 0}
+        .mmb-invoice-row label{text-transform:none;font-size:.92rem;letter-spacing:0}
+        .mmb-money-input{display:flex;align-items:center;gap:.5rem}
+        .mmb-money-input input{text-align:right}
+        .mmb-invoice-total{font-weight:700;border-top:2px solid var(--mmb-border);margin-top:.25rem}
+        .mmb-price-calculation summary{cursor:pointer;padding:.75rem 0;font-size:.9rem}
+        .mmb-detail-note{overflow-wrap:anywhere;line-height:1.5;margin:0}
+        @media(max-width:900px){
+          .mmb-detail-grid{grid-template-columns:minmax(0,1fr)}
+          .mmb-detail-meta{width:auto;order:initial;font-size:.78rem;gap:.35rem .75rem}
+          .mmb-detail-title{font-size:1rem;gap:.15rem .4rem}
+          .mmb-detail-title-row{gap:.35rem}
+          .mmb-detail-title-row>.mmb-status-badge{font-size:.68rem}
+          .mmb-detail-header{flex-wrap:nowrap!important;padding:.65rem!important}
+          .mmb-detail-close{padding:0;flex:none}
+          .mmb-detail-meta a{max-width:100%}
+          .mmb-invoice-row{grid-template-columns:minmax(0,1fr) 112px;gap:.5rem}
+          .mmb-detail-section h3{font-size:.85rem;letter-spacing:.04em}
+        }
       `;
       document.head.appendChild(style);
     }
@@ -131,6 +179,7 @@
     const FULFILLMENT_CHOICES = [
       { id:'pickup',   label:'Abholung', full:'Abholung in Wesel', note:'', priceDelta:0, addsToTotal:true },
       { id:'shipping', label:'Versand',  full:'Versand (deutschlandweit)', note:'inkl. Express-Hin- & Rückversand sowie Vorbereitungspauschale', priceDelta:80, addsToTotal:true },
+      { id:'delivery_setup', label:'Lieferung und Montage', full:'Lieferung und Montage', note:'Fahrt, Aufbau mit zwei Personen und Abbau auf Angebot', priceDelta:0, addsToTotal:false },
       { id:'delivery', label:'Lieferung', full:'Lieferung (NRW-weit)', note:'zzgl. individueller Lieferpauschale – wir melden uns mit einem Angebot', priceDelta:0, addsToTotal:false },
       { id:'unknown', label:'Nicht erfasst', full:'Nicht erfasst', note:'Bei älteren Anfragen wurde die Abwicklung nicht gespeichert. Bitte mit der Kundschaft klären.', priceDelta:0, addsToTotal:false }
     ];
@@ -348,7 +397,9 @@
       async loadBookings(){ try{
         const res=await MMBApi.listBookings();
         const items=(res.items||[]).map(r=>{
-          const boxId = String(r.box_id);
+          const boxId = r.box_id==null?'':String(r.box_id);
+          const order=this.safeParseJson(r.order_json);
+          const visualStatus=r.alternative_proposed_at&&r.status!=='confirmed'&&r.status!=='cancelled'?'alternative':r.status;
           const totalAmount = Number(r.total_amount ?? 0);
           const deposit = Number(r.deposit_eur ?? 0);
           const pricingRaw = r.pricing_details_json ?? r.pricing_details ?? null;
@@ -362,8 +413,10 @@
           const fulfillmentCanonical = this.stableStringify(normalizedFulfillmentDetails || {});
           return {
             id:String(r.id),
+            order,
+            visual_status:visualStatus,
             box_id:boxId,
-            box_name: BOX_MAP[boxId] || r.box_name || ('Box #'+boxId),
+            box_name: order?order.package_name+' · '+order.summary:(BOX_MAP[boxId] || r.box_name || ('Box #'+boxId)),
             start_date:r.start_date,
             end_date:r.end_date,
             status:(r.status||'').toString(),
@@ -453,13 +506,15 @@
         <div class="mmb-admin-filters">
           <select aria-label="Buchungsstatus filtern" id="filter-status-${this.instanceId}">
             <option value="">Status: Alle</option>
+            <option value="alternative" ${f.status==='alternative'?'selected':''}>Alternative vorgeschlagen</option>
             <option value="pending"   ${f.status==='pending'?'selected':''}>Ausstehend</option>
             <option value="confirmed" ${f.status==='confirmed'?'selected':''}>Bestätigt</option>
             <option value="rejected"  ${f.status==='rejected'?'selected':''}>Abgelehnt</option>
             <option value="cancelled" ${f.status==='cancelled'?'selected':''}>Storniert</option>
           </select>
-          <select aria-label="Musikbox filtern" id="filter-box-${this.instanceId}">
-            <option value="">Box: Alle</option>
+          <select aria-label="Produkt oder Paket filtern" id="filter-box-${this.instanceId}">
+            <option value="">Produkte: Alle</option>
+            ${[['photo','Fotobox'],['tent','Zelt'],['controller','DJ-Mischpult'],['dj','DJ-Set'],['party','Party-Set'],['event','Event-Set']].map(([id,name])=>`<option value="${id}" ${f.box===id?'selected':''}>${name}</option>`).join('')}
             ${this.state.boxes.map(b=>`<option value="${b.id}" ${f.box===b.id?'selected':''}>${b.name}</option>`).join('')}
           </select>
           <input id="filter-id-${this.instanceId}" aria-label="Buchungs-ID suchen" inputmode="numeric" pattern="[0-9]*" placeholder="ID (z. B. 00123)" value="${this.escape(f.id)}"/>
@@ -509,16 +564,16 @@
         <tr>
           <td class="cell--id"><span class="badge-id">${displayId(b.id)}</span></td>
           <td class="cell--customer"><span class="cell--name">${this.escape(b.customer_name)}</span>${emailLine}</td>
-          <td class="cell--box">${this.escape(b.box_name)}</td>
+          <td class="cell--box">${b.order?`<strong>${this.escape(b.order.package_name)}</strong><div class="mmb-order-mini">${b.order.items.map(x=>`<span>${MMBIcons.icon({music:'speaker',photo:'camera',tent:'tent',accessory:'package'}[x.category])}${x.quantity}× ${this.escape(x.label)}</span>`).join('')}</div>`:MMBIcons.icon('speaker')+' '+this.escape(b.box_name)}</td>
           <td class="cell--date">${this.renderDateCell(b)}</td>
           <td class="cell--fulfillment"${fulfillmentNoteAttr}>${this.escape(this.formatFulfillmentCell(b))}</td>
           <td class="cell--total">${this.formatEuro(b.price_total)}</td>
-          <td class="cell--status"><span class="mmb-status-badge mmb-status-${b.status}">${this.translateStatus(b.status)}</span></td>
+          <td class="cell--status"><span class="mmb-status-badge mmb-status-${b.visual_status||b.status}">${this.translateStatus(b.visual_status||b.status)}</span></td>
           <td class="cell--actions">
             <div class="cell--actions-row">
               <button class="mmb-btn mmb-btn-small mmb-btn-secondary"
                       data-action="viewDetails" data-id="${b.id}"
-                      title="Details anzeigen" aria-label="Buchung ${displayId(b.id)} – Details und Aktionen"><span aria-hidden="true">ℹ️</span><span class="mmb-action-label">Details &amp; Aktionen</span></button>
+                      title="Details anzeigen" aria-label="Buchung ${displayId(b.id)} – Details und Aktionen">${MMBIcons.icon('info')}<span class="mmb-action-label">Details &amp; Aktionen</span></button>
               <button class="mmb-btn mmb-btn-small mmb-btn-success"
                       data-action="confirmBooking" data-id="${b.id}"
                       title="${isConfirmed?'Bereits bestätigt':'Buchung bestätigen'}"
@@ -627,8 +682,8 @@
       applyFilters(focusSnapshot=null){
         const f = this.state.filters;
         const rows = this.state.originalBookings.filter(x=>{
-          if (f.status && x.status!==f.status) return false;
-          if (f.box && x.box_id!==f.box) return false;
+          if (f.status && (x.visual_status||x.status)!==f.status) return false;
+          if(f.box){const c=x.order?.cart;const matches=['dj','party','event'].includes(f.box)?x.order?.package===f.box:f.box==='photo'?!!c?.photo:f.box==='tent'?!!c?.tent:f.box==='controller'?!!c?.controller:x.box_id===f.box||String(c?.speaker)===f.box;if(!matches)return false;}
 
           if (f.id){
             const disp = displayId(x.id);
@@ -992,7 +1047,7 @@
           customer_name: (values.customer_name||'').trim(),
           customer_email: (values.customer_email||'').trim(),
           customer_phone: (values.customer_phone||'').trim(),
-          box_id: finalBoxId,
+          box_id: booking.order&&!orderState?.cart?.speaker?null:finalBoxId,
           start_date: startDate,
           end_date: endDate,
           status: (values.status || b.status || '').trim(),
@@ -1189,7 +1244,7 @@
       }
 
       escape(s){ return (s??'').toString().replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-      translateStatus(s){ return ({pending:'Ausstehend',confirmed:'Bestätigt',rejected:'Abgelehnt',cancelled:'Storniert'})[s]||s; }
+      translateStatus(s){ return ({pending:'Ausstehend',confirmed:'Bestätigt',rejected:'Abgelehnt',cancelled:'Storniert',alternative:'Alternative vorgeschlagen'})[s]||s; }
 
       getFulfillmentChoice(id){ return FULFILLMENT_LOOKUP[id] || FULFILLMENT_CHOICES[0]; }
       computeFulfillmentMeta(record, normalizedDetails){
@@ -1296,7 +1351,7 @@
       }
 
       renderDetailOverlay(booking, overlay, closeOverlay){
-        const statusLabel = this.translateStatus(booking.status || 'pending');
+        const statusLabel = this.translateStatus(booking.visual_status || booking.status || 'pending');
         const createdLabel = this.formatDateTimeLabel(booking.created_at);
         const rangeLabel = this.formatBookingRangeLabel(booking.start_date, booking.end_date);
         const boxOptions = this.getBoxOptionsForDetail(booking);
@@ -1330,19 +1385,20 @@
           const isSelected = time === (fulfillmentDetails.preferred_time || '');
           return `<option value="${time}" ${isSelected?'selected':''}>${this.escape(label)}</option>`;
         }).join('');
-        const showExtended = currentFulfillmentMethod === 'shipping' || currentFulfillmentMethod === 'delivery';
+        const showExtended = currentFulfillmentMethod === 'shipping' || currentFulfillmentMethod.startsWith('delivery');
 
         overlay.innerHTML = `
           <div class="mmb-detail-panel" role="dialog" aria-modal="true">
             <div class="mmb-detail-header">
-              <div>
-                <h2 class="mmb-detail-title">Buchung ${this.escape(displayId(booking.id))}</h2>
-                <p class="mmb-detail-sub">${this.escape(createdLabel)}</p>
-              </div>
-              <div class="mmb-detail-meta">
-                <span class="mmb-chip">${this.escape(statusLabel)}</span>
-                <span class="mmb-chip">${this.escape(booking.box_name)}</span>
-                <span class="mmb-chip">${this.escape(rangeLabel)}</span>
+              <div class="mmb-detail-summary">
+                <div class="mmb-detail-title-row"><h2 class="mmb-detail-title">Buchung ${this.escape(displayId(booking.id))} <span data-summary="customer_name">${this.escape(booking.customer_name)}</span></h2><span class="mmb-status-badge mmb-status-${this.escape(booking.visual_status||booking.status)}" data-summary="status">${this.escape(statusLabel)}</span></div>
+                <div class="mmb-detail-meta">
+                  <span>${MMBIcons.icon('calendar')}<span data-summary="range">${this.escape(rangeLabel)}</span></span>
+                  <span>${MMBIcons.icon('truck')}<span data-summary="fulfillment_method">${this.escape(fulfillmentChoice.label)}</span></span>
+                  <strong>${MMBIcons.icon('euro')}<span data-summary="total_amount">${this.formatEuro(totalValue)}</span></strong>
+                  <a data-summary="customer_email" href="mailto:${this.escape(booking.customer_email)}">${MMBIcons.icon('mail')}<span>${this.escape(booking.customer_email||'Keine E-Mail')}</span></a>
+                  <a data-summary="customer_phone" href="tel:${this.escape(booking.customer_phone)}">${MMBIcons.icon('phone')}<span>${this.escape(booking.customer_phone||'Keine Telefonnummer')}</span></a>
+                </div>
               </div>
               <button type="button" class="mmb-detail-close" data-close aria-label="Detailansicht schließen">×</button>
             </div>
@@ -1358,7 +1414,7 @@
                   </div>
                   <div class="mmb-detail-field">
                     <label>Box</label>
-                    <select name="box_id">${boxOptionsHtml}</select>
+                    <select name="box_id" ${booking.order?'disabled':''}>${boxOptionsHtml}</select>${booking.order?'<span class="mmb-detail-note">Produkte im Ausstattungsbereich bearbeiten.</span>':''}
                   </div>
                   <div class="mmb-detail-field">
                     <label>Startdatum</label>
@@ -1396,10 +1452,10 @@
               <div class="mmb-detail-section">
                 <h3>Rechnungsadresse &amp; Vertragsvorbereitung</h3>
                 <div class="mmb-detail-grid">
-                  <div class="mmb-detail-field"><label>Straße &amp; Hausnummer<input name="billing_address_line1" maxlength="200" value="${this.escape(booking.billing_address_line1||'')}"></label></div>
-                  <div class="mmb-detail-field"><label>PLZ<input name="billing_postal_code" maxlength="20" value="${this.escape(booking.billing_postal_code||'')}"></label></div>
-                  <div class="mmb-detail-field"><label>Ort<input name="billing_city" maxlength="120" value="${this.escape(booking.billing_city||'')}"></label></div>
-                  <div class="mmb-detail-field"><label>Geburtsdatum (freiwillig)<input type="date" name="customer_birthdate" value="${this.escape(booking.customer_birthdate||'')}"></label></div>
+                  <div class="mmb-detail-field"><label>Straße &amp; Hausnummer</label><input name="billing_address_line1" maxlength="200" value="${this.escape(booking.billing_address_line1||'')}"></div>
+                  <div class="mmb-detail-field"><label>PLZ</label><input name="billing_postal_code" maxlength="20" value="${this.escape(booking.billing_postal_code||'')}"></div>
+                  <div class="mmb-detail-field"><label>Ort</label><input name="billing_city" maxlength="120" value="${this.escape(booking.billing_city||'')}"></div>
+                  <div class="mmb-detail-field"><label>Geburtsdatum (freiwillig)</label><input type="date" name="customer_birthdate" value="${this.escape(booking.customer_birthdate||'')}"></div>
                 </div>
                 <p class="mmb-detail-note">E-Mail-Adresse: ${booking.email_verified_at?'Bestätigt am '+this.escape(this.formatDateTimeLabel(booking.email_verified_at)):'Noch nicht bestätigt / bei Altanfragen nicht erfasst'}. Dies ist keine Identitätsprüfung.</p>
                 <p class="mmb-detail-note">Eingangsmail: ${booking.customer_mail_sent_at?'vom Mailserver angenommen':'nicht als versendet erfasst'} · Interne Benachrichtigung: ${booking.internal_mail_sent_at?'vom Mailserver angenommen':'nicht als versendet erfasst'}. Der tatsächliche Posteingang ist damit nicht garantiert.</p>
@@ -1467,7 +1523,7 @@
                 </div>
               </div>
 
-              <div class="mmb-detail-section" data-fulfillment-section="delivery" ${currentFulfillmentMethod==='delivery'?'':'hidden'}>
+              <div class="mmb-detail-section" data-fulfillment-section="delivery" ${currentFulfillmentMethod.startsWith('delivery')?'':'hidden'}>
                 <h3>Lieferdetails</h3>
                 <div class="mmb-detail-grid">
                   <div class="mmb-detail-field">
@@ -1483,51 +1539,16 @@
 
               <div class="mmb-detail-section">
                 <h3>Rechnungsübersicht</h3>
-                <div class="mmb-detail-grid">
-                  <div class="mmb-detail-field">
-                    <label>Grundpreis</label>
-                    <input name="pricing_original" value="${this.escape(this.formatNumberInput(originalValue))}">
-                  </div>
-                  <div class="mmb-detail-field">
-                    <label>Zwischensumme</label>
-                    <input name="pricing_base_total" value="${this.escape(this.formatNumberInput(baseTotalValue))}">
-                  </div>
-                  <div class="mmb-detail-field">
-                    <label>Gesamtpreis</label>
-                    <input name="total_amount" value="${this.escape(this.formatNumberInput(totalValue))}">
-                  </div>
-                  <div class="mmb-detail-field">
-                    <label>Kaution</label>
-                    <input name="deposit_eur" value="${this.escape(this.formatNumberInput(depositValue))}">
-                  </div>
+                <div class="mmb-invoice-rows">
+                  ${[['pricing_original','Miete vor Rabatt',originalValue],['pricing_discount_amount','Rabatt',discountAmountValue],['pricing_base_total','Miete nach Rabatt',baseTotalValue],['pricing_shipping_delta','Versand / Lieferung',shippingDeltaValue],['total_amount','Gesamtpreis',totalValue],['deposit_eur','Kaution (zusätzlich)',depositValue]].map(([name,label,value])=>`<div class="mmb-detail-field mmb-invoice-row ${name==='total_amount'?'mmb-invoice-total':''}"><label>${label}</label><div class="mmb-money-input"><input inputmode="decimal" name="${name}" value="${this.escape(this.formatNumberInput(value))}"><span aria-hidden="true">€</span></div></div>`).join('')}
                 </div>
-                <div class="mmb-detail-grid">
-                  <div class="mmb-detail-field">
-                    <label>Rabatt (%)</label>
-                    <input name="pricing_discount_percent_exact" value="${this.escape(this.formatNumberInput(discountPercentExactValue))}">
-                  </div>
-                  <div class="mmb-detail-field">
-                    <label>Rabatt (Anzeige)</label>
-                    <input name="pricing_discount_percent_display" value="${this.escape(discountPercentDisplayValue)}">
-                  </div>
-                  <div class="mmb-detail-field">
-                    <label>Rabatt (Betrag)</label>
-                    <input name="pricing_discount_amount" value="${this.escape(this.formatNumberInput(discountAmountValue))}">
-                  </div>
-                  <div class="mmb-detail-field">
-                    <label>Versand/Lieferaufschlag</label>
-                    <input name="pricing_shipping_delta" value="${this.escape(this.formatNumberInput(shippingDeltaValue))}">
-                  </div>
-                  <div class="mmb-detail-field">
-                    <label>Ø Preis pro Tag</label>
-                    <input name="pricing_avg_per_day" value="${this.escape(this.formatNumberInput(avgPerDayValue))}">
-                  </div>
-                  <div class="mmb-detail-field">
-                    <label>Anzahl Tage</label>
-                    <input name="pricing_days" value="${this.escape(this.formatIntegerInput(daysValue))}">
-                  </div>
-                </div>
-                <div class="mmb-detail-note">Alle Beträge verstehen sich in Euro.</div>
+                <details class="mmb-price-calculation"><summary>Berechnungsdetails bearbeiten</summary><div class="mmb-detail-grid">
+                  <div class="mmb-detail-field"><label>Rabatt (%)</label><input inputmode="decimal" name="pricing_discount_percent_exact" value="${this.escape(this.formatNumberInput(discountPercentExactValue))}"></div>
+                  <div class="mmb-detail-field"><label>Rabatt (Anzeige)</label><input name="pricing_discount_percent_display" value="${this.escape(discountPercentDisplayValue)}"></div>
+                  <div class="mmb-detail-field"><label>Ø Preis pro Tag</label><input inputmode="decimal" name="pricing_avg_per_day" value="${this.escape(this.formatNumberInput(avgPerDayValue))}"></div>
+                  <div class="mmb-detail-field"><label>Anzahl Tage</label><input inputmode="numeric" name="pricing_days" value="${this.escape(this.formatIntegerInput(daysValue))}"></div>
+                </div></details>
+                <p class="mmb-detail-note">Beträge in Euro. Änderungen an Einzelwerten sind manuelle Preisangaben; bitte Gesamtpreis und Rabatt gemeinsam prüfen.</p>
               </div>
 
               <div class="mmb-detail-section">
@@ -1572,6 +1593,26 @@
 
         const form = overlay.querySelector('form');
         if(!form) return;
+        const fieldIcons={status:'circle-check',box_id:'speaker',start_date:'calendar',end_date:'calendar',customer_name:'user',customer_email:'mail',customer_phone:'phone',billing_address_line1:'house',billing_postal_code:'map-pin',billing_city:'map-pin',customer_birthdate:'cake',fulfillment_method:'truck',fulfillment_note:'info'};
+        form.querySelectorAll('.mmb-detail-field').forEach((field,index)=>{
+          const input=field.querySelector('input,select,textarea'),label=field.querySelector('label');
+          if(!input||!label||label.querySelector('input'))return;
+          input.id='mmb-detail-'+booking.id+'-'+index;label.htmlFor=input.id;
+          label.insertAdjacentHTML('afterbegin',MMBIcons.icon(fieldIcons[input.name]||(input.name.startsWith('pricing_')||input.name==='total_amount'?'euro':'info')));
+        });
+        const refreshSummary=()=>{
+          ['customer_name','customer_email','customer_phone','total_amount','status','fulfillment_method'].forEach(name=>{
+            const input=form.elements.namedItem(name),target=overlay.querySelector('[data-summary="'+name+'"]');if(!input||!target)return;
+            const value=input.value;
+            if(name==='status'){const visual=value===booking.status?(booking.visual_status||value):value;target.className='mmb-status-badge mmb-status-'+visual;target.textContent=this.translateStatus(visual);}
+            else if(name==='fulfillment_method')target.textContent=this.getFulfillmentChoice(value).label;
+            else if(name==='total_amount')target.textContent=this.formatEuro(Number(String(value).replace(',','.'))||0);
+            else if(name==='customer_email'||name==='customer_phone'){target.href=(name==='customer_email'?'mailto:':'tel:')+value;target.querySelector('span').textContent=value||'Nicht angegeben';}
+            else target.textContent=value;
+          });
+          overlay.querySelector('[data-summary="range"]').textContent=this.formatBookingRangeLabel(form.elements.start_date.value,form.elements.end_date.value);
+        };
+        form.addEventListener('input',refreshSummary);form.addEventListener('change',refreshSummary);
         overlay.querySelector('[data-toggle-actions]')?.addEventListener('click',event=>{
           const actions=event.currentTarget.closest('.mmb-detail-actions');
           const expanded=actions.classList.toggle('is-expanded');
@@ -1632,7 +1673,7 @@
           detailSections.forEach(section=>{
             const target = section.dataset.fulfillmentSection;
             if(target==='extended' || target==='address'){
-              section.hidden = !(method==='shipping' || method==='delivery');
+              section.hidden = !(method==='shipping' || method.startsWith('delivery'));
             }else{
               section.hidden = target !== method;
             }
@@ -1723,6 +1764,7 @@
 
         syncEmailFields(true);
 
+        form._mmbOrder=MMBOrderAdmin.mount(form,booking,mmbApiPost);
         form.addEventListener('submit', async (event)=>{
           event.preventDefault();
           await this.handleDetailSubmit(form, booking, closeOverlay, { baseSubject });
@@ -1734,6 +1776,7 @@
         const originalLabel = submitBtn ? submitBtn.textContent : '';
         if(submitBtn){ submitBtn.disabled = true; submitBtn.textContent = 'Speichern…'; }
         try{
+          const orderState=form._mmbOrder?await form._mmbOrder.flush():null;
           const getField = (name)=>form.querySelector(`[name="${name}"]`);
           const getValue = (name)=>{
             const el = getField(name);
@@ -1776,7 +1819,7 @@
             billing_city: getValue('billing_city').trim(),
             billing_postal_code: getValue('billing_postal_code').trim(),
             billing_address_line1: getValue('billing_address_line1').trim(),
-            box_id: finalBoxId,
+            box_id: booking.order&&!orderState?.cart?.speaker?null:finalBoxId,
             start_date: startDate,
             end_date: endDate,
             status: statusValue,
@@ -1868,6 +1911,7 @@
             updatesToSend.fulfillment_details_json = fulfillmentDetailsPayload && Object.keys(fulfillmentDetailsPayload).length ? fulfillmentDetailsPayload : null;
           }
 
+          if(orderState?.dirty){updatesToSend.cart=orderState.cart;updatesToSend.manual_price_override=orderState.manual;updatesToSend.start_date=sanitized.start_date;updatesToSend.end_date=sanitized.end_date;updatesToSend.fulfillment_method=sanitized.fulfillment_method;if(orderState.manual)updatesToSend.total_amount=sanitized.total_amount;}
           const hasUpdates = Object.keys(updatesToSend).length > 0;
           const sendSwitch = getField('send_email');
           const shouldSendEmail = !!(sendSwitch && sendSwitch.checked);
@@ -1964,6 +2008,7 @@
           options.push({id,name:box.name});
         });
         const currentId = String(booking.box_id);
+        if(booking.order&&!booking.box_id)options.unshift({id:'',name:'Ohne Musikbox'});
         if(currentId && !seen.has(currentId)){
           options.push({id:currentId,name:booking.box_name || BOX_MAP[currentId] || `Box #${currentId}`});
         }
@@ -2180,7 +2225,7 @@
       }
 
       buildFulfillmentDetailsPayload(form, method, existing){
-        if(method !== 'shipping' && method !== 'delivery'){
+        if(method !== 'shipping' && !method.startsWith('delivery')){
           return null;
         }
         const getValue = (name)=>{
@@ -2213,7 +2258,7 @@
         payload.allow_contact_whatsapp = allowWhatsApp;
         payload.contact_preferences = { phone: allowPhone, whatsapp: allowWhatsApp };
 
-        if(method === 'shipping' || method === 'delivery'){
+        if(method === 'shipping' || method.startsWith('delivery')){
           const line1 = getValue('shipping_address_line1');
           const postal = getValue('shipping_postal_code');
           const city = getValue('shipping_city');
@@ -2224,7 +2269,7 @@
           if(extra) payload.address_extra = extra;
         }
 
-        if(method === 'delivery'){
+        if(method.startsWith('delivery')){
           const meeting = getValue('delivery_meeting_point');
           const preferred = getValue('delivery_preferred_time');
           if(meeting) payload.meeting_point = meeting;

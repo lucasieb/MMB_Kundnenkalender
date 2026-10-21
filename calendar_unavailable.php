@@ -2,6 +2,7 @@
 // calendar_unavailable.php – public read endpoint for customer calendar
 declare(strict_types=1);
 require __DIR__.'/db.php';
+require __DIR__.'/cors.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -36,6 +37,17 @@ try {
   ");
   $q1->execute([$box_id, $to, $from]);
   $bookings = $q1->fetchAll();
+
+  $columns=array_column($pdo->query('SHOW COLUMNS FROM bookings')->fetchAll(),'Field');
+  if(in_array('order_json',$columns,true)){
+    $modern=$pdo->prepare("SELECT box_id,start_date,end_date,order_json FROM bookings WHERE order_json IS NOT NULL AND status IN ('pending','confirmed') AND NOT (? < start_date OR ? > end_date)");
+    $modern->execute([$to,$from]);
+    foreach($modern->fetchAll(PDO::FETCH_ASSOC) as $row){
+      $order=json_decode($row['order_json'],true);
+      if((int)($order['cart']['speaker']??0)!==$box_id||(int)$row['box_id']===$box_id)continue;
+      $bookings[]=['start_date'=>$row['start_date'],'end_date'=>$row['end_date']];
+    }
+  }
 
   // Admin availability blocks that overlap the window
   $q2 = $pdo->prepare("

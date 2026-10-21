@@ -9,7 +9,7 @@ mkdir($temp . '/lib', 0700);
 mkdir($temp . '/sessions', 0700);
 foreach (glob($root . '/*.php') as $file) copy($file, $temp . '/' . basename($file));
 copy($root . '/lib/env.php', $temp . '/lib/env.php');
-copy($root . '/lib/booking_customer.php', $temp . '/lib/booking_customer.php');
+foreach(glob($root.'/lib/*.php') as $file)copy($file,$temp.'/lib/'.basename($file));
 copy(__DIR__ . '/fixtures/db.php', $temp . '/db.php');
 file_put_contents($temp . '/mailer.php', '<?php function sendMail(...$args): bool { file_put_contents(__DIR__."/mail-capture.jsonl",json_encode($args).PHP_EOL,FILE_APPEND);return is_file(__DIR__."/mail-success"); } function get_last_mail_error(): string { return "SMTP stub unavailable"; }');
 file_put_contents($temp . '/admin_users.php', '<?php return ' . var_export([
@@ -27,6 +27,8 @@ exec(escapeshellarg(PHP_BINARY).' '.escapeshellarg($temp.'/migrate_booking_field
 if($migrationCode!==0 || $db->query("SELECT customer_name FROM bookings WHERE id=999")->fetchColumn()!=='Historical preserved') throw new RuntimeException('Additive migration failed');
 exec(escapeshellarg(PHP_BINARY).' '.escapeshellarg($temp.'/migrate_booking_fields.php'),$repeatOutput,$repeatCode);
 if($repeatCode!==0 || count($repeatOutput)!==1) throw new RuntimeException('Migration must be idempotent');
+exec(escapeshellarg(PHP_BINARY).' '.escapeshellarg($temp.'/migrate_order_fields.php'),$orderMigrationOutput,$orderMigrationCode);
+if($orderMigrationCode!==0)throw new RuntimeException('Order migration failed');
 $db->exec('DELETE FROM bookings WHERE id=999');
 $db->exec("DELETE FROM sqlite_sequence WHERE name='bookings'");
 $db->exec('CREATE TABLE availability_blocks (id INTEGER PRIMARY KEY, box_id INTEGER, start_date TEXT, end_date TEXT, reason TEXT)');
@@ -197,6 +199,30 @@ try {
     check($status===200 && !$db->query('SELECT email_verified_at FROM bookings WHERE id='.$verifyId)->fetchColumn(),'Changed email must lose verification');
     $invalidPage=file_get_contents($verificationUrl);
     check(str_contains($invalidPage,'Link ist ungültig'),'Old email token must be revoked');
+    // New multi-product path: prices come from the server, not the submitted total.
+    foreach([
+      ['photo'=>'print200'],['tent'=>1,'walls'=>1],['controller'=>1],['package'=>'dj','batteries'=>3,'controller'=>1],['package'=>'party','photo'=>'print700'],['package'=>'event','walls'=>1]
+    ] as $cart){
+      [$status,$quote]=request('quote_order.php',['cart'=>$cart,'start_date'=>'2030-01-11','end_date'=>'2030-01-13']);
+      check($status===200&&$quote['ok'],'Public quote failed');$q=$quote['quote'];
+      $payload=array_replace($valid,['cart'=>$cart,'start_date'=>'2030-01-11','end_date'=>'2030-01-13','total_amount'=>0.01,'quoted_total'=>$q['total'],'quote_version'=>$q['version']]);unset($payload['box_id']);
+      [$status,$modern]=request('create_booking.php',$payload,true);
+      check($status===200&&$modern['ok'],'Modern creation failed: '.json_encode($modern));$modernId=$modern['booking']['id'];
+      $row=$db->query('SELECT * FROM bookings WHERE id='.(int)$modernId)->fetch(PDO::FETCH_ASSOC);$order=json_decode($row['order_json'],true);
+      check($order['cart']===$q['cart']&&abs((float)$row['total_amount']-$q['total'])<0.01,'Cart or authoritative total lost');
+      check((($order['primary_box_id']===null)===($row['box_id']===null)),'Standalone order needs no speaker');
+      $captures=array_map(fn($line)=>json_decode($line,true),file($temp.'/mail-capture.jsonl',FILE_IGNORE_NEW_LINES));
+      foreach(array_slice($captures,-2) as $mail)foreach($order['items'] as $item)check(str_contains($mail[2],$item['quantity'].'× '.$item['label']),'Component missing in mail');
+      [$status]=request('update_booking.php',['id'=>$modernId,'billing_city'=>'Neustadt'],true);check($status===200,'Modern contact edit failed');
+      [$status]=request('update_booking.php',['id'=>$modernId,'end_date'=>'2030-01-14'],true);check($status===200,'Modern date edit failed');
+      $row=$db->query('SELECT * FROM bookings WHERE id='.(int)$modernId)->fetch(PDO::FETCH_ASSOC);$next=json_decode($row['order_json'],true);check($next['days']===4&&$next['end_date']==='2030-01-14'&&(float)$row['total_amount']===(float)$next['total'],'Date edit did not reprice canonical order');
+      [$status]=request('update_booking.php',['id'=>$modernId,'total_amount'=>77.5],true);check($status===200,'Manual price edit failed');
+      $row=$db->query('SELECT * FROM bookings WHERE id='.(int)$modernId)->fetch(PDO::FETCH_ASSOC);check((float)json_decode($row['order_json'],true)['manual_total']===77.5,'Manual override not recorded');
+      $altered=$payload;$altered['quoted_total']=0.01;[$status]=request('create_booking.php',$altered,true);check($status===409,'Stale/tampered quoted total accepted');
+      $altered=$payload;$altered['cart']=['photo'=>'digital'];$altered['fulfillment_method']='shipping';[$status]=request('create_booking.php',$altered,true);check($status===422,'Photo shipping accepted');
+    }
+    [$status,$quote]=request('quote_order.php',['cart'=>['tent'=>1],'start_date'=>'2030-01-11','end_date'=>'2030-01-13','fulfillment_method'=>'delivery_setup']);check($status===200&&$quote['quote']['quote_required'],'Assembly quote failed');
+    [$status,$setup]=request('create_booking.php',array_replace($valid,['cart'=>['tent'=>1],'start_date'=>'2030-01-11','end_date'=>'2030-01-13','fulfillment_method'=>'delivery_setup','fulfillment_details_json'=>['address_line1'=>'Montageweg 4','postal_code'=>'46485','city'=>'Wesel']]),true);check($status===200&&$setup['booking']['fulfillment_method']==='delivery_setup','Assembly booking lost fulfillment');
     file_put_contents($temp . '/admin_users.php', "\n// changed credentials\n", FILE_APPEND);
     [$status,$state]=request('admin_login_token.php');
     check($status===200 && $state['authenticated']===false,'Changed credentials must expire existing sessions');
