@@ -15,8 +15,8 @@ function mmb_order_date(string $value): DateTimeImmutable {
 /** Canonical server quote. Client prices and component labels are never trusted. */
 function mmb_order_quote(array $input,string $start,string $end,string $method='pickup'): array {
     $c=mmb_catalog();$s=mmb_order_date($start);$e=mmb_order_date($end);
-    $days=(int)$s->diff($e)->format('%r%a')+1;
-    if($days<1||$days>366) throw new InvalidArgumentException('Bitte einen Zeitraum von 1 bis 366 Tagen wählen.');
+    $days=(int)$s->diff($e)->format('%r%a');
+    if($days<1||$days>366) throw new InvalidArgumentException('Bitte ein Rückgabedatum nach dem Mietbeginn wählen (1 bis 366 Miettage).');
     $package=(string)($input['package']??'single');
     if(!isset($c['packages'][$package])) throw new InvalidArgumentException('Unbekanntes Paket.');
     $speaker=mmb_order_int($input,'speaker',0,3);$quantity=mmb_order_int($input,'speaker_qty',0,2,$speaker?1:0);
@@ -46,28 +46,39 @@ function mmb_order_quote(array $input,string $start,string $end,string $method='
     $factor=1-$durationDiscount/100;
     if($speaker){
         $base=0.0;$keys=['so','mo','di','mi','do','fr','sa'];
-        for($date=$s;$date<=$e;$date=$date->modify('+1 day'))$base+=(float)$c['pricing']['boxes'][(string)$speaker]['prices'][$keys[(int)$date->format('w')]];
+        for($date=$s;$date<$e;$date=$date->modify('+1 day'))$base+=(float)$c['pricing']['boxes'][(string)$speaker]['prices'][$keys[(int)$date->format('w')]];
         // Preserve the established first-speaker rounding, then charge exactly half for the second.
         $first=round($base*$factor,0,PHP_ROUND_HALF_UP);
         $net=$first*($quantity===2?1.5:1);
-        $add('speaker-'.$speaker,$c['pricing']['boxes'][(string)$speaker]['name'],'music',$quantity,$base*$quantity,$net,$days.' Kalendertag(e) · '.$durationDiscount.' % Mietdauerrabatt'.($quantity===2?' · zweite SOUNDBOKS zum halben Preis':''));
+        $add('speaker-'.$speaker,$c['pricing']['boxes'][(string)$speaker]['name'],'music',$quantity,$base*$quantity,$net,$days.' Miettag(e) à 24 Stunden · '.$durationDiscount.' % Mietdauerrabatt'.($quantity===2?' · zweite SOUNDBOKS zum halben Preis':''));
     }
     foreach(['stands'=>$stands,'microphone'=>$microphone,'batteries'=>$batteries,'backpack'=>$backpack,'controller'=>$controller] as $id=>$qty){
         if(!$qty)continue;$x=$c['extras'][$id];$base=$x['price']*$days*$qty;
-        $included=$id==='stands'&&$package!=='single';
-        $add($id,$x['name'],'accessory',$qty,$included?0:$base,$included?0:round($base*$factor,2),$included?'Im Set enthalten':$days.' Kalendertag(e) · '.$durationDiscount.' % Mietdauerrabatt');
+        $included=false;
+        $add($id,$x['name'],'accessory',$qty,$included?0:$base,$included?0:round($base*$factor,2),$included?'Im Set enthalten':$days.' Miettag(e) à 24 Stunden · '.$durationDiscount.' % Mietdauerrabatt');
     }
     if($photo!==''){
         $base=$c['photo'][$photo]['price']+max(0,$days-$c['photo_included_days'])*$c['photo_extra_day'];
-        $net=$base*(in_array($package,['party','event'],true)?1-$c['set_photo_discount_percent']/100:1);
-        $add('photo-'.$photo,'Fotobox '.$c['photo'][$photo]['name'],'photo',1,$base,$net,'Paketpreis für den gewählten Zeitraum'.(in_array($package,['party','event'],true)?' · 15 % Setvorteil':''));
+        $net=$c['photo'][$photo]['price']+round(max(0,$days-$c['photo_included_days'])*$c['photo_extra_day']*$factor,2);
+        $add('photo-'.$photo,'Fotobox '.$c['photo'][$photo]['name'],'photo',1,$base,$net,'Paketpreis bis 5 Miettage; weitere Tage mit '.$durationDiscount.' % Mietdauerrabatt');
         $lines[count($lines)-1]['included']=array_merge(['Fotobox','Stativ','Requisiten','Unbegrenzt Fotos','Fotocloud-Download 60 Tage'],$photo==='digital'?[]:['Drucker',$photo==='print200'?'200 Ausdrucke, 2 Layouts':'700 Ausdrucke, 3 Layouts','Formate 5×15 / 10×15 cm, Filter']);
     }
     if($tent){
-        $base=0.0;for($date=$s;$date<=$e;$date=$date->modify('+1 day'))$base+=(float)$c['tent'][(int)$date->format('N')>=5?'weekend':'weekday'];
-        $net=round($base*$factor,2);if($package==='event')$net=round($net*(1-$c['event_tent_discount_percent']/100),2);
-        $add('tent',$c['tent']['name'],'tent',1,$base,$net,$days.' Kalendertag(e) · '.$durationDiscount.' % Mietdauerrabatt'.($package==='event'?' · 15 % Setvorteil':''));
+        $base=0.0;for($date=$s;$date<$e;$date=$date->modify('+1 day'))$base+=(float)$c['tent'][(int)$date->format('N')>=5?'weekend':'weekday'];
+        $net=round($base*$factor,2);
+        $add('tent',$c['tent']['name'],'tent',1,$base,$net,$days.' Miettag(e) à 24 Stunden · '.$durationDiscount.' % Mietdauerrabatt');
         if($walls)$add('walls','Seitenwände für das Eventzelt','accessory',1,$c['tent']['walls'],$c['tent']['walls'],'Einmalig je Miete');
+    }
+    // Set saving compares exactly the same individually priced contents after duration/second-box discounts.
+    $setPercent=(int)$c['set_discounts'][$package];
+    $setReference=round(array_sum(array_column($lines,'total')),2);$setSaving=0.0;
+    if($setPercent){
+        $target=floor(round($setReference*(1-$setPercent/100),6));
+        $remaining=round($setReference-$target,2);$setSaving=$remaining;
+        foreach($lines as &$line){$reduction=min((float)$line['total'],round($line['total']*$setPercent/100,2));$line['total']=round($line['total']-$reduction,2);$remaining=round($remaining-$reduction,2);$line['basis'].=' · '.$setPercent.' % Setvorteil';}unset($line);
+        // Allocate the sub-euro rounding advantage without a negative line or a hidden fee.
+        for($i=count($lines)-1;$i>=0&&abs($remaining)>.001;$i--){$change=$remaining>0?min($lines[$i]['total'],$remaining):$remaining;$lines[$i]['total']=round($lines[$i]['total']-$change,2);$remaining=round($remaining-$change,2);}
+        $discount+=$setSaving;
     }
     if($method==='delivery_setup'){$assembly=$c['assembly_setup']+$c['assembly_teardown'];$add('assembly','Eventzelt Auf- und Abbau','service',1,$assembly,$assembly,'Aufbau 80 € + Abbau 80 €; je 2 Personen × ca. 1 Stunde');}
     $rental=round(array_sum(array_column($lines,'total')),2);
@@ -78,7 +89,7 @@ function mmb_order_quote(array $input,string $start,string $end,string $method='
     $labels=['pickup'=>'Abholung in Wesel','shipping'=>$tent?'Speditionsversand / Selbstaufbau':'Versand','delivery'=>'Lieferung','delivery_setup'=>'Lieferung und Montage'];
     $note=$method==='pickup'?'Kostenlos':($method==='delivery_setup'?$c['assembly_note']:($method==='delivery'?$c['delivery_note']:($quoteRequired?'Frachtkosten auf individuelles Angebot; nicht in der Mietsumme enthalten.':'Hin- und Rückversand inklusive Vorbereitung, 80 € je Musikbox.')));
     return ['version'=>$c['version'],'package'=>$package,'package_name'=>$c['packages'][$package]['name'],'cart'=>$cart,'items'=>$lines,'summary'=>implode(', ',array_map(fn($x)=>$x['quantity'].'× '.$x['label'],$lines)),
-        'start_date'=>$start,'end_date'=>$end,'days'=>$days,'primary_box_id'=>$speaker?:null,'original'=>round($original,2),'discount_amount'=>round($discount,2),'discount_percent_exact'=>$original?round($discount/$original*100,4):0,'duration_discount_percent'=>$durationDiscount,
+        'start_date'=>$start,'end_date'=>$end,'days'=>$days,'day_unit'=>'24h','set_discount_percent'=>$setPercent,'set_reference_total'=>$setReference,'set_discount_amount'=>$setSaving,'primary_box_id'=>$speaker?:null,'original'=>round($original,2),'discount_amount'=>round($discount,2),'discount_percent_exact'=>$original?round($discount/$original*100,4):0,'duration_discount_percent'=>$durationDiscount,
         'base_total'=>$rental,'shipping_delta'=>$shipping,'total'=>round($rental+$shipping,2),'avg_per_day'=>round(($rental+$shipping)/$days,2),'deposit'=>0,
         'fulfillment_id'=>$method,'fulfillment_label'=>$labels[$method],'fulfillment_note'=>$note,'fulfillment_price_delta'=>$shipping,'fulfillment_adds_to_total'=>!$quoteRequired,'quote_required'=>$quoteRequired,'allowed_fulfillment'=>$allowed];
 }

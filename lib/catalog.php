@@ -2,7 +2,7 @@
 declare(strict_types=1);
 function mmb_catalog(): array {
     return [
-        'version'=>'2026-10-21-v2',
+        'version'=>'2026-10-22-v3',
         'pricing'=>require __DIR__.'/pricing_config.php',
         'packages'=>[
             'single'=>['name'=>'Einzelbuchung','icon'=>'speaker','description'=>'Musik, Fotobox, Eventzelt oder Mischpult – frei kombinieren.'],
@@ -25,7 +25,7 @@ function mmb_catalog(): array {
         ],
         'tent'=>['name'=>'Eventzelt 4 × 8 m','weekday'=>99,'weekend'=>129,'walls'=>20],
         'photo_included_days'=>5,'photo_extra_day'=>40,
-        'set_photo_discount_percent'=>15,'event_tent_discount_percent'=>15,
+        'set_discounts'=>['single'=>0,'dj'=>10,'party'=>15,'event'=>20],
         'shipping_per_speaker'=>80,
         'assembly_setup'=>80,'assembly_teardown'=>80,
         'delivery_note'=>'Lieferkosten nach Entfernung auf Angebot. Abholung in Wesel kostenlos.',

@@ -135,6 +135,11 @@ function buildEmailTemplates(array $bk, array $alternativeBoxIds = []): array {
   $fulfillmentInfo = fulfillmentInfoFromBooking($bk);
   $fulfillmentLine = $order ? $order['fulfillment_label'].' — '.$order['fulfillment_note'] : fulfillmentEmailLine($fulfillmentInfo);
 
+  $timing=json_decode((string)($bk['fulfillment_details_json']??''),true)??[];
+  if(($bk['fulfillment_method']??'pickup')!=='shipping'){
+    if(!empty($timing['preferred_time']))$fulfillmentLine.=' · Wunschzeit: '.$timing['preferred_time'].' Uhr (wird abgestimmt)';
+    if(!empty($timing['meeting_point']))$fulfillmentLine.=' · Hinweis: '.$timing['meeting_point'];
+  }
   $subjects = [
     'confirmed'   => "Buchung bestätigt – {$dispId}",
     'rejected'    => "Buchungsanfrage – {$dispId}",
@@ -393,6 +398,10 @@ try {
       $currentOrder=json_decode((string)($bk['order_json']??''),true);
       if($currentOrder&&$customMsg!=='')$bodyTxt.="\n\nAktueller gespeicherter Buchungsstand:\n".mmb_order_mail_lines($currentOrder)."\nAbwicklung: ".$currentOrder['fulfillment_label'].' — '.$currentOrder['fulfillment_note']."\nMietsumme: ".number_format((float)$bk['total_amount'],2,',','.').' €';
 
+      if($customMsg!==''){
+        $timing=json_decode((string)($bk['fulfillment_details_json']??''),true)??[];
+        if(($bk['fulfillment_method']??'pickup')!=='shipping'){if(!empty($timing['preferred_time']))$bodyTxt.="\n".'Wunschzeit: '.$timing['preferred_time'].' Uhr (wird abgestimmt)';if(!empty($timing['meeting_point']))$bodyTxt.="\n".'Hinweis: '.$timing['meeting_point'];}
+      }
       $toEmail = (string)($bk['customer_email'] ?? '');
       $toName  = (string)($bk['customer_name'] ?? 'Kunde');
 
