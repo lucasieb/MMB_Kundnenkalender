@@ -6,6 +6,7 @@ require_once __DIR__ . '/db.php';
 $pdo = pdo();
 $columns = array_column($pdo->query('SHOW COLUMNS FROM bookings')->fetchAll(), 'Field');
 $definitions = [
+ 'customer_type'=>'VARCHAR(20) NULL', 'company_name'=>'VARCHAR(200) NULL',
  'customer_phone'=>'VARCHAR(50) NULL', 'note'=>'TEXT NULL', 'deposit_eur'=>'DECIMAL(10,2) NULL',
  'fulfillment_method'=>'VARCHAR(20) NULL', 'fulfillment_label'=>'VARCHAR(120) NULL',
  'fulfillment_note'=>'TEXT NULL', 'fulfillment_price_delta'=>'DECIMAL(10,2) NULL',

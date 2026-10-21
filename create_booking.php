@@ -243,7 +243,7 @@ function normalize_fulfillment_details_for_storage(?array $details, string $meth
 
   $data['method'] = $method;
 
-  $stringFields = ['label','full','note','contact_name','contact_email','contact_phone','address_line1','postal_code','city','address_extra','meeting_point','preferred_time','submitted_via'];
+  $stringFields = ['label','full','note','contact_name','contact_email','contact_phone','customer_type','company_name','address_line1','postal_code','city','address_extra','meeting_point','preferred_time','submitted_via'];
   foreach ($stringFields as $field) {
     if (array_key_exists($field, $data)) {
       $value = trim((string)$data[$field]);
@@ -466,6 +466,8 @@ function build_submission_mail(array $data): array {
   $range     = $ctx['range'];
   $totalDisp = $ctx['totalDisp'];
   $fulfillment = $ctx['fulfillment'];
+  $delivery=$ctx['fulfillment_details']??[];
+  $deliveryLine=implode(', ',array_filter([$delivery['company_name']??'', $delivery['contact_name']??'', $delivery['address_line1']??'',trim(($delivery['postal_code']??'').' '.($delivery['city']??''))]));
 
   $subject = "Deine Buchungsanfrage ist eingegangen – Buchungs-ID: {$data['display_id']}";
 
@@ -478,10 +480,11 @@ Deine Buchung im Überblick:
 👤 Name: {$name}
 📧 E-Mail: {$email}
 📞 Telefon: {$data['customer_phone']}
-🏠 Rechnungsadresse: {$data['billing_address_line1']}, {$data['billing_postal_code']} {$data['billing_city']}
+🏠 Rechnungsadresse: {$data['company_name']} {$data['billing_address_line1']}, {$data['billing_postal_code']} {$data['billing_city']}
 Ausstattung: {$boxName}
 🕰️ Zeitraum: {$range}
 🚚 Abwicklung: {$fulfillment}
+Lieferadresse: {$deliveryLine}
 💶 Mietsumme: {$totalDisp}
 
 Bitte bestätige innerhalb von 48 Stunden deine E-Mail-Adresse:
@@ -525,7 +528,7 @@ function build_internal_submission_mail(array $data): array {
   $extraHtmlLines = [];
   $method = is_array($fulfillmentInfo) ? ($fulfillmentInfo['method'] ?? null) : null;
 
-  if (in_array($method, ['shipping', 'delivery'], true) && is_array($fulfillmentDetails)) {
+  if (in_array($method, ['shipping', 'delivery', 'delivery_setup'], true) && is_array($fulfillmentDetails)) {
     $escHtml = static function (string $value): string {
       return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     };
@@ -561,8 +564,9 @@ function build_internal_submission_mail(array $data): array {
       $extraHtmlLines[] = '☎️ Kontaktwege: ' . $escHtml($channels);
     }
 
-    if ($method === 'shipping' || $method === 'delivery') {
+    if ($method === 'shipping' || str_starts_with($method,'delivery')) {
       $addressParts = [];
+      if(!empty($fulfillmentDetails['company_name']))$addressParts[]=(string)$fulfillmentDetails['company_name'];
       $addressLine = trim((string)($fulfillmentDetails['address_line1'] ?? ''));
       $postalCode = trim((string)($fulfillmentDetails['postal_code'] ?? ''));
       $city = trim((string)($fulfillmentDetails['city'] ?? ''));
@@ -584,7 +588,7 @@ function build_internal_submission_mail(array $data): array {
       }
     }
 
-    if ($method === 'delivery') {
+    if (str_starts_with($method,'delivery')) {
       $meetingPoint = trim((string)($fulfillmentDetails['meeting_point'] ?? ''));
       $preferredTime = trim((string)($fulfillmentDetails['preferred_time'] ?? ''));
       if ($meetingPoint !== '') {
@@ -608,7 +612,7 @@ Buchung im Überblick:
 👤 Name: {$name}
 📧 E-Mail: {$email}
 📞 Telefon: {$data['customer_phone']}
-🏠 Rechnungsadresse: {$data['billing_address_line1']}, {$data['billing_postal_code']} {$data['billing_city']}
+🏠 Rechnungsadresse: {$data['company_name']} {$data['billing_address_line1']}, {$data['billing_postal_code']} {$data['billing_city']}
 Ausstattung: {$boxName}
 🕰️ Zeitraum: {$range}
 🚚 Abwicklung: {$fulfillment}
@@ -714,7 +718,7 @@ try {
   try { $customer = booking_customer_fields($in); } catch (InvalidArgumentException $e) { json_response(['ok'=>false,'error'=>$e->getMessage(),'code'=>'validation'],422); }
   if (!is_truthy($in['accept_terms']??false) || !is_truthy($in['privacy_acknowledged']??false)) json_response(['ok'=>false,'error'=>'Bitte AGB und Datenschutzhinweis bestätigen.','code'=>'validation'],422);
   // Fail explicitly instead of silently losing data when migration is missing.
-  foreach (['customer_phone','billing_address_line1','billing_postal_code','billing_city','customer_birthdate','fulfillment_method','fulfillment_details_json','pricing_details_json','email_verification_hash','privacy_notice_version','privacy_acknowledged_at','email_verification_expires_at','email_verified_at','customer_mail_sent_at','internal_mail_sent_at','note','deposit_eur','fulfillment_label','fulfillment_note','fulfillment_price_delta'] as $column) {
+  foreach (['customer_type','company_name','customer_phone','billing_address_line1','billing_postal_code','billing_city','customer_birthdate','fulfillment_method','fulfillment_details_json','pricing_details_json','email_verification_hash','privacy_notice_version','privacy_acknowledged_at','email_verification_expires_at','email_verified_at','customer_mail_sent_at','internal_mail_sent_at','note','deposit_eur','fulfillment_label','fulfillment_note','fulfillment_price_delta'] as $column) {
     if (!has_col($pdo,$column)) json_response(['ok'=>false,'error'=>'Buchungssystem wird aktualisiert. Bitte später erneut versuchen.','code'=>'schema_missing'],503);
   }
 
@@ -805,6 +809,7 @@ try {
       if (empty($fulfillmentDetailsArray[$key]) || !is_scalar($fulfillmentDetailsArray[$key]) || strlen((string)$fulfillmentDetailsArray[$key])>400) json_response(['ok'=>false,'error'=>'Bitte eine vollständige Zieladresse angeben.','code'=>'validation'],422);
     }
   }
+  try {booking_delivery_company($fulfillmentDetailsArray??[]);}catch(InvalidArgumentException $e){json_response(['ok'=>false,'error'=>$e->getMessage(),'code'=>'validation'],422);}
   $verificationToken=bin2hex(random_bytes(32));
   $customer['privacy_notice_version']=BOOKING_PRIVACY_VERSION;
   $customer['privacy_acknowledged_at']=date('Y-m-d H:i:s');
@@ -922,6 +927,8 @@ try {
       'customer_name'  => $name,
       'customer_email' => $email,
       'customer_phone' => $phone,
+      'company_name'=>$customer['company_name']??'',
+      'customer_type'=>$customer['customer_type'],
       'billing_address_line1'=>$customer['billing_address_line1'],
       'billing_postal_code'=>$customer['billing_postal_code'],
       'billing_city'=>$customer['billing_city'],

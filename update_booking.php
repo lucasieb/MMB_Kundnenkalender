@@ -53,7 +53,7 @@ try {
   $id = isset($data['id']) ? (int)$data['id'] : 0;
   if ($id <= 0) throw new Exception('Ungültige ID');
 
-  try { $validatedCustomer=booking_customer_fields($data,true); $data=array_replace($data,$validatedCustomer); } catch(InvalidArgumentException $e) { http_response_code(422); echo json_encode(['ok'=>false,'error'=>$e->getMessage()]); exit; }
+
   $columns = bookings_columns($pdo);
   $hasColumn = function(string $field) use ($columns): bool {
     return isset($columns[strtolower($field)]);
@@ -68,6 +68,15 @@ try {
 
   $previousStatement=$pdo->prepare('SELECT * FROM bookings WHERE id=?');$previousStatement->execute([$id]);$existing=$previousStatement->fetch(PDO::FETCH_ASSOC);
   if(!$existing)throw new InvalidArgumentException('Buchung nicht gefunden.');
+  try {
+    $customerInput=$data;
+    if(array_key_exists('customer_type',$data)||array_key_exists('company_name',$data)) {
+      $customerInput['customer_type']=$data['customer_type']??$existing['customer_type']??'private';
+      $customerInput['company_name']=$data['company_name']??$existing['company_name']??'';
+    }
+    $data=array_replace($data,booking_customer_fields($customerInput,true));
+  }catch(InvalidArgumentException $e){http_response_code(422);echo json_encode(['ok'=>false,'error'=>$e->getMessage()]);exit;}
+
   unset($data['order_json'],$data['package_id']); // Canonical components are generated exclusively from a validated cart.
   $oldOrder=json_decode((string)($existing['order_json']??''),true);
   if($oldOrder){
@@ -96,8 +105,12 @@ try {
   mmb_order_date($nextStart);mmb_order_date($nextEnd);if($nextEnd<$nextStart)throw new InvalidArgumentException('Enddatum liegt vor Beginn.');
   foreach(['total_amount','deposit_eur','fulfillment_price_delta'] as $number)if(isset($data[$number])&&(!is_numeric($data[$number])||(float)$data[$number]<0||!is_finite((float)$data[$number])))throw new InvalidArgumentException('Ungültiger Betrag.');
 
+  if(array_key_exists('fulfillment_details_json',$data)||array_key_exists('fulfillment_details',$data)){
+    $delivery=$data['fulfillment_details_json']??$data['fulfillment_details'];$delivery=is_array($delivery)?$delivery:json_decode((string)$delivery,true);
+    booking_delivery_company($delivery??[]);
+  }
   // Whitelist erlaubter Felder
-  $allow = ['order_json','package_id','customer_name','customer_email','customer_phone','billing_address_line1','billing_postal_code','billing_city','customer_birthdate','box_id','start_date','end_date','status','total_amount','fulfillment_method','fulfillment_label','fulfillment_note','fulfillment_price_delta','note','deposit_eur','pricing_details_json','pricing_details','fulfillment_details_json','fulfillment_details'];
+  $allow = ['order_json','package_id','customer_type','company_name','customer_name','customer_email','customer_phone','billing_address_line1','billing_postal_code','billing_city','customer_birthdate','box_id','start_date','end_date','status','total_amount','fulfillment_method','fulfillment_label','fulfillment_note','fulfillment_price_delta','note','deposit_eur','pricing_details_json','pricing_details','fulfillment_details_json','fulfillment_details'];
   $columns = bookings_columns($pdo);
   $processed = [];
   $sets = [];

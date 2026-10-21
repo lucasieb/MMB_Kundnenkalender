@@ -430,6 +430,7 @@
             billing_postal_code:r.billing_postal_code||'',
             billing_city:r.billing_city||'',
             customer_birthdate:r.customer_birthdate||'',
+            customer_type:r.customer_type||'private',company_name:r.company_name||'',
             email_verified_at:r.email_verified_at||'',
             customer_mail_sent_at:r.customer_mail_sent_at||'',
             internal_mail_sent_at:r.internal_mail_sent_at||'',
@@ -931,6 +932,8 @@
             const subjectInput = form.querySelector('input[name="subject"]');
             const messageInput = form.querySelector('textarea[name="message"]');
             const sendSwitch = form.querySelector('input[name="send_email"]');
+            const companyField=form.querySelector('[name=company_name]'),typeField=form.querySelector('[name=customer_type]');
+            if(companyField&&typeField){const syncCompany=()=>{companyField.required=typeField.value==='business';companyField.closest('.mmb-detail-field').hidden=typeField.value!=='business';};typeField.addEventListener('change',syncCompany);syncCompany();}
             const watchFields = ['customer_name','customer_email','customer_phone','box_id','start_date','end_date','status','total_amount','fulfillment_method'];
             let subjectDirty = false;
             let messageDirty = false;
@@ -1454,7 +1457,7 @@
               </div>
 
               <div class="mmb-detail-section">
-                <h3>Rechnungsadresse &amp; Vertragsvorbereitung</h3>
+                <h3>Rechnungs- und Lieferadresse</h3><div class="mmb-detail-grid"><div class="mmb-detail-field"><label>Kundentyp</label><select name="customer_type"><option value="private" ${booking.customer_type!=='business'?'selected':''}>Privat</option><option value="business" ${booking.customer_type==='business'?'selected':''}>Gewerblich</option></select></div><div class="mmb-detail-field"><label>Vollständiger Unternehmensname</label><input name="company_name" maxlength="200" value="${this.escape(booking.company_name||'')}"></div></div>
                 <div class="mmb-detail-grid">
                   <div class="mmb-detail-field"><label>Straße &amp; Hausnummer</label><input name="billing_address_line1" maxlength="200" value="${this.escape(booking.billing_address_line1||'')}"></div>
                   <div class="mmb-detail-field"><label>PLZ</label><input name="billing_postal_code" maxlength="20" value="${this.escape(booking.billing_postal_code||'')}"></div>
@@ -1506,7 +1509,7 @@
               </div>
 
               <div class="mmb-detail-section" data-fulfillment-section="address" ${showExtended?'':'hidden'}>
-                <h3>Versand- / Lieferadresse</h3>
+                <h3>Lieferadresse</h3><div class="mmb-detail-grid"><div class="mmb-detail-field"><label>Unternehmen (bei Gewerbe)</label><input name="shipping_company_name" maxlength="200" value="${this.escape(fulfillmentDetails.company_name||'')}"></div></div>
                 <div class="mmb-detail-grid">
                   <div class="mmb-detail-field">
                     <label>Straße &amp; Hausnummer</label>
@@ -1693,7 +1696,9 @@
         const subjectInput = form.querySelector('input[name="subject"]');
         const messageInput = form.querySelector('textarea[name="message"]');
         const sendSwitch = form.querySelector('input[name="send_email"]');
-        const watchFields = ['customer_name','customer_email','customer_phone','box_id','start_date','end_date','status','total_amount','fulfillment_method'];
+        const companyField=form.querySelector('[name=company_name]'),typeField=form.querySelector('[name=customer_type]');
+            if(companyField&&typeField){const syncCompany=()=>{companyField.required=typeField.value==='business';companyField.closest('.mmb-detail-field').hidden=typeField.value!=='business';};typeField.addEventListener('change',syncCompany);syncCompany();}
+            const watchFields = ['customer_name','customer_email','customer_phone','box_id','start_date','end_date','status','total_amount','fulfillment_method'];
         let subjectDirty = false;
         let messageDirty = false;
 
@@ -1821,6 +1826,7 @@
             customer_email: (getValue('customer_email') || booking.customer_email || '').trim(),
             customer_phone: (getValue('customer_phone') || booking.customer_phone || '').trim(),
             customer_birthdate: getValue('customer_birthdate').trim(),
+            customer_type:getValue('customer_type'),company_name:getValue('company_name').trim(),
             billing_city: getValue('billing_city').trim(),
             billing_postal_code: getValue('billing_postal_code').trim(),
             billing_address_line1: getValue('billing_address_line1').trim(),
@@ -1843,6 +1849,7 @@
             customer_email: (booking.customer_email || '').trim(),
             customer_phone: (booking.customer_phone || '').trim(),
             customer_birthdate: (booking.customer_birthdate || '').trim(),
+            customer_type:booking.customer_type||'private',company_name:booking.company_name||'',
             billing_city: (booking.billing_city || '').trim(),
             billing_postal_code: (booking.billing_postal_code || '').trim(),
             billing_address_line1: (booking.billing_address_line1 || '').trim(),
@@ -1878,6 +1885,8 @@
           markIfChanged('customer_email', sanitized.customer_email, originalNormalized.customer_email);
           markIfChanged('customer_phone', sanitized.customer_phone, originalNormalized.customer_phone);
           markIfChanged('customer_birthdate', sanitized.customer_birthdate, originalNormalized.customer_birthdate);
+          markIfChanged('customer_type',sanitized.customer_type,originalNormalized.customer_type);
+          markIfChanged('company_name',sanitized.company_name,originalNormalized.company_name);
           markIfChanged('billing_city', sanitized.billing_city, originalNormalized.billing_city);
           markIfChanged('billing_postal_code', sanitized.billing_postal_code, originalNormalized.billing_postal_code);
           markIfChanged('billing_address_line1', sanitized.billing_address_line1, originalNormalized.billing_address_line1);
@@ -2266,6 +2275,8 @@
         payload.contact_preferences = { phone: allowPhone, whatsapp: allowWhatsApp };
 
         if(method === 'shipping' || method.startsWith('delivery')){
+          payload.company_name=getValue('shipping_company_name');
+          payload.customer_type=getValue('customer_type');
           const line1 = getValue('shipping_address_line1');
           const postal = getValue('shipping_postal_code');
           const city = getValue('shipping_city');

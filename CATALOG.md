@@ -1,41 +1,21 @@
-# Einheitlicher Buchungskatalog · Starttarife vom 21.10.2026
+# MietMichBox: zeitabhängige Preise und Buchungsablauf
 
-Die zentrale Konfiguration ist `lib/catalog.php`; die bestehenden Musikboxpreise und Mietdauerrabatte bleiben in `lib/pricing_config.php`. Alle neuen Preise sind vom Nutzer beauftragte Starttarife für die erste Ausbaustufe und können dort angepasst werden. Die serverseitige Berechnung in `lib/order_quote.php` ist maßgeblich. Es werden unverbindliche Anfragen angelegt, keine Onlinezahlungen oder garantierten Bestandsreservierungen.
+Stand: 21.10.2026, Preisversion 2026-10-21-v2. Verbindliche Berechnung in `lib/order_quote.php`; gemeinsame Konfiguration in `lib/catalog.php` und `lib/pricing_config.php`. `quote_order.php` liefert Auswahl und alle passenden Zusatzangebote aus derselben Berechnung. Der Browser berechnet keine eigenen Mietpreise.
 
-| Produkt / Option | Starttarif und Mietdauer |
-| --- | --- |
-| SOUNDBOKS 4 / Teufel Rockster Neo | bisherige 34 € Mo–Do / 44 € Fr–So, Mietdauerrabatt unverändert |
-| Marshall Bromley 750 | bisherige 39 € Mo–Do / 49 € Fr–So, Mietdauerrabatt unverändert |
-| Zweite SOUNDBOKS | gleicher Wochentagstarif; bei anderen Modellen nicht verfügbar |
-| DJ-Set | zwei SOUNDBOKS, zwei Stative enthalten; 10 % Setvorteil zusätzlich zum bisherigen Mietdauerrabatt |
-| Party-Set | DJ-Set plus Fotobox; 20 € Vorteil auf das gewählte Fotoboxpaket |
-| Event-Set | Party-Set plus 4×8-m-Zelt; weitere 20 € Vorteil auf das Zelt |
-| Stativ / Mikrofon / Zusatzakku | je 9 € für bis zu 3 Kalendertage; danach 2 € je Stück/Tag |
-| Rucksack | 5 € bis zu 3 Tage, danach 1 €/Tag; nur SOUNDBOKS |
-| Pioneer DDJ-FLX4 | allein 29 €, mit Musikbox 19 € für bis zu 3 Tage; danach 5 €/Tag; eigener Laptop/Software erforderlich |
-| Fotobox Digital / Print 200 / Print 700 | 139 / 219 / 295 € bis zu 5 Kalendertage; danach 40 €/Tag |
-| Zelt 4×8 m | 99 € erster Kalendertag, danach 25 €/Tag; Freitag–Sonntag 149 € |
-| Zelt-Seitenwände | 20 € pro Miete |
-| Zelt Auf- und Abbau | 80 € Aufbau + 80 € Abbau, je zwei Personen und etwa eine Stunde kalkuliert; bei gewählter Montage im angezeigten Betrag enthalten |
-| Abholung in Wesel | kostenlos; Selbstaufbau |
-| Musikboxversand | 80 € je Musikbox für Hin- und Rückversand / Vorbereitung |
-| Fotoboxversand | nicht angeboten, auch nicht in kombinierten Sets |
-| Zelt-/Mischpultversand | Frachtkosten individuell auf Angebot; keine erfundene Paketpauschale |
-| Lieferfahrt | individuell nach Entfernung auf Angebot; zusätzlich zur angezeigten Mietsumme |
+## Ablauf
 
-SOUNDBOKS-Zusatzakkus sind auf drei begrenzt, die Anzahl Stative auf die Anzahl Musikboxen. Sets enthalten Stative ohne doppelte Berechnung. Neue Angaben wie Komponenten, Mengen, Set, Mietdauer, Tarifversion und offene Angebotskosten werden als kanonischer Snapshot in `bookings.order_json` gespeichert. Eigenständige Fotobox-/Zelt-/Mischpultanfragen haben `box_id=NULL`. Bestehende Anfragen behalten ihre bisherigen Preise und Daten. Preisüberschreibungen der Verwaltung werden als `manual_total` dokumentiert.
+1. Zeitraum (native Von/Bis-Auswahl), dann Einzelbuchung, DJ-, Party- oder Event-Set. Ab-Preise für den ausgewählten Zeitraum.
+2. Kategorien und Ausstattung. Produktbereiche einzeln aufklappbar; Informationen über den jeweiligen Info-Button. Alle zusätzlichen Mengen, Produktwechsel und Upgrades mit aktuellem Aufpreis.
+3. Abwicklung und optionale Verlängerung um einen oder zwei Tage. Fahrt/Fracht auf Angebot bleibt ausdrücklich separat ausgewiesen.
+4. Kontakt und Rechnungs-/Lieferadresse. Privat oder Gewerblich; bei Gewerbe Unternehmensname verpflichtend, auch bei separater Lieferadresse. Geburtstag freiwillig; Hinweise/Wunschzeit/Anmerkung zunächst zugeklappt.
 
-## Veröffentlichung
+## Preise
 
-1. CI bestehen lassen und Main deployen.
-2. `php migrate_order_fields.php` ausdrücklich per SSH ausführen (nur CLI, idempotent; alte Datensätze bleiben erhalten).
-3. Kunden-Code aus `Kundenkalender` in den fünf bestehenden Builder-Einbettungen aktualisieren; `Adminbuchungsliste` ebenfalls aktualisieren und Builder veröffentlichen.
-4. Asset-URLs werden beim Abruf revalidiert. Die Einbettungen benötigen bei reinen Änderungen an den externen JS-/CSS-Dateien keine erneute Kopie.
+- Bestehende Tagestarife der drei Musikboxen und Mietdauerrabatte bleiben erhalten. Zweite SOUNDBOKS kostet genau 50 % der für den Zeitraum berechneten ersten Box; maximal zwei.
+- Stativ: 5 €/Tag/Stück, Mikrofon: 9 €/Tag/Stück (maximal zwei), Akku: 15 €/Tag/Stück (maximal drei), Rucksack: 9 €/Tag (maximal einer), DDJ-FLX4: 19 €/Tag (maximal einer, auch einzeln). Für alle gilt derselbe Mietdauerrabatt wie für Musikboxen. Akku/Rucksack und zweite Box nur für SOUNDBOKS.
+- Eventzelt: 99 €/Tag Montag–Donnerstag, 129 €/Tag Freitag–Sonntag, gleicher Mietdauerrabatt. Seitenwände einmalig 20 €.
+- Fotobox-Pakete bleiben unverändert: Digital 139 €, Print 200 219 €, Print 700 295 € für bis zu fünf Kalendertage; danach 40 €/Tag. Die Differenzen werden für den tatsächlichen Zeitraum angezeigt.
+- Sets: zwei SOUNDBOKS, zwei Stative inklusive. Mischpult optional, beim erstmaligen Setwechsel vorausgewählt und entfernbar. Kein zusätzlicher pauschaler Musikrabatt neben dem Halbpreis der zweiten Box. Fotobox im Party-/Event-Set und Eventzelt im Event-Set jeweils zusätzlich 15 % günstiger.
+- Abholung Wesel kostenlos. Musikversand 80 €/Box Hin/Rück. Mit Fotobox kein Versand. Eventzelt oder einzelnes Mischpult: Fracht nur auf Angebot. Lieferung nach Entfernung auf Angebot, Eventzeltmontage 160 € für Auf- und Abbau zusätzlich zur offenen Fahrt.
 
-## Quellen und Preisgrundlage
-
-- Vorhandene Fotoboxpreise/Leistungsmerkmale: https://www.mietmichbox.de/fotobox-mieten
-- Hochwertiges 4×8-m-Zelt als Orientierung, anderer Serviceumfang: https://www.partyverleih-schreiner.de/MIETEQUIPMENT/Partyzelte-Zubehoer/Partyzelt-4x8m/
-- Piktogramme lokal aus Lucide 0.468.0, ISC/Feather MIT: `LICENSE-LUCIDE.txt`; https://lucide.dev/license
-
-Die neuen Zubehör-/Zelttarife und Personalansätze sind eigene anfängliche Kalkulationsannahmen, keine übernommenen Marktpreise. Montage berücksichtigt auch Abbau und reserviert vier Personenstunden zu je 40 €. Die tatsächlichen Logistikbedingungen und Fahrtkosten werden vor einer verbindlichen Bestätigung abgestimmt. Umgebende Website-Inhalte und das bisherige separate Fotoboxformular bleiben für den späteren Website-Umbau erhalten.
+Start- und Endtag zählen mit. Rabatte werden auf die Tagespreissumme angewendet. Erste Musikbox wie bisher auf volle Euro gerundet; zweite genau halb so teuer. Zubehör und Eventzelt auf Cent. Gespeicherte alte Aufträge behalten ihren Preis; Neuberechnung erst nach bewusster Produkt-/Termin-/Abwicklungsänderung durch die Verwaltung. Eine reine Kontaktänderung rechnet nicht neu.
