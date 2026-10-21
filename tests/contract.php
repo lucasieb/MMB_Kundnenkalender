@@ -210,6 +210,9 @@ try {
     [$status]=request('update_booking.php',['id'=>$businessId,'customer_type'=>'private'],true);check($status===200&&$db->query('SELECT company_name FROM bookings WHERE id='.(int)$businessId)->fetchColumn()===null,'Private switch retained company');
 
     $badDelivery=$business;$badDelivery['fulfillment_details_json']['customer_type']='business';$badDelivery['fulfillment_details_json']['company_name']='';[$status]=request('create_booking.php',$badDelivery);check($status===422,'Business delivery without company accepted');
+    $pickupTiming=array_replace($valid,['fulfillment_method'=>'pickup','fulfillment_details_json'=>['method'=>'pickup','preferred_time'=>'08:45','meeting_point'=>'TEST Abholhinweis']]);
+    [$status,$timed]=request('create_booking.php',$pickupTiming,true);check($status===200,'Pickup desired time failed');$timedId=$timed['booking']['id'];$timedRow=$db->query('SELECT * FROM bookings WHERE id='.(int)$timedId)->fetch(PDO::FETCH_ASSOC);check(json_decode($timedRow['fulfillment_details_json'],true)['preferred_time']==='08:45','Pickup time lost');
+    $timeMails=file_get_contents($temp.'/mail-capture.jsonl');check(str_contains($timeMails,'08:45')&&str_contains($timeMails,'TEST Abholhinweis'),'Pickup details missing in mails');
     // New multi-product path: prices come from the server, not the submitted total.
     foreach([
       ['photo'=>'print200'],['tent'=>1,'walls'=>1],['controller'=>1],['package'=>'dj','batteries'=>3,'controller'=>1],['package'=>'party','photo'=>'print700'],['package'=>'event','walls'=>1]
@@ -226,7 +229,7 @@ try {
       foreach(array_slice($captures,-2) as $mail)foreach($order['items'] as $item)check(str_contains($mail[2],$item['quantity'].'× '.$item['label']),'Component missing in mail');
       [$status]=request('update_booking.php',['id'=>$modernId,'billing_city'=>'Neustadt'],true);check($status===200,'Modern contact edit failed');
       [$status]=request('update_booking.php',['id'=>$modernId,'end_date'=>'2030-01-14'],true);check($status===200,'Modern date edit failed');
-      $row=$db->query('SELECT * FROM bookings WHERE id='.(int)$modernId)->fetch(PDO::FETCH_ASSOC);$next=json_decode($row['order_json'],true);check($next['days']===4&&$next['end_date']==='2030-01-14'&&(float)$row['total_amount']===(float)$next['total'],'Date edit did not reprice canonical order');
+      $row=$db->query('SELECT * FROM bookings WHERE id='.(int)$modernId)->fetch(PDO::FETCH_ASSOC);$next=json_decode($row['order_json'],true);check($next['days']===3&&$next['end_date']==='2030-01-14'&&(float)$row['total_amount']===(float)$next['total'],'Date edit did not reprice canonical order');
       [$status]=request('update_booking.php',['id'=>$modernId,'total_amount'=>77.5],true);check($status===200,'Manual price edit failed');
       $row=$db->query('SELECT * FROM bookings WHERE id='.(int)$modernId)->fetch(PDO::FETCH_ASSOC);check((float)json_decode($row['order_json'],true)['manual_total']===77.5,'Manual override not recorded');
       [$status]=request('update_booking.php',['id'=>$modernId,'fulfillment_method'=>'pickup','fulfillment_label'=>'Abholung','total_amount'=>77.5],true);check($status===200&&(float)$db->query('SELECT total_amount FROM bookings WHERE id='.(int)$modernId)->fetchColumn()===77.5,'Repeated unchanged fulfillment reset manual price');

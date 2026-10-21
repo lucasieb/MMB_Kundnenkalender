@@ -440,6 +440,12 @@ function booking_mail_context(array $data): array {
   $fulfillmentInfo = normalize_fulfillment_from_request($data, $fulfillmentDetails, $pricingDetails);
   $fulfillmentLine = !empty($data['order']) ? $data['order']['fulfillment_label'].' — '.$data['order']['fulfillment_note'] : fulfillment_email_line($fulfillmentInfo);
 
+  $method=(string)($fulfillmentInfo['method']??'pickup');
+  if($method!=='shipping'&&is_array($fulfillmentDetails)){
+    $time=(string)($fulfillmentDetails['preferred_time']??'');$hint=(string)($fulfillmentDetails['meeting_point']??'');
+    if($time!=='')$fulfillmentLine.=' · Wunschzeit für '.($method==='pickup'?'Abholung':'Lieferung').' am '.$data['start_date'].': '.$time.' Uhr (wird abgestimmt)';
+    if($hint!=='')$fulfillmentLine.=' · '.($method==='pickup'?'Abholhinweis':'Lieferhinweis').': '.$hint;
+  }
   $startDate = new DateTimeImmutable($data['start_date']);
   $endDate   = new DateTimeImmutable($data['end_date']);
   $startDisp = $startDate->format('d.m.Y');
@@ -810,6 +816,9 @@ try {
     }
   }
   try {booking_delivery_company($fulfillmentDetailsArray??[]);}catch(InvalidArgumentException $e){json_response(['ok'=>false,'error'=>$e->getMessage(),'code'=>'validation'],422);}
+  if($fulfillmentMethod==='shipping'&&is_array($fulfillmentDetailsArray)){unset($fulfillmentDetailsArray['preferred_time'],$fulfillmentDetailsArray['meeting_point']);}
+  if(!empty($fulfillmentDetailsArray['preferred_time'])&&!preg_match('/^([01][0-9]|2[0-3]):[0-5][0-9]$/',(string)$fulfillmentDetailsArray['preferred_time']))json_response(['ok'=>false,'error'=>'Bitte eine gültige Wunschzeit angeben.','code'=>'validation'],422);
+  $fulfillmentDetailsJson=json_encode($fulfillmentDetailsArray,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
   $verificationToken=bin2hex(random_bytes(32));
   $customer['privacy_notice_version']=BOOKING_PRIVACY_VERSION;
   $customer['privacy_acknowledged_at']=date('Y-m-d H:i:s');

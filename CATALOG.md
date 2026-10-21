@@ -1,21 +1,38 @@
-# MietMichBox: zeitabhängige Preise und Buchungsablauf
+# MietMichBox – Buchung und Preise
 
-Stand: 21.10.2026, Preisversion 2026-10-21-v2. Verbindliche Berechnung in `lib/order_quote.php`; gemeinsame Konfiguration in `lib/catalog.php` und `lib/pricing_config.php`. `quote_order.php` liefert Auswahl und alle passenden Zusatzangebote aus derselben Berechnung. Der Browser berechnet keine eigenen Mietpreise.
+Stand 22.10.2026, Preisversion `2026-10-22-v3`. Zentrale Konfiguration: `lib/catalog.php` und `lib/pricing_config.php`; verbindliche Preisberechnung: `lib/order_quote.php`. Der Browser verwendet ausschließlich die Serverangebote, auch für Zusatzausstattung, Produktwechsel und Verlängerungen.
 
-## Ablauf
+## Mietdauer
 
-1. Zeitraum (native Von/Bis-Auswahl), dann Einzelbuchung, DJ-, Party- oder Event-Set. Ab-Preise für den ausgewählten Zeitraum.
-2. Kategorien und Ausstattung. Produktbereiche einzeln aufklappbar; Informationen über den jeweiligen Info-Button. Alle zusätzlichen Mengen, Produktwechsel und Upgrades mit aktuellem Aufpreis.
-3. Abwicklung und optionale Verlängerung um einen oder zwei Tage. Fahrt/Fracht auf Angebot bleibt ausdrücklich separat ausgewiesen.
-4. Kontakt und Rechnungs-/Lieferadresse. Privat oder Gewerblich; bei Gewerbe Unternehmensname verpflichtend, auch bei separater Lieferadresse. Geburtstag freiwillig; Hinweise/Wunschzeit/Anmerkung zunächst zugeklappt.
+Ein Miettag entspricht 24 Stunden, das Rückgabedatum wird nicht als zusätzlicher Miettag berechnet. Freitag bis Samstag = 1 Miettag, Freitag bis Sonntag = 2, Freitag bis Montag = 3. Rückgabe zur gleichen vereinbarten Uhrzeit; eingegebene Wunschzeiten werden persönlich abgestimmt. Datumsgrenzen werden in Europe/Berlin gezählt, ohne eine zusätzliche Berechnung durch Sommer-/Winterzeit. Mietbeginn und Rückgabe müssen verschieden sein, maximal 366 Miettage.
 
-## Preise
+Tagestarife für Musikboxen und Eventzelt richten sich nach den belegten Mietbeginn-Tagen, ohne den Rückgabetag. Der bisherige Mietdauerrabatt gilt weiter (z.B. 2 Tage 20 %, 3 Tage 30 %, 7 Tage 50 %, maximal 70 % ab 30 Tagen).
 
-- Bestehende Tagestarife der drei Musikboxen und Mietdauerrabatte bleiben erhalten. Zweite SOUNDBOKS kostet genau 50 % der für den Zeitraum berechneten ersten Box; maximal zwei.
-- Stativ: 5 €/Tag/Stück, Mikrofon: 9 €/Tag/Stück (maximal zwei), Akku: 15 €/Tag/Stück (maximal drei), Rucksack: 9 €/Tag (maximal einer), DDJ-FLX4: 19 €/Tag (maximal einer, auch einzeln). Für alle gilt derselbe Mietdauerrabatt wie für Musikboxen. Akku/Rucksack und zweite Box nur für SOUNDBOKS.
-- Eventzelt: 99 €/Tag Montag–Donnerstag, 129 €/Tag Freitag–Sonntag, gleicher Mietdauerrabatt. Seitenwände einmalig 20 €.
-- Fotobox-Pakete bleiben unverändert: Digital 139 €, Print 200 219 €, Print 700 295 € für bis zu fünf Kalendertage; danach 40 €/Tag. Die Differenzen werden für den tatsächlichen Zeitraum angezeigt.
-- Sets: zwei SOUNDBOKS, zwei Stative inklusive. Mischpult optional, beim erstmaligen Setwechsel vorausgewählt und entfernbar. Kein zusätzlicher pauschaler Musikrabatt neben dem Halbpreis der zweiten Box. Fotobox im Party-/Event-Set und Eventzelt im Event-Set jeweils zusätzlich 15 % günstiger.
-- Abholung Wesel kostenlos. Musikversand 80 €/Box Hin/Rück. Mit Fotobox kein Versand. Eventzelt oder einzelnes Mischpult: Fracht nur auf Angebot. Lieferung nach Entfernung auf Angebot, Eventzeltmontage 160 € für Auf- und Abbau zusätzlich zur offenen Fahrt.
+## Ausstattung und Preise
 
-Start- und Endtag zählen mit. Rabatte werden auf die Tagespreissumme angewendet. Erste Musikbox wie bisher auf volle Euro gerundet; zweite genau halb so teuer. Zubehör und Eventzelt auf Cent. Gespeicherte alte Aufträge behalten ihren Preis; Neuberechnung erst nach bewusster Produkt-/Termin-/Abwicklungsänderung durch die Verwaltung. Eine reine Kontaktänderung rechnet nicht neu.
+- Musikboxen: bestehende Tagestarife unverändert. Erste Box wie bisher auf volle Euro gerundet. Zweite SOUNDBOKS 4 kostet für denselben Zeitraum genau die Hälfte der ersten. Zweite Box nur bei SOUNDBOKS, maximal zwei insgesamt.
+- Stativ 5 €/Miettag/Stück (maximal zwei), Mikrofon 9 € (maximal zwei), Zusatzakku 15 € (maximal drei), SOUNDBOKS-Rucksack 9 € (maximal einer), Pioneer DDJ-FLX4 19 € (maximal einer, auch einzeln). Gleicher Mietdauerrabatt wie Musikboxen. Akku und Rucksack nur bei SOUNDBOKS.
+- Fotobox: Digital 139 €, Print 200 219 €, Print 700 295 €, unverändert für bis zu fünf Miettage. Jeder weitere Tag 40 € vor Mietdauerrabatt; Rabatt wird nur auf die zusätzlichen Tage angewendet, der Paketgrundpreis bleibt erhalten. Beispiel Digital für 7 Tage: 139 € + 2 × 40 € × 50 % = 179 €.
+- Eventzelt 4 × 8 m: 99 €/Miettag Montag–Donnerstag, 129 € Freitag–Sonntag; gleicher Mietdauerrabatt. Seitenwände einmalig 20 €.
+
+## Sparsets
+
+- DJ-Set: zwei SOUNDBOKS und zwei Stative, Mischpult optional und vorausgewählt; 10 % Setvorteil.
+- Party-Set: DJ-Ausstattung plus Fotobox Digital; 15 % Setvorteil.
+- Event-Set: Party-Ausstattung plus Eventzelt; 20 % Setvorteil.
+
+Vergleich immer mit exakt derselben einzeln gebuchten Ausstattung nach Mietdauer- und Zweitboxrabatt, einschließlich Stative und gewählter Extras. Setprozente gelten auf die Mietausstattung, anschließend wird der Set-Mietpreis zugunsten des Kunden auf volle Euro abgerundet. Keine zusätzlichen pauschalen Fotobox-/Eventzelt-Setrabatte aus älteren Preisversionen. Transport und Montage erhalten keinen Setrabatt. Jede Position bleibt im Auftrag nachvollziehbar; die Summe der Positionen entspricht dem Gesamtpreis.
+
+## Abwicklung und Daten
+
+Abholung in Wesel kostenlos. Musikversand 80 €/Box Hin/Rück. Kein Versand mit Fotobox. Eventzelt oder einzelnes Mischpult: Fracht nur auf Angebot. Lieferung nach Entfernung auf Angebot; Eventzeltmontage 160 € für Auf- und Abbau, Fahrt zusätzlich. Geplante Zustellung spätestens zum Mietbeginn, normalerweise ein bis zwei Tage vorher; Termin wird bestätigt.
+
+Rechnungsadresse immer erforderlich. Bei Lieferung eigene Lieferadresse oder dieselbe wie Rechnungsadresse; bei Versand entsprechend Versandadresse. Privat/Gewerblich wird für separate Adresse übernommen, Unternehmensname bei Gewerbe erforderlich. Bei Abholung keine Zustelladresse. Abholung/Lieferung: Wunschzeit und optionaler Abhol-/Lieferhinweis sichtbar, Speicherung in Abwicklungsdetails und E-Mails. Bei Versand keine Wunschzeit und kein entsprechender Hinweis; alte Formularreste werden serverseitig entfernt. Anmerkung und Geburtstag freiwillig.
+
+## Bedienung und Historie
+
+Ein gemeinsamer Kalender für Von/Bis: erster Klick Beginn, zweiter späterer Klick Rückgabe. Früherer zweiter Klick setzt neuen Beginn; danach weiteren Endtag wählen. Wiederöffnen zeigt vorherige Auswahl, neue Klickfolge beginnt einen neuen Zeitraum. Geburtstag mit eigenem Kalender und Monat-/Jahrauswahl.
+
+Sparsets oberhalb der vier kombinierbaren Einzelprodukte. Ausstattung einzeln auf-/zuklappbar; neue Auswahl schließt andere Bereiche nicht. Set- und Einzelprodukt-Ergänzungen im zweiten Schritt. +1/+2/+3 Tage als reversible Auswahl mit festem Ausgangsdatum, keine unbemerkte Akkumulation. Beliebige Datumsänderung bleibt im aktuellen Schritt. Feste Navigation unter dem scrollbaren Inhalt; rechts durchgehende Trennlinie zur Auswahlübersicht, auf Handys gemeinsame Inhaltsrolle.
+
+Bestehende Buchungen behalten gespeicherte Preise und bisherige Mietdauerdefinition. Reine Kontaktbearbeitung berechnet nicht neu. Erst bewusste Termin-/Produkt-/Abwicklungsänderungen werden mit der neuen Preisliste berechnet und vor dem Speichern angezeigt.

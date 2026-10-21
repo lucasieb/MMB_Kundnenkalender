@@ -1316,7 +1316,7 @@
         return safe.toLocaleString('de-DE', {minimumFractionDigits:0, maximumFractionDigits:2}) + ' €';
       }
       fulfillmentEmailLine(b){
-        if(b.order)return b.order.fulfillment_label+' — '+b.order.fulfillment_note;
+        if(b.order){const details=b.fulfillment_details||{};return b.order.fulfillment_label+' — '+b.order.fulfillment_note+(b.fulfillment_method!=='shipping'&&details.preferred_time?' · Wunschzeit: '+details.preferred_time+' Uhr (wird abgestimmt)':'')+(b.fulfillment_method!=='shipping'&&details.meeting_point?' · Hinweis: '+details.meeting_point:'');}
         const info = this.getFulfillmentInfo(b);
         if(info.method==='pickup'){
           return info.priceDelta>0 ? `${info.full} +${this.formatEuro(info.priceDelta)}` : `${info.full} (gratis)`;
@@ -1530,15 +1530,15 @@
                 </div>
               </div>
 
-              <div class="mmb-detail-section" data-fulfillment-section="delivery" ${currentFulfillmentMethod.startsWith('delivery')?'':'hidden'}>
-                <h3>Lieferdetails</h3>
+              <div class="mmb-detail-section" data-fulfillment-section="delivery" ${currentFulfillmentMethod!=='shipping'?'':'hidden'}>
+                <h3 data-timing-title>${currentFulfillmentMethod==='pickup'?'Abholdetails':'Lieferdetails'}</h3>
                 <div class="mmb-detail-grid">
                   <div class="mmb-detail-field">
-                    <label>Treffpunkt oder Adresse</label>
+                    <label data-timing-hint>${currentFulfillmentMethod==='pickup'?'Abholhinweis':'Lieferhinweis'}</label>
                     <textarea name="delivery_meeting_point">${this.escape(fulfillmentDetails.meeting_point || '')}</textarea>
                   </div>
                   <div class="mmb-detail-field">
-                    <label>Bevorzugte Uhrzeit</label>
+                    <label data-timing-label>Wunschzeit für ${currentFulfillmentMethod==='pickup'?'Abholung':'Lieferung'} am ${this.escape(booking.start_date)}</label>
                     <select name="delivery_preferred_time">${preferredOptionsHtml}</select>
                   </div>
                 </div>
@@ -1677,12 +1677,14 @@
         const updateFulfillmentUI = ()=>{
           if(!fulfillmentSelect) return;
           const method = fulfillmentSelect.value;
+          const timingTitle=form.querySelector('[data-timing-title]'),timingHint=form.querySelector('[data-timing-hint]'),timingLabel=form.querySelector('[data-timing-label]');
+          if(timingTitle)timingTitle.textContent=method==='pickup'?'Abholdetails':'Lieferdetails';if(timingHint)timingHint.textContent=method==='pickup'?'Abholhinweis':'Lieferhinweis';if(timingLabel)timingLabel.textContent='Wunschzeit für '+(method==='pickup'?'Abholung':'Lieferung')+' am '+(form.elements.start_date?.value||booking.start_date);
           detailSections.forEach(section=>{
             const target = section.dataset.fulfillmentSection;
             if(target==='extended' || target==='address'){
               section.hidden = !(method==='shipping' || method.startsWith('delivery'));
             }else{
-              section.hidden = target==='delivery'?!method.startsWith('delivery'):target!==method;
+              section.hidden = target==='delivery'?method==='shipping':target!==method;
             }
           });
           if(hintEl){
@@ -2287,7 +2289,7 @@
           if(extra) payload.address_extra = extra;
         }
 
-        if(method.startsWith('delivery')){
+        if(method!=='shipping'){
           const meeting = getValue('delivery_meeting_point');
           const preferred = getValue('delivery_preferred_time');
           if(meeting) payload.meeting_point = meeting;
