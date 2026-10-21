@@ -37,7 +37,7 @@ function mmb_order_options(array $cart,string $start,string $end,string $method,
     }
     if($cart['photo'])foreach(['digital','print200','print700']as$id){$v=$cart;$v['photo']=$id;$q=$price($v);$line=array_values(array_filter($q['items'],fn($x)=>$x['category']==='photo'))[0];$options['photos'][$id]=['delta'=>round($q['total']-$total,2),'total'=>$line['total']];}
     if($cart['speaker']&&$cart['package']==='single')foreach([3,1,2]as$id){$v=$cart;$v['speaker']=$id;if($id!==3){$v['speaker_qty']=1;$v['batteries']=0;$v['backpack']=0;$v['stands']=min(1,(int)$v['stands']);}$options['speakers'][$id]=round($price($v)['total']-$total,2);}
-    foreach(['dj','party','event']as$id){$v=$cart;$v['package']=$id;if(in_array($id,['party','event'],true)&&!$v['photo'])$v['photo']='digital';if($id==='event')$v['tent']=1;$options['upgrades'][$id]=round($price($v)['total']-$total,2);}
+    foreach(['dj','party','event']as$id){$v=$cart;$v['package']=$id;if($cart['package']==='single'&&!$v['controller'])$v['controller']=1;if(in_array($id,['party','event'],true)&&!$v['photo'])$v['photo']='digital';if($id==='event')$v['tent']=1;$options['upgrades'][$id]=round($price($v)['total']-$total,2);}
     if($quote){
         $extensionBase=$extensionBase??$end;
         $baseQuote=$price($cart,$extensionBase);

@@ -37,3 +37,5 @@ foreach([['2030-01-07','2030-01-07'],['2030-02-30','2030-03-01'],['2030-01-08','
 echo 'PASS: '.$count." combinations, 24-hour boundaries, DST, half-price second speaker, 10/15/20 percent exact basket comparisons, rounded sets, photo package duration, extension anchors, fulfillment and invalid carts\n";
 
 assert_order(is_numeric($empty['offers']['packages']['single']),'Standalone minimum must not be overwritten by set metadata');foreach(['dj','party','event']as$id)assert_order(is_numeric($empty['offers']['packages'][$id]['total'])&&$empty['offers']['packages'][$id]['saving_percent']===$c['set_discounts'][$id],'Set offer metadata invalid');
+
+$upgrade=mmb_order_options(['speaker'=>3],'2030-01-11','2030-01-14','pickup');$dj=mmb_order_quote(['package'=>'dj','controller'=>1],'2030-01-11','2030-01-14');assert_order($upgrade['offers']['upgrades']['dj']===$dj['total']-$upgrade['quote']['total'],'Upgrade offer must include the preselected optional controller');
