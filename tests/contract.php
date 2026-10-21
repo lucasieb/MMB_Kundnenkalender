@@ -218,6 +218,7 @@ try {
       $row=$db->query('SELECT * FROM bookings WHERE id='.(int)$modernId)->fetch(PDO::FETCH_ASSOC);$next=json_decode($row['order_json'],true);check($next['days']===4&&$next['end_date']==='2030-01-14'&&(float)$row['total_amount']===(float)$next['total'],'Date edit did not reprice canonical order');
       [$status]=request('update_booking.php',['id'=>$modernId,'total_amount'=>77.5],true);check($status===200,'Manual price edit failed');
       $row=$db->query('SELECT * FROM bookings WHERE id='.(int)$modernId)->fetch(PDO::FETCH_ASSOC);check((float)json_decode($row['order_json'],true)['manual_total']===77.5,'Manual override not recorded');
+      [$status]=request('update_booking.php',['id'=>$modernId,'fulfillment_method'=>'pickup','fulfillment_label'=>'Abholung','total_amount'=>77.5],true);check($status===200&&(float)$db->query('SELECT total_amount FROM bookings WHERE id='.(int)$modernId)->fetchColumn()===77.5,'Repeated unchanged fulfillment reset manual price');
       $altered=$payload;$altered['quoted_total']=0.01;[$status]=request('create_booking.php',$altered,true);check($status===409,'Stale/tampered quoted total accepted');
       $altered=$payload;$altered['cart']=['photo'=>'digital'];$altered['fulfillment_method']='shipping';[$status]=request('create_booking.php',$altered,true);check($status===422,'Photo shipping accepted');
     }

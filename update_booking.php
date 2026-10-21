@@ -71,7 +71,8 @@ try {
   unset($data['order_json'],$data['package_id']); // Canonical components are generated exclusively from a validated cart.
   $oldOrder=json_decode((string)($existing['order_json']??''),true);
   if($oldOrder){
-    $changed=isset($data['cart'])||array_intersect(['start_date','end_date','fulfillment_method','box_id'],array_keys($data));
+    $changed=isset($data['cart']);
+    foreach(['start_date','end_date','fulfillment_method','box_id'] as $field)if(array_key_exists($field,$data)&&(string)$data[$field]!==(string)$existing[$field])$changed=true;
     if($changed){
       $cart=isset($data['cart'])?mmb_order_decode($data['cart']):$oldOrder['cart'];
       if(array_key_exists('box_id',$data)&&!isset($data['cart'])&&(int)$data['box_id']!==(int)$existing['box_id'])throw new InvalidArgumentException('Produkte bitte im Ausstattungsbereich ändern.');
@@ -86,6 +87,9 @@ try {
       unset($data['fulfillment_details']);
       $data['order_json']=$order;
     }elseif(isset($data['total_amount'])){$oldOrder['manual_total']=(float)$data['total_amount'];$data['order_json']=$oldOrder;}
+    $activeOrder=$data['order_json']??$oldOrder;
+    // A repeated method field or display label must not trigger a recalculation or overwrite manual totals.
+    foreach(['fulfillment_label'=>'fulfillment_label','fulfillment_note'=>'fulfillment_note','fulfillment_price_delta'=>'shipping_delta'] as $field=>$orderKey)if(array_key_exists($field,$data))$data[$field]=$activeOrder[$orderKey];
   }elseif(isset($data['cart']))throw new InvalidArgumentException('Diese Altbuchung wird weiterhin über ihre bisherigen Felder verwaltet.');
   if(isset($data['status'])&&!in_array($data['status'],['pending','confirmed','rejected','cancelled'],true))throw new InvalidArgumentException('Ungültiger Status.');
   $nextStart=(string)($data['start_date']??$existing['start_date']);$nextEnd=(string)($data['end_date']??$existing['end_date']);
