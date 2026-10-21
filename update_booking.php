@@ -105,6 +105,10 @@ try {
   mmb_order_date($nextStart);mmb_order_date($nextEnd);if($nextEnd<$nextStart)throw new InvalidArgumentException('Enddatum liegt vor Beginn.');
   foreach(['total_amount','deposit_eur','fulfillment_price_delta'] as $number)if(isset($data[$number])&&(!is_numeric($data[$number])||(float)$data[$number]<0||!is_finite((float)$data[$number])))throw new InvalidArgumentException('Ungültiger Betrag.');
 
+  if(array_key_exists('fulfillment_details_json',$data)||array_key_exists('fulfillment_details',$data)){
+    $delivery=$data['fulfillment_details_json']??$data['fulfillment_details'];$delivery=is_array($delivery)?$delivery:json_decode((string)$delivery,true);
+    booking_delivery_company($delivery??[]);
+  }
   // Whitelist erlaubter Felder
   $allow = ['order_json','package_id','customer_type','company_name','customer_name','customer_email','customer_phone','billing_address_line1','billing_postal_code','billing_city','customer_birthdate','box_id','start_date','end_date','status','total_amount','fulfillment_method','fulfillment_label','fulfillment_note','fulfillment_price_delta','note','deposit_eur','pricing_details_json','pricing_details','fulfillment_details_json','fulfillment_details'];
   $columns = bookings_columns($pdo);

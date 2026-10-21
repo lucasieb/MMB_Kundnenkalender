@@ -4,6 +4,7 @@ require_once __DIR__.'/order_quote.php';
 /** All displayed offers use canonical quotes, including rounding and shipping restrictions. */
 function mmb_order_options(array $cart,string $start,string $end,string $method): array {
     $base=['package'=>'single','speaker'=>0,'speaker_qty'=>0,'photo'=>'','tent'=>0,'walls'=>0,'stands'=>0,'microphone'=>0,'batteries'=>0,'backpack'=>0,'controller'=>0];
+    if(!array_key_exists('speaker_qty',$cart)&&!empty($cart['speaker']))$cart['speaker_qty']=1;
     $cart=array_merge($base,$cart);
     $quote=null;
     try{$quote=mmb_order_quote($cart,$start,$end,$method);}catch(InvalidArgumentException $e){

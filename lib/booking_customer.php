@@ -45,3 +45,11 @@ function booking_customer_fields(array $input, bool $partial = false): array {
  }
  return $fields;
 }
+
+/** Additional company information follows the same bounds as billing data. */
+function booking_delivery_company(array $details): void {
+ if(isset($details['customer_type'])&&!in_array($details['customer_type'],['private','business'],true))throw new InvalidArgumentException('Ungültiger Kundentyp der Lieferadresse.');
+ $value=$details['company_name']??'';
+ if(!is_scalar($value)||mb_strlen((string)$value)>200||preg_match('/[\x00-\x1F\x7F]/u',(string)$value))throw new InvalidArgumentException('Bitte einen gültigen Unternehmensnamen der Lieferadresse angeben.');
+ if(($details['customer_type']??'private')==='business'&&trim((string)$value)==='')throw new InvalidArgumentException('Bitte den Unternehmensnamen der Lieferadresse angeben.');
+}

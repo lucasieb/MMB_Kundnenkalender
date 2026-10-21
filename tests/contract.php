@@ -209,6 +209,7 @@ try {
     [$status]=request('update_booking.php',['id'=>$businessId,'company_name'=>''],true);check($status===422,'Empty business company update accepted');
     [$status]=request('update_booking.php',['id'=>$businessId,'customer_type'=>'private'],true);check($status===200&&$db->query('SELECT company_name FROM bookings WHERE id='.(int)$businessId)->fetchColumn()===null,'Private switch retained company');
 
+    $badDelivery=$business;$badDelivery['fulfillment_details_json']['customer_type']='business';$badDelivery['fulfillment_details_json']['company_name']='';[$status]=request('create_booking.php',$badDelivery);check($status===422,'Business delivery without company accepted');
     // New multi-product path: prices come from the server, not the submitted total.
     foreach([
       ['photo'=>'print200'],['tent'=>1,'walls'=>1],['controller'=>1],['package'=>'dj','batteries'=>3,'controller'=>1],['package'=>'party','photo'=>'print700'],['package'=>'event','walls'=>1]

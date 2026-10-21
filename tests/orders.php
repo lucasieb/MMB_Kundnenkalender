@@ -40,3 +40,5 @@ $empty=mmb_order_options([],'2030-01-07','2030-01-09','pickup');assert_order($em
 $party=mmb_order_quote(['package'=>'party'],'2030-01-07','2030-01-07');$line=array_values(array_filter($party['items'],fn($x)=>$x['category']==='photo'))[0];assert_order($line['total']===118.15,'Photobox set advantage must be 15 percent');
 expect_invalid(fn()=>mmb_order_quote(['speaker'=>3,'microphone'=>3],'2030-01-07','2030-01-07'),'third microphone');
 echo "PASS: second speaker half price, daily accessory discounts, 2 microphones, dynamic offers and extensions, 15 percent set advantage\n";
+
+assert_order(mmb_order_options(['speaker'=>3],'2030-01-07','2030-01-07','pickup')['quote']['total']===34.0,'Partial speaker cart must retain default quantity');

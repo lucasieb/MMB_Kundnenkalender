@@ -809,6 +809,7 @@ try {
       if (empty($fulfillmentDetailsArray[$key]) || !is_scalar($fulfillmentDetailsArray[$key]) || strlen((string)$fulfillmentDetailsArray[$key])>400) json_response(['ok'=>false,'error'=>'Bitte eine vollständige Zieladresse angeben.','code'=>'validation'],422);
     }
   }
+  try {booking_delivery_company($fulfillmentDetailsArray??[]);}catch(InvalidArgumentException $e){json_response(['ok'=>false,'error'=>$e->getMessage(),'code'=>'validation'],422);}
   $verificationToken=bin2hex(random_bytes(32));
   $customer['privacy_notice_version']=BOOKING_PRIVACY_VERSION;
   $customer['privacy_acknowledged_at']=date('Y-m-d H:i:s');
