@@ -466,6 +466,8 @@ function build_submission_mail(array $data): array {
   $range     = $ctx['range'];
   $totalDisp = $ctx['totalDisp'];
   $fulfillment = $ctx['fulfillment'];
+  $delivery=$ctx['fulfillment_details']??[];
+  $deliveryLine=implode(', ',array_filter([$delivery['company_name']??'', $delivery['contact_name']??'', $delivery['address_line1']??'',trim(($delivery['postal_code']??'').' '.($delivery['city']??''))]));
 
   $subject = "Deine Buchungsanfrage ist eingegangen – Buchungs-ID: {$data['display_id']}";
 
@@ -482,6 +484,7 @@ Deine Buchung im Überblick:
 Ausstattung: {$boxName}
 🕰️ Zeitraum: {$range}
 🚚 Abwicklung: {$fulfillment}
+Lieferadresse: {$deliveryLine}
 💶 Mietsumme: {$totalDisp}
 
 Bitte bestätige innerhalb von 48 Stunden deine E-Mail-Adresse:
@@ -525,7 +528,7 @@ function build_internal_submission_mail(array $data): array {
   $extraHtmlLines = [];
   $method = is_array($fulfillmentInfo) ? ($fulfillmentInfo['method'] ?? null) : null;
 
-  if (in_array($method, ['shipping', 'delivery'], true) && is_array($fulfillmentDetails)) {
+  if (in_array($method, ['shipping', 'delivery', 'delivery_setup'], true) && is_array($fulfillmentDetails)) {
     $escHtml = static function (string $value): string {
       return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     };

@@ -11,6 +11,7 @@ function mmb_order_options(array $cart,string $start,string $end,string $method)
         if($cart['speaker']||$cart['photo']||$cart['tent']||$cart['controller'])throw $e;
         mmb_order_date($start);mmb_order_date($end);
     }
+    if($quote)$cart=$quote['cart'];
     $total=$quote['total']??0;
     $price=function(array $candidate,?string $until=null)use($start,$end,$method):array{
         $safeMethod=$method==='shipping'&&!empty($candidate['photo'])?'pickup':$method;

@@ -214,7 +214,7 @@ try {
       ['photo'=>'print200'],['tent'=>1,'walls'=>1],['controller'=>1],['package'=>'dj','batteries'=>3,'controller'=>1],['package'=>'party','photo'=>'print700'],['package'=>'event','walls'=>1]
     ] as $cart){
       [$status,$quote]=request('quote_order.php',['cart'=>$cart,'start_date'=>'2030-01-11','end_date'=>'2030-01-13']);
-      check($status===200&&$quote['ok'],'Public quote failed');$q=$quote['quote'];
+      check($status===200&&$quote['ok'],'Public quote failed: '.json_encode($cart).' '.json_encode($quote));$q=$quote['quote'];
       $payload=array_replace($valid,['cart'=>$cart,'start_date'=>'2030-01-11','end_date'=>'2030-01-13','total_amount'=>0.01,'quoted_total'=>$q['total'],'quote_version'=>$q['version']]);unset($payload['box_id']);
       [$status,$modern]=request('create_booking.php',$payload,true);
       check($status===200&&$modern['ok'],'Modern creation failed: '.json_encode($modern));$modernId=$modern['booking']['id'];
