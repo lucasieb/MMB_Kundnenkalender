@@ -134,7 +134,7 @@
     const FULFILLMENT_CHOICES = [
       { id:'pickup',   label:'Abholung', full:'Abholung in Wesel', note:'', priceDelta:0, addsToTotal:true },
       { id:'shipping', label:'Versand',  full:'Versand (deutschlandweit)', note:'inkl. Express-Hin- & Rückversand sowie Vorbereitungspauschale', priceDelta:80, addsToTotal:true },
-      { id:'delivery_setup', label:'Lieferung und Montage', full:'Lieferung und Montage', note:'Fahrt, Aufbau mit zwei Personen und Abbau auf Angebot', priceDelta:0, addsToTotal:false },
+      { id:'delivery_setup', label:'Lieferung und Montage', full:'Lieferung und Montage', note:'Auf- und Abbau 160 € enthalten; Lieferfahrt zusätzlich auf Angebot', priceDelta:0, addsToTotal:false },
       { id:'delivery', label:'Lieferung', full:'Lieferung (NRW-weit)', note:'zzgl. individueller Lieferpauschale – wir melden uns mit einem Angebot', priceDelta:0, addsToTotal:false },
       { id:'unknown', label:'Nicht erfasst', full:'Nicht erfasst', note:'Bei älteren Anfragen wurde die Abwicklung nicht gespeichert. Bitte mit der Kundschaft klären.', priceDelta:0, addsToTotal:false }
     ];
@@ -518,7 +518,7 @@
           </select>
           <select aria-label="Produkt oder Paket filtern" id="filter-box-${this.instanceId}">
             <option value="">Produkte: Alle</option>
-            ${[['photo','Fotobox'],['tent','Zelt'],['controller','DJ-Mischpult'],['dj','DJ-Set'],['party','Party-Set'],['event','Event-Set']].map(([id,name])=>`<option value="${id}" ${f.box===id?'selected':''}>${name}</option>`).join('')}
+            ${[['photo','Fotobox'],['tent','Eventzelt'],['controller','DJ-Mischpult'],['dj','DJ-Set'],['party','Party-Set'],['event','Event-Set']].map(([id,name])=>`<option value="${id}" ${f.box===id?'selected':''}>${name}</option>`).join('')}
             ${this.state.boxes.map(b=>`<option value="${b.id}" ${f.box===b.id?'selected':''}>${b.name}</option>`).join('')}
           </select>
           <input id="filter-id-${this.instanceId}" aria-label="Buchungs-ID suchen" inputmode="numeric" pattern="[0-9]*" placeholder="ID (z. B. 00123)" value="${this.escape(f.id)}"/>
@@ -1600,7 +1600,7 @@
 
         const form = overlay.querySelector('form');
         if(!form) return;
-        const fieldIcons={status:'circle-check',box_id:'speaker',start_date:'calendar',end_date:'calendar',customer_name:'user',customer_email:'mail',customer_phone:'phone',billing_address_line1:'house',billing_postal_code:'map-pin',billing_city:'map-pin',customer_birthdate:'cake',fulfillment_method:'truck',fulfillment_note:'info'};
+        const fieldIcons={customer_type:'user',company_name:'house',shipping_company_name:'house',status:'circle-check',box_id:'speaker',start_date:'calendar',end_date:'calendar',customer_name:'user',customer_email:'mail',customer_phone:'phone',billing_address_line1:'house',billing_postal_code:'map-pin',billing_city:'map-pin',customer_birthdate:'cake',fulfillment_method:'truck',fulfillment_note:'info'};
         form.querySelectorAll('.mmb-detail-field').forEach((field,index)=>{
           const input=field.querySelector('input,select,textarea'),label=field.querySelector('label');
           if(!input||!label||label.querySelector('input'))return;
