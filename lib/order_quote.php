@@ -23,7 +23,7 @@ function mmb_order_quote(array $input,string $start,string $end,string $method='
     $photo=(string)($input['photo']??'');
     if($photo!==''&&!isset($c['photo'][$photo])) throw new InvalidArgumentException('Unbekanntes Fotobox-Paket.');
     $tent=mmb_order_int($input,'tent',0,1);$walls=mmb_order_int($input,'walls',0,1);
-    $stands=mmb_order_int($input,'stands',0,2);$microphone=mmb_order_int($input,'microphone',0,1);
+    $stands=mmb_order_int($input,'stands',0,2);$microphone=mmb_order_int($input,'microphone',0,2);
     $batteries=mmb_order_int($input,'batteries',0,3);$backpack=mmb_order_int($input,'backpack',0,1);$controller=mmb_order_int($input,'controller',0,1);
     if($package!=='single') {$speaker=3;$quantity=2;$stands=2;}
     if(in_array($package,['party','event'],true)&&$photo==='') $photo='digital';
@@ -42,23 +42,34 @@ function mmb_order_quote(array $input,string $start,string $end,string $method='
         $before=round($before,2);$after=round($after,2);$original+=$before;$discount+=$before-$after;
         $lines[]=['id'=>$id,'label'=>$label,'category'=>$category,'quantity'=>$qty,'original'=>$before,'total'=>$after,'basis'=>$basis];
     };
-    $durationDiscount=0.0;
+    $durationDiscount=(float)$c['pricing']['discountsByDay'][min(30,$days)];
+    $factor=1-$durationDiscount/100;
     if($speaker){
         $base=0.0;$keys=['so','mo','di','mi','do','fr','sa'];
-        for($date=$s;$date<=$e;$date=$date->modify('+1 day'))$base+=(float)$c['pricing']['boxes'][(string)$speaker]['prices'][$keys[(int)$date->format('w')]]*$quantity;
-        $durationDiscount=(float)$c['pricing']['discountsByDay'][min(30,$days)];
-        $net=round($base*(1-$durationDiscount/100),0,PHP_ROUND_HALF_UP);
-        if($package!=='single')$net=round($net*(1-$c['set_music_discount_percent']/100),2);
-        $add('speaker-'.$speaker,$c['pricing']['boxes'][(string)$speaker]['name'],'music',$quantity,$base,$net,$days.' Kalendertag(e) · '.$durationDiscount.' % Mietdauerrabatt'.($package!=='single'?' + 10 % Setvorteil':''));
+        for($date=$s;$date<=$e;$date=$date->modify('+1 day'))$base+=(float)$c['pricing']['boxes'][(string)$speaker]['prices'][$keys[(int)$date->format('w')]];
+        // Preserve the established first-speaker rounding, then charge exactly half for the second.
+        $first=round($base*$factor,0,PHP_ROUND_HALF_UP);
+        $net=$first*($quantity===2?1.5:1);
+        $add('speaker-'.$speaker,$c['pricing']['boxes'][(string)$speaker]['name'],'music',$quantity,$base*$quantity,$net,$days.' Kalendertag(e) · '.$durationDiscount.' % Mietdauerrabatt'.($quantity===2?' · zweite SOUNDBOKS zum halben Preis':''));
     }
     foreach(['stands'=>$stands,'microphone'=>$microphone,'batteries'=>$batteries,'backpack'=>$backpack,'controller'=>$controller] as $id=>$qty){
-        if(!$qty)continue;$x=$c['extras'][$id];$base=($id==='controller'&&$speaker?$x['with_music']:$x['price'])+$x['extra_day']*max(0,$days-3);
+        if(!$qty)continue;$x=$c['extras'][$id];$base=$x['price']*$days*$qty;
         $included=$id==='stands'&&$package!=='single';
-        $add($id,$x['name'],'accessory',$qty,$included?0:$base*$qty,$included?0:$base*$qty,$included?'Im Set enthalten':'Bis 3 Tage inklusive; danach +'.$x['extra_day'].' € je Stück/Tag');
+        $add($id,$x['name'],'accessory',$qty,$included?0:$base,$included?0:round($base*$factor,2),$included?'Im Set enthalten':$days.' Kalendertag(e) · '.$durationDiscount.' % Mietdauerrabatt');
     }
-    if($photo!==''){$base=$c['photo'][$photo]['price']+max(0,$days-$c['photo_included_days'])*$c['photo_extra_day'];$net=$base-(in_array($package,['party','event'],true)?$c['set_photo_discount']:0);$add('photo-'.$photo,'Fotobox '.$c['photo'][$photo]['name'],'photo',1,$base,$net,'Bis 5 Kalendertage; danach +40 €/Tag');$lines[count($lines)-1]['included']=array_merge(['Fotobox','Stativ','Requisiten','Unbegrenzt Fotos','Fotocloud-Download 60 Tage'],$photo==='digital'?[]:['Drucker',$photo==='print200'?'200 Ausdrucke, 2 Layouts':'700 Ausdrucke, 3 Layouts','Formate 5×15 / 10×15 cm, Filter']);}
-    if($tent){$base=$c['tent']['first_day']+($days-1)*$c['tent']['extra_day'];$add('tent',$c['tent']['name'],'tent',1,$base,$base-($package==='event'?$c['event_tent_discount']:0),'1. Tag 99 €, jeder weitere Tag 25 €');if($walls)$add('walls','Seitenwände für das Zelt','accessory',1,$c['tent']['walls'],$c['tent']['walls'],'Einmalig je Miete');}
-    if($method==='delivery_setup'){$assembly=$c['assembly_setup']+$c['assembly_teardown'];$add('assembly','Zelt Auf- und Abbau','service',1,$assembly,$assembly,'Aufbau 80 € + Abbau 80 €; je 2 Personen × ca. 1 Stunde');}
+    if($photo!==''){
+        $base=$c['photo'][$photo]['price']+max(0,$days-$c['photo_included_days'])*$c['photo_extra_day'];
+        $net=$base*(in_array($package,['party','event'],true)?1-$c['set_photo_discount_percent']/100:1);
+        $add('photo-'.$photo,'Fotobox '.$c['photo'][$photo]['name'],'photo',1,$base,$net,'Paketpreis für den gewählten Zeitraum'.(in_array($package,['party','event'],true)?' · 15 % Setvorteil':''));
+        $lines[count($lines)-1]['included']=array_merge(['Fotobox','Stativ','Requisiten','Unbegrenzt Fotos','Fotocloud-Download 60 Tage'],$photo==='digital'?[]:['Drucker',$photo==='print200'?'200 Ausdrucke, 2 Layouts':'700 Ausdrucke, 3 Layouts','Formate 5×15 / 10×15 cm, Filter']);
+    }
+    if($tent){
+        $base=0.0;for($date=$s;$date<=$e;$date=$date->modify('+1 day'))$base+=(float)$c['tent'][(int)$date->format('N')>=5?'weekend':'weekday'];
+        $net=round($base*$factor,2);if($package==='event')$net=round($net*(1-$c['event_tent_discount_percent']/100),2);
+        $add('tent',$c['tent']['name'],'tent',1,$base,$net,$days.' Kalendertag(e) · '.$durationDiscount.' % Mietdauerrabatt'.($package==='event'?' · 15 % Setvorteil':''));
+        if($walls)$add('walls','Seitenwände für das Eventzelt','accessory',1,$c['tent']['walls'],$c['tent']['walls'],'Einmalig je Miete');
+    }
+    if($method==='delivery_setup'){$assembly=$c['assembly_setup']+$c['assembly_teardown'];$add('assembly','Eventzelt Auf- und Abbau','service',1,$assembly,$assembly,'Aufbau 80 € + Abbau 80 €; je 2 Personen × ca. 1 Stunde');}
     $rental=round(array_sum(array_column($lines,'total')),2);
     $shipping=$method==='shipping'&&!$tent?$c['shipping_per_speaker']*max(1,$quantity):0;
     // Standalone controller shipping needs a freight offer, rather than assuming a speaker parcel.

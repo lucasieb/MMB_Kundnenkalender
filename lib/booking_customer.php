@@ -34,5 +34,14 @@ function booking_customer_fields(array $input, bool $partial = false): array {
   }
   $fields['customer_birthdate']=$birth===''?null:$birth;
  }
+ if (!$partial || array_key_exists('customer_type',$input) || array_key_exists('company_name',$input)) {
+  $type=$input['customer_type']??'private';
+  if(!is_string($type)||!in_array($type,['private','business'],true))throw new InvalidArgumentException('Bitte Privat oder Gewerblich wählen.');
+  $company=$input['company_name']??'';
+  if(!is_scalar($company))throw new InvalidArgumentException('Bitte einen gültigen Unternehmensnamen angeben.');
+  $company=trim((string)$company);
+  if($type==='business'&&($company===''||mb_strlen($company)>200||preg_match('/[\x00-\x1F\x7F]/u',$company)))throw new InvalidArgumentException('Bitte den vollständigen Unternehmensnamen angeben.');
+  $fields['customer_type']=$type;$fields['company_name']=$type==='business'?$company:null;
+ }
  return $fields;
 }

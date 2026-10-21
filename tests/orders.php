@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-require dirname(__DIR__).'/lib/order_quote.php';
+require dirname(__DIR__).'/lib/order_options.php';
 function assert_order(bool $condition,string $message):void{if(!$condition)throw new RuntimeException($message);}
 function expect_invalid(callable $run,string $label):void{try{$run();}catch(InvalidArgumentException $e){return;}throw new RuntimeException('Accepted invalid '.$label);}
 $c=mmb_catalog();$count=0;
@@ -18,14 +18,25 @@ foreach(['single','dj','party','event'] as $package)foreach(['','digital','print
 }
 $photo=mmb_order_quote(['photo'=>'digital'],'2030-01-07','2030-01-07');assert_order($photo['primary_box_id']===null&&$photo['total']===139.0,'Photo alone needs no fake speaker');
 $p200=mmb_order_quote(['photo'=>'print200'],'2030-01-07','2030-01-07');$p700=mmb_order_quote(['photo'=>'print700'],'2030-01-07','2030-01-07');assert_order($p200['total']-$photo['total']===80.0&&$p700['total']-$photo['total']===156.0,'Photo upgrade difference wrong');
-$tent=mmb_order_quote(['tent'=>1],'2030-01-11','2030-01-13');assert_order($tent['total']===149.0,'Tent weekend tariff incorrect');
+$tent=mmb_order_quote(['tent'=>1],'2030-01-11','2030-01-13');assert_order($tent['total']===270.9,'Tent weekend tariff incorrect');
 $freight=mmb_order_quote(['tent'=>1],'2030-01-11','2030-01-13','shipping');assert_order($freight['quote_required']&&$freight['shipping_delta']===0,'Tent parcel price invented');
 $setup=mmb_order_quote(['package'=>'event'],'2030-01-11','2030-01-13','delivery_setup');assert_order($setup['total']>=$setup['base_total']&&$setup['quote_required']&&str_contains($setup['fulfillment_note'],'zwei Personen'),'Assembly scope missing');
 $setupLine=array_values(array_filter($setup['items'],fn($x)=>$x['id']==='assembly'))[0];assert_order($setupLine['total']===160.0,'Assembly labor must be included exactly once');
 $shipping=mmb_order_quote(['speaker'=>3,'speaker_qty'=>2],'2030-01-07','2030-01-07','shipping');assert_order($shipping['shipping_delta']===160,'Two parcels must be charged');
-$controller=mmb_order_quote(['controller'=>1],'2030-01-07','2030-01-07');assert_order($controller['primary_box_id']===null&&$controller['total']===29.0,'Controller alone price wrong');
+$controller=mmb_order_quote(['controller'=>1],'2030-01-07','2030-01-07');assert_order($controller['primary_box_id']===null&&$controller['total']===19.0,'Controller alone price wrong');
 foreach([['speaker'=>1,'batteries'=>1],['speaker'=>2,'backpack'=>1],['speaker'=>1,'speaker_qty'=>2],['speaker'=>3,'batteries'=>4],['speaker'=>3,'stands'=>2],['walls'=>1],['package'=>'missing'],['speaker'=>'3.5'],['speaker'=>3,'controller'=>-1],[]] as $invalid)expect_invalid(fn()=>mmb_order_quote($invalid,'2030-01-07','2030-01-07'),'cart');
 foreach([['2030-02-30','2030-03-01'],['2030-01-08','2030-01-07'],['2030-01-01','2032-01-01']] as [$a,$b])expect_invalid(fn()=>mmb_order_quote(['speaker'=>3],$a,$b),'date range');
 expect_invalid(fn()=>mmb_order_quote(['speaker'=>3],'2030-01-07','2030-01-07','delivery_setup'),'assembly without tent');
 expect_invalid(fn()=>mmb_order_decode(str_repeat('x',12001)),'oversized cart');
 echo 'PASS: '.$count." quote combinations, legacy rates/rounding, DST, set contents, photo upgrades, tent weekend, fulfillment and invalid carts\n";
+
+foreach([1,3,7,31] as $days){
+ $start='2030-01-07';$end=(new DateTimeImmutable($start))->modify('+'.($days-1).' days')->format('Y-m-d');
+ $single=mmb_order_quote(['speaker'=>3],$start,$end);$two=mmb_order_quote(['speaker'=>3,'speaker_qty'=>2],$start,$end);assert_order($two['total']===$single['total']*1.5,'Second SOUNDBOKS must cost exactly half');
+ foreach(['stands'=>5,'microphone'=>9,'batteries'=>15,'backpack'=>9,'controller'=>19]as$id=>$daily){$q=mmb_order_quote(['speaker'=>3,$id=>1],$start,$end);assert_order(abs($q['total']-$single['total']-round($daily*$days*(1-$c['pricing']['discountsByDay'][min(30,$days)]/100),2))<0.001,'Accessory duration tariff '.$id);}
+ foreach(['single','dj','party','event'] as $package){$cart=['package'=>$package,'speaker'=>3,'speaker_qty'=>2,'stands'=>2,'photo'=>'print200','tent'=>1,'controller'=>1,'microphone'=>2,'batteries'=>3];$result=mmb_order_options($cart,$start,$end,'pickup');assert_order($result['quote']['total']>0,'Offers failed with complete cart');foreach($result['offers']['extensions']as$o){$q=mmb_order_quote($cart,$start,$o['end']);assert_order(abs($o['delta']-($q['total']-$result['quote']['total']))<.001,'Extension offer differs from canonical quote');}}
+}
+$empty=mmb_order_options([],'2030-01-07','2030-01-09','pickup');assert_order($empty['quote']===null&&$empty['offers']['categories']['controller']===39.9,'Empty selection must still have valid date-specific offers');
+$party=mmb_order_quote(['package'=>'party'],'2030-01-07','2030-01-07');$line=array_values(array_filter($party['items'],fn($x)=>$x['category']==='photo'))[0];assert_order($line['total']===118.15,'Photobox set advantage must be 15 percent');
+expect_invalid(fn()=>mmb_order_quote(['speaker'=>3,'microphone'=>3],'2030-01-07','2030-01-07'),'third microphone');
+echo "PASS: second speaker half price, daily accessory discounts, 2 microphones, dynamic offers and extensions, 15 percent set advantage\n";

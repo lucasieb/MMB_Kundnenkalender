@@ -199,6 +199,16 @@ try {
     check($status===200 && !$db->query('SELECT email_verified_at FROM bookings WHERE id='.$verifyId)->fetchColumn(),'Changed email must lose verification');
     $invalidPage=file_get_contents($verificationUrl);
     check(str_contains($invalidPage,'Link ist ungültig'),'Old email token must be revoked');
+    // Company data is validated, persisted and included in both outgoing mails.
+    $business=array_replace($valid,['customer_type'=>'business','company_name'=>'TEST Beispiel GmbH','fulfillment_method'=>'delivery','fulfillment_details_json'=>['method'=>'delivery','contact_name'=>'TEST Lieferkontakt','company_name'=>'TEST Lieferfirma GmbH','address_line1'=>'Lieferweg 2','postal_code'=>'46485','city'=>'Wesel']]);
+    [$status,$createdBusiness]=request('create_booking.php',$business);check($status===200&&$createdBusiness['ok'],'Business request failed');$businessId=$createdBusiness['booking']['id'];
+    $row=$db->query('SELECT * FROM bookings WHERE id='.(int)$businessId)->fetch(PDO::FETCH_ASSOC);check($row['customer_type']==='business'&&$row['company_name']==='TEST Beispiel GmbH'&&json_decode($row['fulfillment_details_json'],true)['company_name']==='TEST Lieferfirma GmbH','Company details lost');
+    $businessCaptures=file_get_contents($temp.'/mail-capture.jsonl');check(str_contains($businessCaptures,'TEST Beispiel GmbH')&&str_contains($businessCaptures,'TEST Lieferfirma GmbH'),'Company missing from mail');
+    $badCompany=$business;$badCompany['company_name']='';[$status]=request('create_booking.php',$badCompany);check($status===422,'Missing company accepted');
+    [$status]=request('update_booking.php',['id'=>$businessId,'company_name'=>'TEST Geändert GmbH'],true);check($status===200&&$db->query('SELECT company_name FROM bookings WHERE id='.(int)$businessId)->fetchColumn()==='TEST Geändert GmbH','Company patch lost business context');
+    [$status]=request('update_booking.php',['id'=>$businessId,'company_name'=>''],true);check($status===422,'Empty business company update accepted');
+    [$status]=request('update_booking.php',['id'=>$businessId,'customer_type'=>'private'],true);check($status===200&&$db->query('SELECT company_name FROM bookings WHERE id='.(int)$businessId)->fetchColumn()===null,'Private switch retained company');
+
     // New multi-product path: prices come from the server, not the submitted total.
     foreach([
       ['photo'=>'print200'],['tent'=>1,'walls'=>1],['controller'=>1],['package'=>'dj','batteries'=>3,'controller'=>1],['package'=>'party','photo'=>'print700'],['package'=>'event','walls'=>1]
