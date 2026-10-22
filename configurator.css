@@ -22,3 +22,6 @@ html,body{min-width:0}#mmb-customer{height:var(--mmb-stage-height,760px);display
 /* Existing operator photos, optimized locally; fixed geometry avoids layout shifts. */
 .mmb-product-photo{width:100%;height:88px;object-fit:contain;border-radius:5px;background:#eeeee3;display:block}.mmb-speaker-tiles .mmb-tile>span{width:100%}.mmb-info-photo{max-width:260px;width:100%;height:160px;object-fit:contain;justify-self:start;border-radius:6px}.mmb-product-photo[alt]{font-size:.7rem}
 @media(max-width:520px){.mmb-product-photo{height:70px}.mmb-speaker-tiles .mmb-tile{min-height:158px}.mmb-info-photo{height:140px}}
+/* Keep the cookie control clear of the back action on narrow embedded screens. */
+@media(max-width:520px){.mmb-bottom{padding-left:3.2rem}}
+@media(max-width:300px){.mmb-speaker-tiles .mmb-tile{min-height:112px}.mmb-speaker-tiles .mmb-tile>span{display:grid;grid-template-columns:64px minmax(0,1fr);gap:.4rem .8rem;text-align:left;align-items:center}.mmb-speaker-tiles .mmb-product-photo{grid-row:1 / span 2;height:90px}.mmb-speaker-tiles .mmb-tile strong{justify-content:flex-start;font-size:.78rem}.mmb-speaker-tiles .mmb-tile small{font-size:.75rem}}
