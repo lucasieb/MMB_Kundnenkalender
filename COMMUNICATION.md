@@ -4,7 +4,7 @@
 
 Eingang beim Kunden, interne neue Anfrage, Bestätigung, Änderung, Ablehnung, Storno und Alternativangebot verwenden `lib/booking_mail.php`. HTML und Klartext enthalten denselben gespeicherten Buchungsstand, einschließlich Komponenten, Setvorteil, Mietsumme, manueller Preisanpassung, Abwicklung, Anmerkung und passender Rechnungs-/Zieladresse. Alte Aufträge werden nicht neu kalkuliert. Eine Wunschzeit ist ausdrücklich noch abzustimmen.
 
-Die vom Betreiber genannten Betriebsangaben stehen in `lib/communication_config.php`: Kreuzstraße 60 in Wesel, Rückgabe zur vereinbarten Abholzeit, aktuell keine Kaution, Vorauszahlung bei Versand/Lieferung und Rücksendung mit bereitgestellten Etiketten. Es gibt noch keinen aktiven Onlinezahlungsanbieter. Die Mails versprechen keinen fertigen Zahlungslink.
+Die vom Betreiber genannten Betriebsangaben stehen in `lib/communication_config.php`: Kreuzstraße 60 in Wesel, Rückgabe zur vereinbarten Abholzeit, aktuell keine Kaution, persönlich abgestimmte Zahlung ohne derzeitige Vorauszahlungspflicht und Rücksendung mit bereitgestellten Etiketten (bei geschlossener Annahme am nächsten geöffneten Werktag Montag–Samstag). Es gibt noch keinen aktiven Onlinezahlungsanbieter. Die Mails versprechen keinen fertigen Zahlungslink.
 
 ## Service-Erinnerungen
 
