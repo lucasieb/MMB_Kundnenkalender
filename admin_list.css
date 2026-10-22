@@ -302,3 +302,6 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
 @media(min-width:901px){.mmb-detail-section:has([name=delivery_preferred_time]) .mmb-detail-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
 @media(max-width:900px){.mmb-filter-customer{grid-column:1/-1;grid-row:3}.mmb-reset{grid-column:2;grid-row:2;align-self:end}.mmb-admin-heading p{display:none}}
+
+/* Leave the website's fixed cookie control clear of the mobile dialog actions. */
+@media(max-width:520px){.mmb-detail-footer .mmb-detail-actions,.mmb-footer{padding-left:2.25rem;box-sizing:border-box}}
