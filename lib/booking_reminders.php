@@ -16,6 +16,6 @@ function mmb_reminder_service(array $b,array $config): array {
 }
 /** A unique durable claim prevents overlapping runs and retries after ambiguous SMTP results. */
 function mmb_reminder_claim(PDO $pdo,array $b,string $kind): bool {
- try{$s=$pdo->prepare("INSERT INTO booking_mail_jobs (booking_id,event_key,rental_start,recipient,status,created_at) VALUES (?,?,?,?,?,?)");$s->execute([$b['id'],$kind,$b['start_date'],$b['customer_email'],'sending',gmdate('Y-m-d H:i:s')]);return true;}
+ try{$s=$pdo->prepare("INSERT INTO booking_mail_jobs (booking_id,event_key,rental_start,recipient,status,created_at) VALUES (?,?,?,?,?,?)");$s->execute([$b['id'],$kind,$b['start_date'],hash('sha256',strtolower($b['customer_email'])),'sending',gmdate('Y-m-d H:i:s')]);return true;}
  catch(PDOException $e){if(in_array((string)$e->getCode(),['23000','23505'],true))return false;throw $e;}
 }
