@@ -1,7 +1,6 @@
 name: Booking reminders
+# Production schedule runs hourly in Hostinger hPanel. Keep GitHub as manual fallback only.
 on:
-  schedule:
-    - cron: '15 * * * *'
   workflow_dispatch: {}
 permissions:
   contents: read
