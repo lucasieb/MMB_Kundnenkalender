@@ -4,7 +4,7 @@ AddDefaultCharset utf-8
 </IfModule>
 
 # The builder embeds this stable URL, so browsers must revalidate it after deploys.
-<FilesMatch "^(admin_auth|admin_order|mmb_icons|mmb_embed_host|booking_dates|configurator)\.(js|css)$">
+<FilesMatch "^(admin_auth|admin_order|admin_list|mmb_icons|mmb_embed_host|booking_dates|configurator)\.(js|css)$">
   <IfModule mod_expires.c>
     ExpiresActive Off
   </IfModule>

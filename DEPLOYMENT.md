@@ -59,3 +59,7 @@ Copy the complete `Kundenkalender` snippet into all five Builder embeds (home, c
 SMTP credentials belong in `mail.private.php` one directory above `public_html`, with permissions 0600. The file returns the SMTP configuration array. It is outside HTTP access, excluded from the repository and retained across deployments. Environment variables remain available when no private file is present. There is no repository password fallback. Use existing mailbox credentials; never put them in logs, issues or commits. Successful SMTP acceptance and actual inbox receipt are separate checks.
 
 The creation response reports customer and internal mail outcomes separately, and stores acceptance timestamps. A mail failure leaves the booking intact and the customer sees a clear warning. No bulk resending, invoice automation or automatic data deletion is introduced by this release.
+
+## Management layout release 2026-10-22
+
+`Adminbuchungsliste` is now a small loader for `admin_list.js` and `admin_list.css`. Copy this complete loader into the existing booking-list Builder element and publish once with this release. The calendar embed and authentication are unchanged. Future management layout changes are deployed centrally; both new assets must revalidate through `.htaccess`. The list retains all existing API operations, filters and detail actions. Additional equipment lines expand locally in the row without changing a booking.

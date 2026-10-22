@@ -9,7 +9,7 @@ const localDate=d=>[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),Strin
 const today=()=>localDate(new Date());
 const plusDay=date=>{const d=new Date(date+'T12:00:00');d.setDate(d.getDate()+1);return localDate(d);};
 const dateLabel=value=>value?new Date(value+'T12:00:00').toLocaleDateString('de-DE'):'Noch kein Datum';
-const productImage=(id,alt,cls='mmb-product-photo')=>`<img class="${cls}" src="${esc(new URL('assets/products/'+id+'.webp',base).href)}" alt="${esc(alt)}" width="160" height="180" loading="lazy" decoding="async">`;
+const productImage=(id,alt,cls='mmb-product-photo')=>{const image=`<img class="${cls}" src="${esc(new URL('assets/products/'+id+'.webp',base).href)}" alt="${esc(alt)}" width="160" height="180" loading="lazy" decoding="async">`;return cls==='mmb-product-photo'?`<span class="mmb-product-visual">${image}</span>`:image;};
 const emptyCart=()=>({package:'single',speaker:0,speaker_qty:0,photo:'',tent:0,walls:0,stands:0,microphone:0,batteries:0,backpack:0,controller:0});
 class Configurator{
  constructor(){this.cart=emptyCart();this.step=0;this.data={same_address:true,customer_type:'private'};this.start='';this.end='';this.method='pickup';this.quote=null;this.offers=null;this.expanded=new Set(['music']);this.info='';this.attempted=false;this.month=new Date();this.month.setDate(1);this.busy=false;this.revision=0;this.quoteRevision=0;this.available=[];this.extensionBase='';this.extension=0;this.notice='';this.error='';this.init();}
