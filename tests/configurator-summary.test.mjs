@@ -18,3 +18,14 @@ test('separate shipping cost and open delivery quote remain transparent',()=>{
  let html=context.TestConfigurator.prototype.summary.call(view);assert.match(html,/80,00/);assert.match(html,/150,00/);assert.doesNotMatch(html,/Preisvorteil insgesamt/);
  view.quote.quote_required=true;view.quote.fulfillment_note='Fahrtkosten auf Angebot';html=context.TestConfigurator.prototype.summary.call(view);assert.match(html,/Mietsumme/);assert.match(html,/nicht in der Mietsumme enthalten/);
 });
+
+test('photo entry preselects only a digital photobox and never dates or fulfillment',()=>{
+ context.TestConfigurator.prototype.init=()=>{};
+ context.document.getElementById=()=>({dataset:{initialProduct:'photo'}});
+ // The module captures the root at load, so evaluate with a fresh document.
+ const photoContext={...context,document:{...context.document,getElementById:()=>({dataset:{initialProduct:'photo'}})}};
+ vm.runInNewContext(source,photoContext);photoContext.TestConfigurator.prototype.init=()=>{};
+ const view=new photoContext.TestConfigurator();assert.equal(view.cart.photo,'digital');assert.equal(view.cart.speaker,0);assert.equal(view.start,'');assert.equal(view.end,'');assert.equal(view.method,'pickup');assert.equal(view.step,0);
+ const unknown={...context,document:{...context.document,getElementById:()=>({dataset:{initialProduct:'unknown'}})}};
+ vm.runInNewContext(source,unknown);unknown.TestConfigurator.prototype.init=()=>{};assert.equal(new unknown.TestConfigurator().cart.photo,'');
+});
