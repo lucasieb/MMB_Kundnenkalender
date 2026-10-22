@@ -24,4 +24,7 @@ jobs:
           php tests/orders.php
           php tests/communication.php
       - name: Shared embedded admin login
-        run: node --test tests/*.test.mjs
+        run: |
+          node --check admin_list.js
+          node --check configurator.js
+          node --test tests/*.test.mjs
