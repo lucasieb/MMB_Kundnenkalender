@@ -3,7 +3,7 @@
 if(window.MMBCustomerEmbedHost)return;window.MMBCustomerEmbedHost=true;
 const frames=()=>Array.from(document.querySelectorAll('iframe')).filter(frame=>{const html=frame.getAttribute('srcdoc')||'';return /id=["']mmb-customer["']/.test(html)&&html.includes('configurator.js');});
 const headerHeight=()=>document.querySelector('header')?.getBoundingClientRect().height||80;
-const send=frame=>{const height=Math.max(240,Math.min(860,(window.visualViewport?.height||window.innerHeight)-headerHeight()-24));frame.contentWindow?.postMessage({kind:'mmb-booking-viewport',version:1,height},'*');frame.style.scrollMarginTop=(headerHeight()+12)+'px';};
+const send=frame=>{const layout=frame.closest?.('.block-layout');if(layout){layout.style.maxWidth='1224px';layout.style.width='100%';}const height=Math.max(240,Math.min(860,(window.visualViewport?.height||window.innerHeight)-headerHeight()-24));frame.contentWindow?.postMessage({kind:'mmb-booking-viewport',version:1,height},'*');frame.style.scrollMarginTop=(headerHeight()+12)+'px';};
 const refresh=()=>frames().forEach(send);
 window.addEventListener('message',event=>{
  if(event.data?.version!==1||!['mmb-booking-ready','mmb-booking-focus'].includes(event.data?.kind))return;
