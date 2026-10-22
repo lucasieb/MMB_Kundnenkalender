@@ -50,7 +50,7 @@ jobs:
         env:
           EXPECTED_COMMIT: ${{ github.sha }}
         run: |
-          curl --fail --silent --show-error --retry 3 "https://firebrick-squirrel-568721.hostingersite.com/deployment.json?revision=$EXPECTED_COMMIT" -o /tmp/mmb-deployment.json
+          curl --fail --silent --show-error --location --max-redirs 5 --proto-redir =https --max-time 45 --retry 3 --retry-all-errors "https://firebrick-squirrel-568721.hostingersite.com/deployment.json?revision=$EXPECTED_COMMIT" -o /tmp/mmb-deployment.json
           php -r '$data = json_decode(file_get_contents("/tmp/mmb-deployment.json"), true); if (($data["commit"] ?? "") !== getenv("EXPECTED_COMMIT")) { fwrite(STDERR, "Published revision mismatch\n"); exit(1); }'
-          curl --fail --silent --show-error --retry 3 'https://firebrick-squirrel-568721.hostingersite.com/ping.php' -o /tmp/mmb-ping.json
+          curl --fail --silent --show-error --location --max-redirs 5 --proto-redir =https --max-time 45 --retry 3 --retry-all-errors 'https://firebrick-squirrel-568721.hostingersite.com/ping.php' -o /tmp/mmb-ping.json
           php -r '$data = json_decode(file_get_contents("/tmp/mmb-ping.json"), true); if (($data["ok"] ?? false) !== true) { fwrite(STDERR, "Database health check failed\n"); exit(1); }'
