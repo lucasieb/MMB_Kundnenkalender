@@ -39,3 +39,5 @@ echo 'PASS: '.$count." combinations, 24-hour boundaries, DST, half-price second 
 assert_order(is_numeric($empty['offers']['packages']['single']),'Standalone minimum must not be overwritten by set metadata');foreach(['dj','party','event']as$id)assert_order(is_numeric($empty['offers']['packages'][$id]['total'])&&$empty['offers']['packages'][$id]['saving_percent']===$c['set_discounts'][$id],'Set offer metadata invalid');
 
 $upgrade=mmb_order_options(['speaker'=>3],'2030-01-11','2030-01-14','pickup');$dj=mmb_order_quote(['package'=>'dj','controller'=>1],'2030-01-11','2030-01-14');assert_order($upgrade['offers']['upgrades']['dj']===$dj['total']-$upgrade['quote']['total'],'Upgrade offer must include the preselected optional controller');
+
+foreach(["single","dj","party","event"]as$package){$cart=["package"=>$package,"speaker"=>3,"tent"=>1];$v=mmb_order_options($cart,"2030-01-11","2030-01-14","pickup");$cart["walls"]=1;$q=mmb_order_quote($cart,"2030-01-11","2030-01-14");assert_order($v["offers"]["walls"]===$q["total"]-$v["quote"]["total"],"Side-wall offer must include set discount and rounding");}

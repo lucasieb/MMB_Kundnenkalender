@@ -1,0 +1,25 @@
+name: Booking reminders
+on:
+  schedule:
+    - cron: '15 * * * *'
+  workflow_dispatch: {}
+permissions:
+  contents: read
+concurrency:
+  group: booking-reminders
+  cancel-in-progress: false
+jobs:
+  reminders:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Send due service reminders once
+        env:
+          MMB_DEPLOY_SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          MMB_DEPLOY_USER: ${{ secrets.USER }}
+        run: |
+          set -euo pipefail
+          umask 077
+          printf '%s\n' "$MMB_DEPLOY_SSH_KEY" > "$RUNNER_TEMP/mmb-reminder-key"
+          trap 'rm -f "$RUNNER_TEMP/mmb-reminder-key"' EXIT
+          ssh -oBatchMode=yes -oAddressFamily=inet -oConnectTimeout=25 -oStrictHostKeyChecking=yes -oUserKnownHostsFile=.github/hostinger_known_hosts -p 65002 -i "$RUNNER_TEMP/mmb-reminder-key" "$MMB_DEPLOY_USER@srv2024.hstgr.io" 'cd domains/firebrick-squirrel-568721.hostingersite.com/public_html && php booking_reminders.php --send --scheduled'

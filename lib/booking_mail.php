@@ -1,8 +1,9 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__.'/communication_config.php';
 
 /** One saved booking snapshot for all customer and team communications. Never recalculate old orders. */
-function mmb_mail_decode($value): array { return is_array($value)?$value:(json_decode((string)($value??''),true)?:[]); }
+function mmb_mail_decode($value): array { if(is_array($value))return $value;$decoded=json_decode((string)($value??''),true);return is_array($decoded)?$decoded:[]; }
 function mmb_mail_euro($value): string { return number_format((float)$value,2,',','.').' €'; }
 function mmb_mail_date($value): string { $d=DateTimeImmutable::createFromFormat('!Y-m-d',(string)$value);return $d?$d->format('d.m.Y'):(string)$value; }
 function mmb_mail_sections(array $b,bool $internal=false): array {
@@ -76,7 +77,13 @@ function mmb_booking_message(array $b,string $mode='submission',array $options=[
  if($mode==='alternative'){$names=$options['alternatives']??[];$sections=['🔄 Vorgeschlagene Alternative'=>$names?:['Bitte sprich uns auf die passende Alternative an.']]+$sections;}
  if($mode==='submission'&&!empty($b['verification_url'])){$sections=['✅ E-Mail-Adresse bestätigen'=>['Bitte bestätige deine E-Mail-Adresse innerhalb von 48 Stunden über den Button. Der Link bestätigt nur deine E-Mail-Adresse; er ist keine Buchungsbestätigung und schließt keinen Mietvertrag ab.']]+$sections;$actions['E-Mail-Adresse bestätigen']=$b['verification_url'];}
  if($internal)$actions['Buchungsverwaltung öffnen']='https://www.mietmichbox.de/buchungsverwaltung';
- if(in_array($mode,['reminder7','reminder3'],true)&&!empty($options['service_info']))$sections['ℹ️ Für deine Übergabe']=$options['service_info'];
+ if(in_array($mode,['confirmed','reminder7','reminder3'],true)){
+  $config=mmb_communication_config();$method=$b['fulfillment_method']??'pickup';
+  $service=[$config['payment'],$config['deposit']];
+  if($method==='pickup'){$service[]='Abhol- und Rückgabeadresse: '.$config['pickup_address'];$service[]=$config['pickup_return'];}
+  elseif($method==='shipping')$service[]=$config['shipping_return'];else $service[]=$config['delivery_return'];
+  $sections['ℹ️ Für deine Übergabe']=$options['service_info']??$service;
+ }
  $render=mmb_mail_render($title,($internal?'Hallo MietMichBox Team,':'Hallo '.$name.',')."\n\n".$intro,$sections,$actions);
  return ['subject'=>($options['custom_subject']??'')?:$title.' – Buchung '.$id]+$render;
 }
