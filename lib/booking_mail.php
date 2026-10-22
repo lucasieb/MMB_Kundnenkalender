@@ -10,7 +10,7 @@ function mmb_mail_sections(array $b,bool $internal=false): array {
  $o=mmb_mail_decode($b['order']??$b['order_json']??null);$d=mmb_mail_decode($b['fulfillment_details']??$b['fulfillment_details_json']??null);
  $method=(string)($b['fulfillment_method']??'pickup');$id=(string)($b['display_id']??str_pad((string)((int)($b['id']??0)+100),5,'0',STR_PAD_LEFT));
  $sections=[];$sections['📅 Deine Buchung']=['Buchungsnummer: '.$id,'Mietbeginn: '.mmb_mail_date($b['start_date']??''),'Rückgabe: '.mmb_mail_date($b['end_date']??'')];
- if(($o['day_unit']??'')==='24h')$sections['📅 Deine Buchung'][]=($o['days']??'').' Miettag(e) à 24 Stunden. Rückgabe zur vereinbarten Uhrzeit des Mietbeginns.';
+ if(($o['day_unit']??'')==='24h')$sections['📅 Deine Buchung'][]=($o['days']??'').' '.((int)($o['days']??0)===1?'Miettag':'Miettage').' à 24 Stunden. Rückgabe zur vereinbarten Uhrzeit des Mietbeginns.';
  $equipment=[];if(!empty($o['package_name']))$equipment[]=$o['package_name'];
  foreach($o['items']??$o['lines']??[] as $line){
   if(in_array($line['id']??'',['shipping','delivery','assembly'],true))continue;
@@ -52,8 +52,8 @@ function mmb_mail_sections(array $b,bool $internal=false): array {
 function mmb_mail_render(string $title,string $intro,array $sections,array $actions=[]): array {
  $esc=fn($s)=>htmlspecialchars((string)$s,ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8');
  $text=$intro."\n";$content='<h1 style="font-size:25px;line-height:1.25;margin:0 0 20px">'.$esc($title).'</h1><p style="line-height:1.6">'.nl2br($esc($intro),false).'</p>';
- foreach($sections as $heading=>$rows){$text.="\n".$heading."\n".implode("\n",$rows)."\n";$content.='<h2 style="font-size:18px;margin:26px 0 10px;padding-top:18px;border-top:1px solid #dbe2e8">'.$esc($heading).'</h2>';foreach($rows as $row)$content.='<p style="margin:6px 0;line-height:1.5;overflow-wrap:anywhere">'.nl2br($esc($row),false).'</p>';}
  foreach($actions as $label=>$url){if(!preg_match('~^https://(?:www\.)?(?:mietmichbox\.de|firebrick-squirrel-568721\.hostingersite\.com)/~',$url))continue;$text.="\n$label:\n$url\n";$content.='<p style="margin:22px 0"><a href="'.$esc($url).'" style="display:inline-block;background:#087fae;color:#fff;padding:13px 20px;text-decoration:none;border-radius:6px;font-weight:bold">'.$esc($label).'</a></p>';}
+ foreach($sections as $heading=>$rows){$text.="\n".$heading."\n".implode("\n",$rows)."\n";$content.='<h2 style="font-size:18px;margin:26px 0 10px;padding-top:18px;border-top:1px solid #dbe2e8">'.$esc($heading).'</h2>';foreach($rows as $row)$content.='<p style="margin:6px 0;line-height:1.5;overflow-wrap:anywhere">'.nl2br($esc($row),false).'</p>';}
  $footer="Viele Grüße\nDein MietMichBox Team\ninfo@mietmichbox.de · +49 174 2015500\nhttps://www.mietmichbox.de";$text.="\n".$footer;
  $html='<!doctype html><html lang="de"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;background:#f3f4ef;color:#202a35;font:16px Arial,sans-serif"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center" style="padding:20px 12px"><table role="presentation" width="100%" style="max-width:620px;background:#fff" cellspacing="0" cellpadding="0"><tr><td style="padding:20px 24px;background:#24313a;color:white;font-size:20px;font-weight:bold">MietMichBox</td></tr><tr><td style="padding:24px">'.$content.'<p style="margin-top:30px;line-height:1.6">'.nl2br($esc($footer),false).'</p></td></tr></table></td></tr></table></body></html>';
  return ['html'=>$html,'text'=>$text];

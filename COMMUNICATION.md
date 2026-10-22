@@ -8,7 +8,7 @@ Die vom Betreiber genannten Betriebsangaben stehen in `lib/communication_config.
 
 ## Service-Erinnerungen
 
-`booking_reminders.php` ist ausschließlich per CLI erreichbar. Der Workflow `Booking reminders` startet stündlich und sendet nur im lokalen Zeitfenster 09 Uhr Europe/Berlin. GitHub-Zeitpläne können verspätet laufen; die exakte Minute wird nicht garantiert. Fällt ein ganzer Tag aus, erfolgt kein verspäteter Sammelversand.
+`booking_reminders.php` ist ausschließlich per CLI erreichbar. Der Workflow `Booking reminders` startet stündlich und sendet ab 09 Uhr bis einschließlich der 20-Uhr-Stunde Europe/Berlin. Der erste erfolgreiche Lauf verschickt die fällige Mail; spätere Läufe erkennen den bereits beanspruchten Versandauftrag. GitHub-Zeitpläne können verspätet laufen; die exakte Minute wird nicht garantiert. Fällt ein ganzer Tag aus, erfolgt kein verspäteter Sammelversand.
 
 - 7 Tage vor Mietbeginn: Ausstattung, Termin, Abwicklung und offene Abstimmungen prüfen.
 - 3 Tage vorher: gleiche aktuelle Übersicht plus Übergabe-/Rücksendeanweisungen.
@@ -18,8 +18,10 @@ Die vom Betreiber genannten Betriebsangaben stehen in `lib/communication_config.
 - Bei unklarem SMTP-Ergebnis wird `needs_review` protokolliert und nicht automatisch erneut gesendet. Der Workflow meldet dann einen Fehler.
 - Keine Werbung, Bewertungsaufforderung oder automatische Neubestätigung durch die Erinnerung.
 
-Aktivierung: `communication.private.php` außerhalb `public_html`, Dateirechte 0600, mit `enabled => true` und `activate_created_after` als UTC-Zeitstempel. Die Betriebsangaben können dort überschrieben werden. Keine Zugangsdaten ins Repository. Vor Aktivierung `php booking_reminders.php` als Trockenlauf ausführen. `--send` sendet; `--scheduled` beschränkt zusätzlich auf 09 Uhr.
+Aktivierung: `communication.private.php` außerhalb `public_html`, Dateirechte 0600, mit `enabled => true` und `activate_created_after` als UTC-Zeitstempel. Die Betriebsangaben können dort überschrieben werden. Keine Zugangsdaten ins Repository. Vor Aktivierung `php booking_reminders.php` als Trockenlauf ausführen. `--send` sendet; `--scheduled` beschränkt zusätzlich auf das lokale Zeitfenster 09–20 Uhr.
 
 ## Noch nicht freigeschaltet
 
 Onlinezahlungen, 2 % Vorauszahlungsskonto, automatisierte Rechnungen/Verträge, automatische Versandetiketten und Rezensionen. Händlerkonto, wirtschaftliche/regulatorische Abklärung der Zahlarten sowie die endgültigen Zahlungs-/Vertragsregeln sind Voraussetzungen für den nächsten Schritt. Die technischen und fachlichen Vorschläge werden separat dokumentiert.
+
+Betriebshinweis: GitHub kann Zeitplan-Läufe verzögern oder verwerfen; bei öffentlichen Repositories werden Zeitpläne nach 60 Tagen ohne Repository-Aktivität deaktiviert. Der spätere stündliche Nachlauf am selben Tag reduziert das Verzögerungsrisiko, ersetzt aber keine Betriebsüberwachung. Für den dauerhaften Versand ist ein verwalteter Hostinger-/Server-Cronjob mit Fehlerbenachrichtigung vorzuziehen; die gleiche CLI und Doppelversandsperre sind dafür bereits nutzbar. [GitHub-Zeitplanregeln](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows)
