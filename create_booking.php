@@ -464,198 +464,9 @@ function booking_mail_context(array $data): array {
   ];
 }
 
-function build_submission_mail(array $data): array {
-  $ctx = booking_mail_context($data);
-  $name      = $ctx['name'];
-  $email     = $ctx['email'];
-  $boxName   = $ctx['boxName'];
-  $range     = $ctx['range'];
-  $totalDisp = $ctx['totalDisp'];
-  $fulfillment = $ctx['fulfillment'];
-  $delivery=$ctx['fulfillment_details']??[];
-  $deliveryLine=implode(', ',array_filter([$delivery['company_name']??'', $delivery['contact_name']??'', $delivery['address_line1']??'',trim(($delivery['postal_code']??'').' '.($delivery['city']??''))]));
-  $deliveryText=($ctx['fulfillment_info']['method']??'pickup')==='pickup'?'':(($ctx['fulfillment_info']['method']??'')==='shipping'?'Versandadresse: ':'Lieferadresse: ').$deliveryLine;
-
-  $subject = "Deine Buchungsanfrage ist eingegangen – Buchungs-ID: {$data['display_id']}";
-
-  $text = <<<TXT
-Hallo {$name},
-
-deine Buchungsanfrage ist bei uns eingegangen. Sie steht auf Ausstehend und ist noch keine verbindliche Buchung. Wir bearbeiten deine Anfrage schnellstmöglich und melden uns dann mit der Bestätigung. Bis dahin musst du nichts weiter tun.
-
-Deine Buchung im Überblick:
-👤 Name: {$name}
-📧 E-Mail: {$email}
-📞 Telefon: {$data['customer_phone']}
-🏠 Rechnungsadresse: {$data['company_name']} {$data['billing_address_line1']}, {$data['billing_postal_code']} {$data['billing_city']}
-Ausstattung: {$boxName}
-🕰️ Zeitraum: {$range}
-🚚 Abwicklung: {$fulfillment}
-{$deliveryText}
-💶 Mietsumme: {$totalDisp}
-
-Bitte bestätige innerhalb von 48 Stunden deine E-Mail-Adresse:
-{$data['verification_url']}
-
-Der Link bestätigt nur deine E-Mail-Adresse. Er ist keine Buchungsbestätigung und schließt keinen Mietvertrag ab.
-
-Falls du noch offene Fragen hast, kannst du uns jederzeit kontaktieren.
-
-Viele Grüße
-Dein MietMichBox Team
-www.mietmichbox.de
-
-E-Mail: info@mietmichbox.de
-Telefon: 01742015500
-TXT;
-
-  return [
-    'subject' => $subject,
-    'text'    => $text,
-    'html'    => nl2br(htmlspecialchars($text,ENT_QUOTES | ENT_SUBSTITUTE,'UTF-8'), false),
-  ];
-}
-
-function build_internal_submission_mail(array $data): array {
-  $ctx = booking_mail_context($data);
-  $name      = $ctx['name'];
-  $email     = $ctx['email'];
-  $boxName   = $ctx['boxName'];
-  $range     = $ctx['range'];
-  $totalDisp = $ctx['totalDisp'];
-  $fulfillment = $ctx['fulfillment'];
-  $displayId = $data['display_id'];
-  $fulfillmentInfo = $ctx['fulfillment_info'];
-  $fulfillmentDetails = $ctx['fulfillment_details'];
-
-  $linkUrl   = 'https://mietmichbox.de/buchungsverwaltung';
-  $subject   = "👋🏼 Neue Buchungsanfrage 👷🏽 – Buchungs-ID: {$displayId}";
-
-  $extraTextLines = [];
-  $extraHtmlLines = [];
-  $method = is_array($fulfillmentInfo) ? ($fulfillmentInfo['method'] ?? null) : null;
-
-  if (in_array($method, ['shipping', 'delivery', 'delivery_setup'], true) && is_array($fulfillmentDetails)) {
-    $escHtml = static function (string $value): string {
-      return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-    };
-
-    $contactName = trim((string)($fulfillmentDetails['contact_name'] ?? ''));
-    $contactEmail = trim((string)($fulfillmentDetails['contact_email'] ?? ''));
-    $contactPhone = trim((string)($fulfillmentDetails['contact_phone'] ?? ''));
-    if ($contactName !== '') {
-      $extraTextLines[] = "👥 Kontaktname: {$contactName}";
-      $extraHtmlLines[] = '👥 Kontaktname: ' . $escHtml($contactName);
-    }
-    if ($contactEmail !== '') {
-      $extraTextLines[] = "✉️ Kontakt-E-Mail: {$contactEmail}";
-      $extraHtmlLines[] = '✉️ Kontakt-E-Mail: ' . $escHtml($contactEmail);
-    }
-    if ($contactPhone !== '') {
-      $extraTextLines[] = "📞 Kontakt-Telefon: {$contactPhone}";
-      $extraHtmlLines[] = '📞 Kontakt-Telefon: ' . $escHtml($contactPhone);
-    }
-
-    $allowedChannels = [];
-    $allowPhone = $fulfillmentDetails['allow_contact_phone'] ?? ($fulfillmentDetails['contact_preferences']['phone'] ?? null);
-    $allowWhatsapp = $fulfillmentDetails['allow_contact_whatsapp'] ?? ($fulfillmentDetails['contact_preferences']['whatsapp'] ?? null);
-    if ($allowPhone) {
-      $allowedChannels[] = 'Telefon';
-    }
-    if ($allowWhatsapp) {
-      $allowedChannels[] = 'WhatsApp';
-    }
-    if ($allowedChannels) {
-      $channels = implode(', ', $allowedChannels);
-      $extraTextLines[] = "☎️ Kontaktwege: {$channels}";
-      $extraHtmlLines[] = '☎️ Kontaktwege: ' . $escHtml($channels);
-    }
-
-    if ($method === 'shipping' || str_starts_with($method,'delivery')) {
-      $addressParts = [];
-      if(!empty($fulfillmentDetails['company_name']))$addressParts[]=(string)$fulfillmentDetails['company_name'];
-      $addressLine = trim((string)($fulfillmentDetails['address_line1'] ?? ''));
-      $postalCode = trim((string)($fulfillmentDetails['postal_code'] ?? ''));
-      $city = trim((string)($fulfillmentDetails['city'] ?? ''));
-      $addressExtra = trim((string)($fulfillmentDetails['address_extra'] ?? ''));
-      if ($addressLine !== '') {
-        $addressParts[] = $addressLine;
-      }
-      $postalCity = trim($postalCode . ' ' . $city);
-      if ($postalCity !== '') {
-        $addressParts[] = $postalCity;
-      }
-      if ($addressExtra !== '') {
-        $addressParts[] = $addressExtra;
-      }
-      if ($addressParts) {
-        $addressLineText = implode(', ', $addressParts);
-        $extraTextLines[] = "📦 Lieferadresse: {$addressLineText}";
-        $extraHtmlLines[] = '📦 Lieferadresse: ' . $escHtml($addressLineText);
-      }
-    }
-
-    if (str_starts_with($method,'delivery')) {
-      $meetingPoint = trim((string)($fulfillmentDetails['meeting_point'] ?? ''));
-      $preferredTime = trim((string)($fulfillmentDetails['preferred_time'] ?? ''));
-      if ($meetingPoint !== '') {
-        $extraTextLines[] = "📍 Treffpunkt: {$meetingPoint}";
-        $extraHtmlLines[] = '📍 Treffpunkt: ' . $escHtml($meetingPoint);
-      }
-      if ($preferredTime !== '') {
-        $timeDisp = $preferredTime . ' Uhr';
-        $extraTextLines[] = "⏰ Wunschzeit: {$timeDisp}";
-        $extraHtmlLines[] = '⏰ Wunschzeit: ' . $escHtml($timeDisp);
-      }
-    }
-  }
-
-  $textBase = <<<TXT
-Hallo MietMichBox Team,
-
-eine neue Buchungsanfrage ist eingegangen. Der Status steht bislang auf Ausstehend. ⚠️
-
-Buchung im Überblick:
-👤 Name: {$name}
-📧 E-Mail: {$email}
-📞 Telefon: {$data['customer_phone']}
-🏠 Rechnungsadresse: {$data['company_name']} {$data['billing_address_line1']}, {$data['billing_postal_code']} {$data['billing_city']}
-Ausstattung: {$boxName}
-🕰️ Zeitraum: {$range}
-🚚 Abwicklung: {$fulfillment}
-💶 Mietsumme: {$totalDisp}
-TXT;
-
-  $text = $textBase . "\n";
-  if ($extraTextLines) {
-    $text .= "\nZusätzliche Angaben:\n" . implode("\n", $extraTextLines) . "\n";
-  }
-  $text .= "\nBuchung in der Buchungsverwaltung einsehen: {$linkUrl}";
-
-  $htmlBase = <<<HTML
-<p>Hallo MietMichBox Team,</p>
-<p>eine neue Buchungsanfrage ist eingegangen. Der Status steht bislang auf Ausstehend.</p>
-<p>Buchung im Überblick:<br>
-👤 Name: {$name}<br>
-📧 E-Mail: {$email}<br>
-Ausstattung: {$boxName}<br>
-🕰️ Zeitraum: {$range}<br>
-🚚 Abwicklung: {$fulfillment}<br>
-💶 Gesamtkosten: {$totalDisp}</p>
-HTML;
-
-  $html = $htmlBase;
-  if ($extraHtmlLines) {
-    $html .= '<p>Zusätzliche Angaben:<br>' . implode('<br>', $extraHtmlLines) . '</p>';
-  }
-  $html .= "<p>Buchung in der <a href=\"{$linkUrl}\">Buchungsverwaltung</a> einsehen.</p>";
-
-  return [
-    'subject' => $subject,
-    'text'    => $text,
-    'html'    => nl2br(htmlspecialchars($text,ENT_QUOTES | ENT_SUBSTITUTE,'UTF-8'), false),
-  ];
-}
+require_once __DIR__.'/lib/booking_mail.php';
+function build_submission_mail(array $data): array { return mmb_booking_message($data,'submission'); }
+function build_internal_submission_mail(array $data): array { return mmb_booking_message($data,'internal'); }
 
 function send_mail_via_available(string $email, string $name, array $mailData): array {
   $info = ['sent' => false, 'subject' => $mailData['subject']];
@@ -675,7 +486,7 @@ function send_mail_via_available(string $email, string $name, array $mailData): 
       $sent = (bool)send_mail($email, $name, $mailData['subject'], $html);
     }
   } elseif (function_exists('sendMail')) {
-    $sent = (bool)sendMail($email, $mailData['subject'], $mailData['text'], $name);
+    $sent = (bool)sendMail($email, $mailData['subject'], $mailData['text'], $name, $mailData['html']);
     if (!$sent && function_exists('get_last_mail_error')) {
       $lastError = trim((string)get_last_mail_error());
       if ($lastError !== '') {
@@ -937,6 +748,8 @@ try {
       'customer_name'  => $name,
       'customer_email' => $email,
       'customer_phone' => $phone,
+      'note'=>$note,
+      'customer_birthdate'=>$customer['customer_birthdate']??null,
       'company_name'=>$customer['company_name']??'',
       'customer_type'=>$customer['customer_type'],
       'billing_address_line1'=>$customer['billing_address_line1'],

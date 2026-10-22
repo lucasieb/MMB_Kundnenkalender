@@ -22,5 +22,6 @@ jobs:
         run: |
           php tests/contract.php
           php tests/orders.php
+          php tests/communication.php
       - name: Shared embedded admin login
         run: node --test tests/*.test.mjs
