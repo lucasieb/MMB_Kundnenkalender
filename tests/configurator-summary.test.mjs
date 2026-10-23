@@ -40,3 +40,18 @@ test('contextual entries preserve defaults, focused products and optional altern
   const html=v.startScreen();if(entry==='sets'){assert.match(html,/<summary>Alternativ Einzelbuchung<\/summary>/);assert.doesNotMatch(html,/<details[^>]*open/);}else assert.match(html,/<focused-product>/);
  }
 });
+
+
+test('photobox and tent upgrades stay relevant in both selection and equipment steps',()=>{
+ const proto=context.TestConfigurator.prototype;
+ for(const [cart,expected] of [[{photo:'digital',tent:0},['party','event']],[{photo:'',tent:1},['event']],[{photo:'print200',tent:1},['event']]])assert.deepEqual(Array.from(proto.relatedSets.call({cart})),expected);
+ assert.equal(proto.relatedSets.call({cart:{photo:'',tent:0}}),null);
+ const calls=[];
+ const view={cart:{package:'single',photo:'digital',tent:0,speaker:0,controller:0},catalog:{packages:{single:{name:'Einzelbuchung'}}},photo:()=>'<photo>',relatedSets:()=>['party','event'],packageTiles:(upgrades,only)=>{calls.push({upgrades,only});return '<sets>';},startProducts:()=>'<products>'};
+ proto.equipmentScreen.call(view);assert.deepEqual(calls,[{upgrades:true,only:['party','event']}]);
+});
+test('photo and tent prices ask for a period before displaying a calculation state',()=>{
+ const html=context.TestConfigurator.prototype.photo.call({cart:{photo:'digital'},catalog:{photo:{digital:{name:'Digital',description:'Cloud'}}},start:'',end:'',offers:null,group:(_id,_title,_icon,_subtitle,content)=>content});
+ assert.match(html,/Zeitraum wählen/);assert.doesNotMatch(html,/Preis wird berechnet/);
+ const tent=context.TestConfigurator.prototype.tent.call({cart:{walls:0},start:'',end:'',offers:null,group:(_id,_title,_icon,_subtitle,content)=>content});assert.match(tent,/Wähle deinen Zeitraum/);assert.doesNotMatch(tent,/Preis wird berechnet/);
+});
