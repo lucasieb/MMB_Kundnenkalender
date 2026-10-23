@@ -60,11 +60,22 @@ final class MMBImapSentMailbox implements MMBSentMailbox
     {
         // Message IDs are validated before queueing; no IMAP search injection.
         $this->clearErrors();
-        $found = @imap_search($this->connection, 'HEADER Message-ID "'.$messageId.'"', SE_UID);
+        // PHP c-client does not support the generic HEADER criterion. TEXT narrows
+        // candidates; overview headers then verify the exact Message-ID (not forwarded body text).
+        $found = @imap_search($this->connection, 'TEXT "'.$messageId.'"', SE_UID);
         $errors = imap_errors();
         imap_alerts();
         if ($errors) throw new RuntimeException('Sent lookup unavailable');
-        return is_array($found) && count($found) > 0;
+        foreach (array_chunk(is_array($found) ? $found : [], 100) as $uids) {
+            $overview = @imap_fetch_overview($this->connection, implode(',', $uids), FT_UID);
+            $errors = imap_errors();
+            imap_alerts();
+            if ($overview === false || $errors) throw new RuntimeException('Sent headers unavailable');
+            foreach ($overview as $message) {
+                if (trim((string)($message->message_id ?? '')) === $messageId) return true;
+            }
+        }
+        return false;
     }
 
     public function append(string $mime): void
