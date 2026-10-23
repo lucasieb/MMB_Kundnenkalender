@@ -14,6 +14,7 @@ function mmb_legacy_invoice_update(array $existing,array $updates): array {
  $shipping=$method==='shipping'?80.0:($changed?0.0:(float)($pricing['shipping_delta']??$updates['fulfillment_price_delta']??$oldShipping));
  foreach([$base,$shipping]as$n)if(!is_finite($n)||$n<0)throw new InvalidArgumentException('Ungültiger Rechnungsbetrag.');
  $expected=round($base+$shipping,2);
+ if(!array_key_exists('total_amount',$updates)&&array_key_exists('total',$pricing)&&!array_intersect(['base_total','shipping_delta'],array_keys($pricing)))$updates['total_amount']=$pricing['total'];
  $updates['fulfillment_price_delta']=$shipping;
  if(!array_key_exists('total_amount',$updates)||$changed)$updates['total_amount']=$expected;
  $pricing=array_replace($previous,$pricing,['base_total'=>$base,'shipping_delta'=>$shipping,'total'=>(float)$updates['total_amount'],'fulfillment_id'=>$method]);
