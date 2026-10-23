@@ -95,6 +95,12 @@ function sendMail(string $to, string $subject, string $body, string $toName = ''
         $mailer->Body    = nl2br(htmlspecialchars($body, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'), false);
         $mailer->Body = preg_replace('~https://firebrick-squirrel-568721\.hostingersite\.com/verify_booking_email\.php\?id=[0-9]+&amp;token=[a-f0-9]{64}~', '<a href="$0">E-Mail-Adresse bestätigen</a>', $mailer->Body);
         if ($html !== null) $mailer->Body = $html;
+        $logo=__DIR__.'/assets/brand/mietmichbox-logo.png';
+        $logoUrl='https://firebrick-squirrel-568721.hostingersite.com/assets/brand/mietmichbox-logo.png';
+        if(str_contains($mailer->Body,$logoUrl)&&is_file($logo)){
+            $mailer->addEmbeddedImage($logo,'mmb-brand-logo','mietmichbox-logo.png','base64','image/png');
+            $mailer->Body=str_replace($logoUrl,'cid:mmb-brand-logo',$mailer->Body);
+        }
         $mailer->AltBody = $body;
         $mailer->send();
         return true;

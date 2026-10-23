@@ -34,3 +34,32 @@ globalThis.MMBOrderAdmin={mount(form,booking,post){
  return state;
 }};
 })();
+
+/* Invoice arithmetic also applies to historical single-speaker bookings, preserving their agreed rent. */
+(()=>{'use strict';
+const amount=v=>{if(typeof v==='number')return v;let s=String(v??'').trim().replace(/\s|€/g,'');if(!s)return NaN;if(s.includes(','))s=s.replace(/\./g,'').replace(',','.');return Number(s);};
+const round=n=>Math.round((n+Number.EPSILON)*100)/100;
+const total=(base,shipping)=>round(amount(base)+amount(shipping));
+globalThis.MMBInvoiceAdmin={amount,total,mount(form,booking){
+ const field=n=>form.elements.namedItem(n),get=n=>amount(field(n)?.value),set=(n,v)=>{if(field(n))field(n).value=round(v).toFixed(2).replace('.',',');};
+ const warning=document.createElement('p');warning.className='mmb-invoice-warning';warning.setAttribute('role','status');warning.dataset.invoiceWarning='';form.querySelector('.mmb-price-calculation')?.before(warning);
+ const check=()=>{const expected=total(get('pricing_base_total'),get('pricing_shipping_delta')),actual=get('total_amount');warning.hidden=Number.isFinite(expected)&&Number.isFinite(actual)&&Math.abs(expected-actual)<.009;warning.textContent=warning.hidden?'':`Gesamtpreis und Rechnungsübersicht weichen ab. Aus Zwischensumme und Versand ergeben sich ${Number.isFinite(expected)?expected.toLocaleString('de-DE',{style:'currency',currency:'EUR'}):'ungültige Beträge'}. Eine abweichende Gesamtsumme wird als individuelle Preisanpassung gespeichert.`;};
+ const changed=()=>{if(form._mmbOrder)form._mmbOrder.manual=true;field('total_amount')?.dispatchEvent(new Event('change',{bubbles:true}));form.dispatchEvent(new Event('mmb-invoice-changed'));check();};
+ const sum=()=>set('total_amount',total(get('pricing_base_total'),get('pricing_shipping_delta')));
+ for(const name of ['pricing_original','pricing_discount_amount','pricing_base_total','pricing_shipping_delta','pricing_discount_percent_exact','total_amount'])field(name)?.addEventListener('input',()=>{
+  if(name==='pricing_original'||name==='pricing_discount_amount')set('pricing_base_total',get('pricing_original')-get('pricing_discount_amount'));
+  if(name==='pricing_base_total')set('pricing_original',get('pricing_base_total')+get('pricing_discount_amount'));
+  if(name==='pricing_discount_percent_exact'){set('pricing_discount_amount',get('pricing_original')*get(name)/100);set('pricing_base_total',get('pricing_original')-get('pricing_discount_amount'));}
+  if(name!=='total_amount')sum();changed();
+ });
+ if(!booking.order){
+  const p=booking.pricing_details||{};const oldShipping=amount(p.shipping_delta??booking.fulfillment_price_delta??0)||0;
+  const base=Number.isFinite(get('pricing_base_total'))?get('pricing_base_total'):round(amount(booking.price_total??booking.total_amount??0)-oldShipping);
+  if(!Number.isFinite(get('pricing_original')))set('pricing_original',base);if(!Number.isFinite(get('pricing_discount_amount')))set('pricing_discount_amount',0);if(!Number.isFinite(get('pricing_base_total')))set('pricing_base_total',base);if(!Number.isFinite(get('pricing_shipping_delta')))set('pricing_shipping_delta',oldShipping);
+  const shipping=()=>{const method=field('fulfillment_method').value;set('pricing_shipping_delta',method==='shipping'?80:0);sum();const note=field('fulfillment_note');if(note&&!note.value.trim()&&method==='shipping')note.value='Hin- und Rückversand inklusive Vorbereitung: 80 € für eine Musikbox.';changed();};
+  field('fulfillment_method')?.addEventListener('change',shipping);
+  if(field('fulfillment_method')?.value==='shipping'&&(Math.abs(get('pricing_shipping_delta')-80)>.009||oldShipping!==80))shipping();
+ }
+ form.addEventListener('mmb-order-quoted',check);check();return {check};
+}};
+})();

@@ -45,17 +45,23 @@ function mmb_mail_sections(array $b,bool $internal=false): array {
  if(isset($o['manual_total'])&&abs((float)$o['manual_total']-(float)($o['total']??0))>=0.01)$cost[]='Individuelle Preisanpassung: '.mmb_mail_euro($o['manual_total']-$o['total']);
  $cost[]='Mietsumme: '.mmb_mail_euro($b['total_amount']??$o['total']??0);
  if(!empty($o['quote_required'])||in_array($method,['delivery','delivery_setup'],true))$cost[]='Vorläufige Summe; individuelle Fahrt-/Frachtkosten kommen nach Angebot hinzu. Den vollständigen Preis stimmen wir vorab mit dir ab.';
+ if(!$o){$legacy=mmb_mail_decode($b['pricing_details_json']??$b['pricing_details']??null);$freight=(float)($legacy['shipping_delta']??$b['fulfillment_price_delta']??0);if($freight>0)array_unshift($cost,'Hin- und Rückversand: '.mmb_mail_euro($freight));}
  $sections['💶 Kosten']=$cost;
  $note=trim((string)($b['customer_note']??$b['notes']??$b['note']??''));if($note!=='')$sections['📝 Deine Anmerkung']=[$note];
  return $sections;
 }
 function mmb_mail_render(string $title,string $intro,array $sections,array $actions=[]): array {
  $esc=fn($s)=>htmlspecialchars((string)$s,ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8');
- $text=$intro."\n";$content='<h1 style="font-size:25px;line-height:1.25;margin:0 0 20px">'.$esc($title).'</h1><p style="line-height:1.6">'.nl2br($esc($intro),false).'</p>';
- foreach($actions as $label=>$url){if(!preg_match('~^https://(?:www\.)?(?:mietmichbox\.de|firebrick-squirrel-568721\.hostingersite\.com)/~',$url))continue;$text.="\n$label:\n$url\n";$content.='<p style="margin:22px 0"><a href="'.$esc($url).'" style="display:inline-block;background:#087fae;color:#fff;padding:13px 20px;text-decoration:none;border-radius:6px;font-weight:bold">'.$esc($label).'</a></p>';}
- foreach($sections as $heading=>$rows){$text.="\n".$heading."\n".implode("\n",$rows)."\n";$content.='<h2 style="font-size:18px;margin:26px 0 10px;padding-top:18px;border-top:1px solid #dbe2e8">'.$esc($heading).'</h2>';foreach($rows as $row)$content.='<p style="margin:6px 0;line-height:1.5;overflow-wrap:anywhere">'.nl2br($esc($row),false).'</p>';}
+ $text=$intro."\n";
+ $content='<h1 style="font-size:27px;line-height:1.25;margin:0 0 20px;color:#3b3b3b">'.$esc($title).'</h1><p style="line-height:1.65;margin:0 0 20px">'.nl2br($esc($intro),false).'</p>';
+ foreach($actions as $label=>$url){if(!preg_match('~^https://(?:www\.)?(?:mietmichbox\.de|firebrick-squirrel-568721\.hostingersite\.com)/~',$url))continue;$text.="\n$label:\n$url\n";$content.='<p style="margin:22px 0"><a href="'.$esc($url).'" style="display:inline-block;background:#0ea5e9;color:#12303e;padding:14px 20px;text-decoration:none;font-weight:bold">'.$esc($label).'</a></p>';}
+ foreach($sections as $heading=>$rows){$text.="\n".$heading."\n".implode("\n",$rows)."\n";$content.='<h2 style="font-size:18px;line-height:1.4;margin:26px 0 10px;padding-top:18px;border-top:1px solid #cccfc8;color:#3b3b3b">'.$esc($heading).'</h2>';foreach($rows as $row){
+  $value=nl2br($esc($row),false);
+  if(preg_match('/^Telefon: (.+)$/u',$row,$m))$value='Telefon: <a href="tel:'.$esc(preg_replace('/[^0-9+]/','',$m[1])).'" style="white-space:nowrap;color:#3b3b3b;text-decoration:none">'.$esc($m[1]).'</a>';
+  $content.='<p style="margin:6px 0;line-height:1.55;overflow-wrap:break-word">'.$value.'</p>';
+ }}
  $footer="Viele Grüße\nDein MietMichBox Team\ninfo@mietmichbox.de · +49 174 2015500\nhttps://www.mietmichbox.de";$text.="\n".$footer;
- $html='<!doctype html><html lang="de"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;background:#f3f4ef;color:#202a35;font:16px Arial,sans-serif"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center" style="padding:20px 12px"><table role="presentation" width="100%" style="max-width:620px;background:#fff" cellspacing="0" cellpadding="0"><tr><td style="padding:20px 24px;background:#24313a;color:white;font-size:20px;font-weight:bold">MietMichBox</td></tr><tr><td style="padding:24px">'.$content.'<p style="margin-top:30px;line-height:1.6">'.nl2br($esc($footer),false).'</p></td></tr></table></td></tr></table></body></html>';
+ $html='<!doctype html><html lang="de"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>'.$esc($title).'</title></head><body style="margin:0;background:#3b3b3b;color:#3b3b3b;font:16px Arial,sans-serif"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#3b3b3b"><tr><td align="center" style="padding:20px 8px"><table role="presentation" width="100%" style="max-width:620px;background:#efefe6" cellspacing="0" cellpadding="0"><tr><td style="padding:20px 24px 12px;border-bottom:3px solid #0ea5e9"><a href="https://www.mietmichbox.de"><img src="https://firebrick-squirrel-568721.hostingersite.com/assets/brand/mietmichbox-logo.png" width="144" height="81" alt="MietMichBox" style="display:block;width:144px;height:81px;border:0"></a></td></tr><tr><td style="padding:24px">'.$content.'</td></tr><tr><td style="padding:22px 24px;background:#3b3b3b;color:#efefe6;border-top:3px solid #0ea5e9;font-size:14px;line-height:1.8">Viele Grüße<br><strong>Dein MietMichBox Team</strong><br><a href="mailto:info@mietmichbox.de" style="color:#efefe6;text-decoration:none;white-space:nowrap">info@mietmichbox.de</a><br><a href="tel:+491742015500" style="color:#efefe6;text-decoration:none;white-space:nowrap">+49 174 2015500</a><br><a href="https://www.mietmichbox.de" style="color:#efefe6">www.mietmichbox.de</a></td></tr></table></td></tr></table></body></html>';
  return ['html'=>$html,'text'=>$text];
 }
 function mmb_booking_message(array $b,string $mode='submission',array $options=[]): array {
@@ -72,7 +78,7 @@ function mmb_booking_message(array $b,string $mode='submission',array $options=[
  'reminder3'=>['Bald geht es los','In drei Tagen beginnt deine Miete! Hier findest du die wichtigsten Informationen für eine entspannte Übergabe. Falls noch etwas offen ist, antworte einfach auf diese E-Mail.'],
  ];
  [$title,$intro]=$copy[$mode]??$copy['updated'];$internal=$mode==='internal';
- if(!empty($options['custom_message']))$intro=$options['custom_message']."\n\nAktueller gespeicherter Buchungsstand:";
+ if(!empty($options['custom_message']))$intro=$intro."\n\n".$options['custom_message']."\n\nAktueller gespeicherter Buchungsstand:";
  $sections=mmb_mail_sections($b,$internal);$actions=[];
  if($mode==='alternative'){$names=$options['alternatives']??[];$sections=['🔄 Vorgeschlagene Alternative'=>$names?:['Bitte sprich uns auf die passende Alternative an.']]+$sections;}
  if($mode==='submission'&&!empty($b['verification_url'])){$sections=['✅ E-Mail-Adresse bestätigen'=>['Bitte bestätige deine E-Mail-Adresse innerhalb von 48 Stunden über den Button. Der Link bestätigt nur deine E-Mail-Adresse; er ist keine Buchungsbestätigung und schließt keinen Mietvertrag ab.']]+$sections;$actions['E-Mail-Adresse bestätigen']=$b['verification_url'];}

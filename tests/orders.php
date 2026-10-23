@@ -41,3 +41,11 @@ assert_order(is_numeric($empty['offers']['packages']['single']),'Standalone mini
 $upgrade=mmb_order_options(['speaker'=>3],'2030-01-11','2030-01-14','pickup');$dj=mmb_order_quote(['package'=>'dj','controller'=>1],'2030-01-11','2030-01-14');assert_order($upgrade['offers']['upgrades']['dj']===$dj['total']-$upgrade['quote']['total'],'Upgrade offer must include the preselected optional controller');
 
 foreach(["single","dj","party","event"]as$package){$cart=["package"=>$package,"speaker"=>3,"tent"=>1];$v=mmb_order_options($cart,"2030-01-11","2030-01-14","pickup");$cart["walls"]=1;$q=mmb_order_quote($cart,"2030-01-11","2030-01-14");assert_order($v["offers"]["walls"]===$q["total"]-$v["quote"]["total"],"Side-wall offer must include set discount and rounding");}
+
+require_once dirname(__DIR__).'/lib/booking_invoice.php';
+$legacy=['total_amount'=>44,'box_id'=>3,'fulfillment_price_delta'=>0,'fulfillment_method'=>'pickup'];
+$ship=mmb_legacy_invoice_update($legacy,['fulfillment_method'=>'shipping']);
+assert_order($ship['total_amount']===124.0&&$ship['fulfillment_price_delta']===80.0,'Legacy shipping must add 80 to agreed rent');
+$again=mmb_legacy_invoice_update(array_replace($legacy,$ship),['fulfillment_method'=>'shipping']);assert_order($again['total_amount']===124.0,'Repeated shipping must not add 80 twice');
+$back=mmb_legacy_invoice_update(array_replace($legacy,$ship),['fulfillment_method'=>'pickup']);assert_order($back['total_amount']===44.0,'Pickup must restore agreed rent');
+assert_order(mmb_legacy_invoice_update($legacy,['customer_phone'=>'123'])===['customer_phone'=>'123'],'Unrelated edits must not reprice legacy bookings');

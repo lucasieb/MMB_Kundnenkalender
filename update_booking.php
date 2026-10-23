@@ -6,6 +6,7 @@ require __DIR__ . '/auth.php';        // falls genutzt
 require_admin();
 require_once __DIR__ . '/lib/booking_customer.php';
 require_once __DIR__.'/lib/order_quote.php';
+require_once __DIR__.'/lib/booking_invoice.php';
 
 $pdo = null;
 
@@ -100,6 +101,7 @@ try {
     // A repeated method field or display label must not trigger a recalculation or overwrite manual totals.
     foreach(['fulfillment_label'=>'fulfillment_label','fulfillment_note'=>'fulfillment_note','fulfillment_price_delta'=>'shipping_delta'] as $field=>$orderKey)if(array_key_exists($field,$data))$data[$field]=$activeOrder[$orderKey];
   }elseif(isset($data['cart']))throw new InvalidArgumentException('Diese Altbuchung wird weiterhin über ihre bisherigen Felder verwaltet.');
+  $data=mmb_legacy_invoice_update($existing,$data);
   if(isset($data['status'])&&!in_array($data['status'],['pending','confirmed','rejected','cancelled'],true))throw new InvalidArgumentException('Ungültiger Status.');
   $nextStart=(string)($data['start_date']??$existing['start_date']);$nextEnd=(string)($data['end_date']??$existing['end_date']);
   mmb_order_date($nextStart);mmb_order_date($nextEnd);if($nextEnd<$nextStart)throw new InvalidArgumentException('Enddatum liegt vor Beginn.');

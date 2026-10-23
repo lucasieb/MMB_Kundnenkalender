@@ -241,11 +241,24 @@ try {
     [$status]=request('update_booking_status.php',['booking_id'=>$modernId,'status'=>'rejected','alternative_box_ids'=>[1],'send_email'=>0],true);check($status===200&&$db->query('SELECT alternative_proposed_at FROM bookings WHERE id='.(int)$modernId)->fetchColumn(),'Alternative status marker lost');
     [$status]=request('update_booking_status.php',['booking_id'=>$modernId,'status'=>'confirmed','send_email'=>1,'message'=>'Persönliche Nachricht'],true);check($status===200&&!$db->query('SELECT alternative_proposed_at FROM bookings WHERE id='.(int)$modernId)->fetchColumn(),'Confirmed status must clear alternative marker');
     $captures=array_map(fn($line)=>json_decode($line,true),file($temp.'/mail-capture.jsonl',FILE_IGNORE_NEW_LINES));$lastMail=$captures[count($captures)-1];check(str_contains($lastMail[2],'Aktueller gespeicherter Buchungsstand')&&str_contains($lastMail[2],'Fotobox')&&str_contains($lastMail[2],'77,50'),'Custom update mail missing canonical summary or manual total');
+    // Preview shares the actual renderer but must never write a booking or call SMTP.
+    $beforeCount=(int)$db->query('SELECT COUNT(*) FROM bookings')->fetchColumn();
+    $beforeMails=count(file($temp.'/mail-capture.jsonl'));
+    [$status,$preview]=request('preview_booking_email.php',['booking'=>['id'=>900,'box_id'=>3,'total_amount'=>124,'fulfillment_method'=>'shipping','fulfillment_price_delta'=>80],'mode'=>'confirmed'],true);
+    check($status===200&&str_contains($preview['preview']['html'],'mietmichbox-logo.png')&&str_contains($preview['preview']['text'],'124,00'),'Central mail preview failed');
+    check(count(file($temp.'/mail-capture.jsonl'))===$beforeMails&&(int)$db->query('SELECT COUNT(*) FROM bookings')->fetchColumn()===$beforeCount,'Preview had side effects');
+    $db->exec("INSERT INTO bookings (id,box_id,start_date,end_date,status,customer_name,customer_email,total_amount,fulfillment_method) VALUES (999,3,'2030-01-11','2030-01-12','pending','Legacy fixture','legacy@example.invalid',44,'pickup')");
+    foreach([['shipping',124],['shipping',124],['pickup',44]] as [$method,$expected]){
+      [$status,$saved]=request('update_booking.php',['id'=>999,'fulfillment_method'=>$method],true);
+      check($status===200&&(float)$db->query('SELECT total_amount FROM bookings WHERE id=999')->fetchColumn()===$expected,'Legacy automatic shipping total failed');
+    }
+    check(count(file($temp.'/mail-capture.jsonl'))===$beforeMails,'Invoice update sent mail');
     file_put_contents($temp . '/admin_users.php', "\n// changed credentials\n", FILE_APPEND);
     [$status,$state]=request('admin_login_token.php');
     check($status===200 && $state['authenticated']===false,'Changed credentials must expire existing sessions');
     [$status]=request('list_bookings.php');
     check($status===401,'Expired session must not read bookings');
+    [$status]=request('preview_booking_email.php',['booking'=>['id'=>900]],true);check($status===401,'Anonymous mail preview must be denied');
     [$status]=request('list_bookings.php',null,false,'https://www.mietmichbox.de',$rotatedToken,false);
     check($status===401,'Credential changes must also expire bearer sessions');
     echo "PASS: authenticated admin, pickup/shipping/delivery, pricing/address persistence, schema migration, customer/billing validation, email verification/revocation, updates, availability, separate SMTP outcomes\n";
