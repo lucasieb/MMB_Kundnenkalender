@@ -50,7 +50,8 @@ test('photobox and tent upgrades stay relevant in both selection and equipment s
  const view={cart:{package:'single',photo:'digital',tent:0,speaker:0,controller:0},catalog:{packages:{single:{name:'Einzelbuchung'}}},photo:()=>'<photo>',relatedSets:()=>['party','event'],packageTiles:(upgrades,only)=>{calls.push({upgrades,only});return '<sets>';},startProducts:()=>'<products>'};
  proto.equipmentScreen.call(view);assert.deepEqual(calls,[{upgrades:true,only:['party','event']}]);
 });
-test('photo package prices ask for a period before displaying a calculation state',()=>{
+test('photo and tent prices ask for a period before displaying a calculation state',()=>{
  const html=context.TestConfigurator.prototype.photo.call({cart:{photo:'digital'},catalog:{photo:{digital:{name:'Digital',description:'Cloud'}}},start:'',end:'',offers:null,group:(_id,_title,_icon,_subtitle,content)=>content});
  assert.match(html,/Zeitraum wählen/);assert.doesNotMatch(html,/Preis wird berechnet/);
+ const tent=context.TestConfigurator.prototype.tent.call({cart:{walls:0},start:'',end:'',offers:null,group:(_id,_title,_icon,_subtitle,content)=>content});assert.match(tent,/Wähle deinen Zeitraum/);assert.doesNotMatch(tent,/Preis wird berechnet/);
 });
