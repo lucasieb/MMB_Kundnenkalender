@@ -42,3 +42,10 @@ html,body{min-width:0}#mmb-customer{height:var(--mmb-stage-height,760px);display
 /* Contextual entries share all booking behavior; only the first selection changes. */
 .mmb-start-alternative{display:block}.mmb-start-alternative>summary{cursor:pointer;font-weight:650;min-height:28px}.mmb-start-alternative[open]>summary{margin-bottom:.85rem}.mmb-start-alternative>.mmb-note{margin:.7rem 0}.mmb-set-tiles:has(>.mmb-set-tile:only-child){grid-template-columns:minmax(0,1fr)}
 .mmb-set-tiles:has(>.mmb-set-tile:nth-child(2):last-child){grid-template-columns:repeat(2,minmax(0,1fr))}
+
+/* Narrow screens: full contents need one readable card per row, including two-set entries. */
+@media(max-width:520px){
+ .mmb-set-tiles:has(>.mmb-set-tile:nth-child(2):last-child){grid-template-columns:minmax(0,1fr)}
+ .mmb-set-tile .mmb-set-contents{grid-column:1 / -1;grid-row:2;font-size:.8rem}
+ .mmb-set-tile .mmb-from{grid-column:1 / -1;grid-row:3;justify-self:start}
+}
