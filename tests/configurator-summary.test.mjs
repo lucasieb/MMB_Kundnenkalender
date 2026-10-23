@@ -55,3 +55,13 @@ test('photo and tent prices ask for a period before displaying a calculation sta
  assert.match(html,/Zeitraum wählen/);assert.doesNotMatch(html,/Preis wird berechnet/);
  const tent=context.TestConfigurator.prototype.tent.call({cart:{walls:0},start:'',end:'',offers:null,group:(_id,_title,_icon,_subtitle,content)=>content});assert.match(tent,/Wähle deinen Zeitraum/);assert.doesNotMatch(tent,/Preis wird berechnet/);
 });
+
+
+test('each set tile lists its actual base contents even when earlier sets are absent',()=>{
+ const proto=context.TestConfigurator.prototype;
+ const view={cart:{package:'single'},catalog:{packages:{dj:{name:'DJ-Set',icon:'music'},party:{name:'Party-Set',icon:'camera'},event:{name:'Event-Set',icon:'tent'}},set_discounts:{dj:10,party:15,event:20}},offers:null};
+ for(const id of ['dj','party','event']){
+  const html=proto.packageTiles.call(view,true,[id]);assert.match(html,/2× SOUNDBOKS 4/);assert.match(html,/2× Stativ/);assert.match(html,/Mischpult optional/);assert.doesNotMatch(html,/Alles aus/);
+  if(id!=='dj')assert.match(html,/Fotobox Digital/);if(id==='event')assert.match(html,/mmb-set-add[^]*Eventzelt/);
+ }
+});

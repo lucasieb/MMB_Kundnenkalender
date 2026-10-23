@@ -107,6 +107,16 @@ try {
   mmb_order_date($nextStart);mmb_order_date($nextEnd);if($nextEnd<$nextStart)throw new InvalidArgumentException('Enddatum liegt vor Beginn.');
   foreach(['total_amount','deposit_eur','fulfillment_price_delta'] as $number)if(isset($data[$number])&&(!is_numeric($data[$number])||(float)$data[$number]<0||!is_finite((float)$data[$number])))throw new InvalidArgumentException('Ungültiger Betrag.');
 
+  // Keep explicitly linked destinations in sync when billing fields alone are edited.
+  $destinationMethod=$data['fulfillment_method']??$existing['fulfillment_method']??'pickup';
+  if($destinationMethod==='shipping'||str_starts_with($destinationMethod,'delivery')){
+    $destinationRaw=$data['fulfillment_details_json']??$data['fulfillment_details']??$existing['fulfillment_details_json']??$existing['fulfillment_details']??null;
+    $destination=is_array($destinationRaw)?$destinationRaw:json_decode((string)$destinationRaw,true);
+    if(is_array($destination)&&($destination['same_as_billing']??false)===true){
+      $data['fulfillment_details_json']=booking_destination_details(array_replace($existing,$data),$destination);
+      unset($data['fulfillment_details']);
+    }
+  }
   if(array_key_exists('fulfillment_details_json',$data)||array_key_exists('fulfillment_details',$data)){
     $delivery=$data['fulfillment_details_json']??$data['fulfillment_details'];$delivery=is_array($delivery)?$delivery:json_decode((string)$delivery,true);
     booking_delivery_company($delivery??[]);

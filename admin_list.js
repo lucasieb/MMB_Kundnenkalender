@@ -1101,6 +1101,8 @@
         const fulfillmentOptionsHtml = FULFILLMENT_CHOICES.map(opt=>`<option value="${opt.id}" ${opt.id===currentFulfillmentMethod?'selected':''}>${this.escape(opt.label)}</option>`).join('');
         const pricing = this.normalizePricingDetails(booking.pricing_details);
         const fulfillmentDetails = this.normalizeFulfillmentDetails(booking.fulfillment_details, currentFulfillmentMethod) || {};
+        const contactPhone=booking.customer_phone||fulfillmentDetails.contact_phone||'';
+        const sameAddress=typeof fulfillmentDetails.same_as_billing==='boolean'?fulfillmentDetails.same_as_billing:!['address_line1','postal_code','city'].some(key=>String(fulfillmentDetails[key]||'').trim());
         const depositValue = Number.isFinite(booking.deposit_eur) ? booking.deposit_eur : (Number(pricing?.deposit) || 0);
         const totalValue = Number.isFinite(booking.price_total) ? booking.price_total : (Number(pricing?.total) || 0);
         const baseTotalValue = Number.isFinite(pricing?.base_total) ? pricing.base_total : Math.max(0,totalValue-(Number(booking.fulfillment_price_delta)||0));
@@ -1137,7 +1139,7 @@
                   <span>${MMBIcons.icon('truck')}<span data-summary="fulfillment_method">${this.escape(fulfillmentChoice.label)}</span></span>
                   <strong>${MMBIcons.icon('euro')}<span data-summary="total_amount">${this.formatEuro(totalValue)}</span></strong>
                   <a data-summary="customer_email" href="mailto:${this.escape(booking.customer_email)}">${MMBIcons.icon('mail')}<span>${this.escape(booking.customer_email||'Keine E-Mail')}</span></a>
-                  <a data-summary="customer_phone" href="tel:${this.escape(booking.customer_phone)}">${MMBIcons.icon('phone')}<span>${this.escape(booking.customer_phone||'Keine Telefonnummer')}</span></a>
+                  <a data-summary="customer_phone" href="tel:${this.escape(contactPhone)}">${MMBIcons.icon('phone')}<span>${this.escape(contactPhone||'Keine Telefonnummer')}</span></a>
                 </div>
               </div>
               <button type="button" class="mmb-detail-close" data-close aria-label="Detailansicht schließen">×</button>
@@ -1181,7 +1183,7 @@
                   </div>
                   <div class="mmb-detail-field">
                     <label>Telefon</label>
-                    <input name="customer_phone" value="${this.escape(booking.customer_phone||'')}">
+                    <input name="customer_phone" type="tel" autocomplete="tel" value="${this.escape(contactPhone)}">${!booking.customer_phone&&contactPhone?'<small>Aus dem Abwicklungskontakt übernommen. Wird beim Speichern auch als allgemeine Telefonnummer hinterlegt.</small>':''}
                   </div>
                 </div>
               </div>
@@ -1239,7 +1241,9 @@
               </div>
 
               <div class="mmb-detail-section" data-fulfillment-section="address" ${showExtended?'':'hidden'}>
-                <h3 data-destination-title>${currentFulfillmentMethod==='shipping'?'Versandadresse':'Lieferadresse'}</h3><div class="mmb-detail-grid"><div class="mmb-detail-field"><label>Unternehmen (bei Gewerbe)</label><input name="shipping_company_name" maxlength="200" value="${this.escape(fulfillmentDetails.company_name||'')}"></div></div>
+                <h3 data-destination-title>${currentFulfillmentMethod==='shipping'?'Versandadresse':'Lieferadresse'}</h3>
+                <label class="mmb-detail-checkbox"><input type="checkbox" name="same_address" ${sameAddress?'checked':''}><span data-same-address-label>${currentFulfillmentMethod==='shipping'?'Versandadresse':'Lieferadresse'} identisch mit Rechnungsadresse</span></label>
+                <div data-separate-address ${sameAddress?'hidden':''}><div class="mmb-detail-grid"><div class="mmb-detail-field"><label>Unternehmen (bei Gewerbe)</label><input name="shipping_company_name" maxlength="200" value="${this.escape(fulfillmentDetails.company_name||'')}"></div></div>
                 <div class="mmb-detail-grid">
                   <div class="mmb-detail-field">
                     <label>Straße &amp; Hausnummer</label>
@@ -1260,6 +1264,7 @@
                 </div>
               </div>
 
+              </div>
               <div class="mmb-detail-section" data-fulfillment-section="delivery" ${currentFulfillmentMethod!=='shipping'?'':'hidden'}>
                 <h3 data-timing-title>${currentFulfillmentMethod==='pickup'?'Abholdetails':'Lieferdetails'}</h3>
                 <div class="mmb-detail-grid">
@@ -1408,6 +1413,7 @@
           if(!fulfillmentSelect) return;
           const method = fulfillmentSelect.value;
           const destinationTitle=form.querySelector('[data-destination-title]');if(destinationTitle)destinationTitle.textContent=method==='shipping'?'Versandadresse':'Lieferadresse';
+          const sameLabel=form.querySelector('[data-same-address-label]');if(sameLabel)sameLabel.textContent=(method==='shipping'?'Versandadresse':'Lieferadresse')+' identisch mit Rechnungsadresse';
           const timingTitle=form.querySelector('[data-timing-title]'),timingHint=form.querySelector('[data-timing-hint]'),timingLabel=form.querySelector('[data-timing-label]');
           if(timingTitle)timingTitle.textContent=method==='pickup'?'Abholdetails':'Lieferdetails';if(timingHint)timingHint.textContent=method==='pickup'?'Abholhinweis':'Lieferhinweis';if(timingLabel)timingLabel.textContent='Wunschzeit für '+(method==='pickup'?'Abholung':'Lieferung')+' am '+(form.elements.start_date?.value||booking.start_date);
           detailSections.forEach(section=>{
@@ -1423,6 +1429,9 @@
             hintEl.textContent = choice.note || 'Keine zusätzlichen Hinweise';
           }
         };
+        const sameAddressInput=form.querySelector('[name="same_address"]');
+        const updateAddressUI=()=>{const separate=form.querySelector('[data-separate-address]');if(separate)separate.hidden=!!sameAddressInput?.checked;};
+        sameAddressInput?.addEventListener('change',updateAddressUI);updateAddressUI();
         updateFulfillmentUI();
         if(fulfillmentSelect){ fulfillmentSelect.addEventListener('change', updateFulfillmentUI); }
 
@@ -2015,16 +2024,14 @@
         payload.contact_preferences = { phone: allowPhone, whatsapp: allowWhatsApp };
 
         if(method === 'shipping' || method.startsWith('delivery')){
-          payload.company_name=getValue('shipping_company_name');
+          const same=form.querySelector('[name="same_address"]');
+          payload.same_as_billing=same?!!same.checked:existing?.same_as_billing===true;
+          payload.company_name=getValue(payload.same_as_billing?'company_name':'shipping_company_name');
           payload.customer_type=getValue('customer_type');
-          const line1 = getValue('shipping_address_line1');
-          const postal = getValue('shipping_postal_code');
-          const city = getValue('shipping_city');
-          const extra = getValue('shipping_address_extra');
-          if(line1) payload.address_line1 = line1;
-          if(postal) payload.postal_code = postal;
-          if(city) payload.city = city;
-          if(extra) payload.address_extra = extra;
+          payload.address_line1=getValue(payload.same_as_billing?'billing_address_line1':'shipping_address_line1');
+          payload.postal_code=getValue(payload.same_as_billing?'billing_postal_code':'shipping_postal_code');
+          payload.city=getValue(payload.same_as_billing?'billing_city':'shipping_city');
+          payload.address_extra=payload.same_as_billing?'':getValue('shipping_address_extra');
         }
 
         if(method!=='shipping'){
