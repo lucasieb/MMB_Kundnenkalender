@@ -53,3 +53,16 @@ function booking_delivery_company(array $details): void {
  if(!is_scalar($value)||mb_strlen((string)$value)>200||preg_match('/[\x00-\x1F\x7F]/u',(string)$value))throw new InvalidArgumentException('Bitte einen gültigen Unternehmensnamen der Lieferadresse angeben.');
  if(($details['customer_type']??'private')==='business'&&trim((string)$value)==='')throw new InvalidArgumentException('Bitte den Unternehmensnamen der Lieferadresse angeben.');
 }
+
+
+/** Resolve the explicit same-as-billing choice; legacy addresses are never inferred on reads. */
+function booking_destination_details(array $booking, array $details): array {
+ if (($details['same_as_billing'] ?? false) !== true) return $details;
+ foreach (['address_line1'=>'billing_address_line1','postal_code'=>'billing_postal_code','city'=>'billing_city','company_name'=>'company_name'] as $target=>$source) {
+  $details[$target]=trim((string)($booking[$source]??''));
+ }
+ $details['customer_type']=$booking['customer_type']??'private';
+ unset($details['address_extra']);
+ foreach(['contact_name'=>'customer_name','contact_email'=>'customer_email','contact_phone'=>'customer_phone'] as $target=>$source)if(empty($details[$target])&&!empty($booking[$source]))$details[$target]=$booking[$source];
+ return $details;
+}

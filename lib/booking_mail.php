@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__.'/communication_config.php';
+require_once __DIR__.'/booking_customer.php';
 
 /** One saved booking snapshot for all customer and team communications. Never recalculate old orders. */
 function mmb_mail_decode($value): array { if(is_array($value))return $value;$decoded=json_decode((string)($value??''),true);return is_array($decoded)?$decoded:[]; }
@@ -8,6 +9,7 @@ function mmb_mail_euro($value): string { return number_format((float)$value,2,',
 function mmb_mail_date($value): string { $d=DateTimeImmutable::createFromFormat('!Y-m-d',(string)$value);return $d?$d->format('d.m.Y'):(string)$value; }
 function mmb_mail_sections(array $b,bool $internal=false): array {
  $o=mmb_mail_decode($b['order']??$b['order_json']??null);$d=mmb_mail_decode($b['fulfillment_details']??$b['fulfillment_details_json']??null);
+ $d=booking_destination_details($b,$d);
  $method=(string)($b['fulfillment_method']??'pickup');$id=(string)($b['display_id']??str_pad((string)((int)($b['id']??0)+100),5,'0',STR_PAD_LEFT));
  $sections=[];$sections['📅 Deine Buchung']=['Buchungsnummer: '.$id,'Mietbeginn: '.mmb_mail_date($b['start_date']??''),'Rückgabe: '.mmb_mail_date($b['end_date']??'')];
  if(($o['day_unit']??'')==='24h')$sections['📅 Deine Buchung'][]=($o['days']??'').' '.((int)($o['days']??0)===1?'Miettag':'Miettage').' à 24 Stunden. Rückgabe zur vereinbarten Uhrzeit des Mietbeginns.';

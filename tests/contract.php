@@ -167,6 +167,16 @@ try {
     $row=$db->query('SELECT * FROM bookings WHERE id=1')->fetch(PDO::FETCH_ASSOC);
     check(json_decode($row['pricing_details_json'],true)['total']===123,'Updated pricing lost');
     check(json_decode($row['fulfillment_details_json'],true)['contact_phone']==='1234','Updated contact lost');
+    [$status,$addressUpdate]=request('update_booking.php',['id'=>1,'customer_phone'=>'+49 174 1234567','billing_address_line1'=>'Neue Rechnung 5','billing_postal_code'=>'46483','billing_city'=>'Wesel','fulfillment_method'=>'shipping','fulfillment_details_json'=>['same_as_billing'=>true,'contact_phone'=>'+49 174 7654321','address_line1'=>'Stale destination']],true,'https://www.mietmichbox.de',$rotatedToken,false);
+    check($status===200,'Linked address save failed');
+    $saved=$db->query('SELECT * FROM bookings WHERE id=1')->fetch(PDO::FETCH_ASSOC);$destination=json_decode($saved['fulfillment_details_json'],true);
+    check($saved['customer_phone']==='+49 174 1234567'&&$destination['contact_phone']==='+49 174 7654321','Customer and alternative phone must both persist');
+    check($destination['same_as_billing']===true&&$destination['address_line1']==='Neue Rechnung 5'&&$destination['postal_code']==='46483','Billing address not copied');
+    [$status]=request('update_booking.php',['id'=>1,'billing_address_line1'=>'Geänderte Rechnung 8'],true,'https://www.mietmichbox.de',$rotatedToken,false);
+    $destination=json_decode($db->query('SELECT fulfillment_details_json FROM bookings WHERE id=1')->fetchColumn(),true);
+    check($status===200&&$destination['address_line1']==='Geänderte Rechnung 8','Linked destination did not follow later billing update');
+    [$status]=request('update_booking.php',['id'=>1,'fulfillment_method'=>'pickup'],true,'https://www.mietmichbox.de',$rotatedToken,false);
+    check($status===200,'Restore isolated pickup fixture failed');
     [$status,$statusUpdate]=request('update_booking_status.php',['booking_id'=>1,'status'=>'confirmed','send_email'=>0],true,'https://www.mietmichbox.de',$rotatedToken,false);
     check($status===200 && $statusUpdate['ok']===true && $db->query('SELECT status FROM bookings WHERE id=1')->fetchColumn()==='confirmed','Cookie-free status action failed');
     [$status,$calendar]=request('calendar_unavailable.php?box_id=3&from=2027-01-01&to=2027-01-31');
