@@ -21,3 +21,8 @@ $shipMail=mmb_booking_message($ship,'reminder3');assert_mail(str_contains($shipM
 $db=new PDO('sqlite::memory:');$db->setAttribute(PDO::ATTR_ERRMODE,PDO::ERRMODE_EXCEPTION);$db->exec('CREATE TABLE booking_mail_jobs (booking_id INTEGER,event_key TEXT,rental_start TEXT,recipient TEXT,status TEXT,created_at TEXT, UNIQUE(booking_id,event_key,rental_start))');assert_mail(mmb_reminder_claim($db,$r,'reminder7'),'Initial claim');assert_mail(!mmb_reminder_claim($db,$r,'reminder7'),'Duplicate claim');assert_mail(mmb_reminder_claim($db,$r,'reminder3'),'Independent reminder');
 file_put_contents(__DIR__.'/communication-preview.html',mmb_booking_message($b,'submission')['html']);
 echo "PASS: 9 complete responsive templates, XSS escaping, old bookings, addresses, custom text, reminder scheduling and duplicate suppression\n";
+
+$legacyMail=mmb_booking_message(['id'=>900,'customer_name'=>'Test Altbuchung','box_id'=>3,'total_amount'=>124,'fulfillment_method'=>'shipping','fulfillment_price_delta'=>80],'confirmed');
+assert_mail(str_contains($legacyMail['text'],'80,00 €')&&str_contains($legacyMail['text'],'124,00 €'),'Legacy mail freight/total missing');
+assert_mail(str_contains($legacyMail['html'],'mietmichbox-logo.png')&&str_contains($legacyMail['html'],'white-space:nowrap'),'Brand logo and phone wrapping protection missing');
+assert_mail(!str_contains($legacyMail['html'],'border-radius'),'Mail shell must stay square');

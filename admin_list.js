@@ -164,7 +164,7 @@
             fulfillment_method:fulfillmentMeta.method,
             fulfillment_label:fulfillmentMeta.label,
             fulfillment_note:fulfillmentMeta.note,
-            fulfillment_price_delta:fulfillmentMeta.priceDelta,
+            fulfillment_price_delta:Number(r.fulfillment_price_delta??normalizedPricing?.shipping_delta??normalizedFulfillmentDetails?.price_delta??0),
             fulfillment_adds_to_total:fulfillmentMeta.addsToTotal,
             created_at:r.created_at,
             pricing_details: normalizedPricing,
@@ -444,14 +444,14 @@
       // ---------- Aktionen ----------
       async confirmBooking(id){
         const b = this.state.originalBookings.find(x=>x.id===id); if(!b) return;
-        const subject = `Deine Buchung wurde bestätigt ✅ – Buchungs-ID: ${displayId(id)}`;
+        const subject = this.mailSubject(b,'confirmed');
         const body = this.tplConfirm(b);
         const html = `
           <div class="mmb-field"><strong>Buchung:</strong> ${displayId(id)} – ${this.escape(b.customer_name)} (${this.escape(b.box_name)})</div>
           <div class="mmb-field"><label>Betreff</label><input name="subject" value="${this.escape(subject)}"/></div>
-          <div class="mmb-field"><label>Nachricht an Kund*in</label><textarea name="message">${this.escape(body)}</textarea></div>
+          <div class="mmb-field"><label>Persönliche Ergänzung (optional)</label><textarea name="message">${this.escape(body)}</textarea></div>
         `;
-        const values = await this.openModal({ title:'Buchung bestätigen', html, confirmText:'Status auf „Bestätigt“ setzen' });
+        const values = await this.openModal({ title:'Buchung bestätigen', html, previewBooking:b, previewMode:'confirmed', confirmText:'Status auf „Bestätigt“ setzen' });
         if(!values) return;
         await MMBApi.updateBookingStatus({ booking_id: Number(id), status: 'confirmed', send_email: 1, subject: values.subject, message: values.message });
         await this.loadBookings();
@@ -460,15 +460,15 @@
 
       async declineBooking(id){
         const b = this.state.originalBookings.find(x=>x.id===id); if(!b) return;
-        const subject = `Deine Buchung wurde abgelehnt ❌ – Buchungs-ID: ${displayId(id)}`;
+        const subject = this.mailSubject(b,'rejected');
         const body = this.tplReject(b);
         const html = `
           <div class="mmb-field"><strong>Buchung:</strong> ${displayId(id)} – ${this.escape(b.customer_name)} (${this.escape(b.box_name)})</div>
           <div class="mmb-field"><label>Grund (intern)</label><input name="reason" placeholder="z.B. Terminkonflikt"/></div>
           <div class="mmb-field"><label>Betreff</label><input name="subject" value="${this.escape(subject)}"/></div>
-          <div class="mmb-field"><label>Nachricht an Kund*in</label><textarea name="message">${this.escape(body)}</textarea></div>
+          <div class="mmb-field"><label>Persönliche Ergänzung (optional)</label><textarea name="message">${this.escape(body)}</textarea></div>
         `;
-        const values = await this.openModal({ title:'Buchung ablehnen', html, confirmText:'Als „Abgelehnt“ markieren' });
+        const values = await this.openModal({ title:'Buchung ablehnen', html, previewBooking:b, previewMode:'rejected', confirmText:'Als „Abgelehnt“ markieren' });
         if(!values) return;
         await MMBApi.updateBookingStatus({ booking_id: Number(id), status: 'rejected', send_email: 1, subject: values.subject, message: values.message });
         await this.loadBookings();
@@ -480,7 +480,7 @@
         const alternatives = [{id:'2',name:BOX_MAP['2']},{id:'3',name:BOX_MAP['3']},{id:'1',name:BOX_MAP['1']}]
           .filter(x => x.id !== b.box_id);
         const altMap = Object.fromEntries(alternatives.map(a=>[a.id,a]));
-        const subject = `Konflikt bei deiner Buchung ⚠️ – Buchungs-ID: ${displayId(id)}`;
+        const subject = this.mailSubject(b,'alternative');
         const initialSelection = alternatives.length ? [alternatives[0]] : [];
         const html = `
           <div class="mmb-field"><strong>Buchung:</strong> ${displayId(id)} – ${this.escape(b.customer_name)}</div>
@@ -492,11 +492,11 @@
             </div>
           </div>
           <div class="mmb-field"><label>Betreff</label><input name="subject" value="${this.escape(subject)}"/></div>
-          <div class="mmb-field"><label>Nachricht an Kund*in</label><textarea name="message">${this.escape(this.tplAlternative(b, initialSelection))}</textarea></div>
+          <div class="mmb-field"><label>Persönliche Ergänzung (optional)</label><textarea name="message">${this.escape(this.tplAlternative(b, initialSelection))}</textarea></div>
         `;
         const values = await this.openModal({
           title:'Alternative Box vorschlagen',
-          html,
+          html, previewBooking:b, previewMode:'alternative',
           confirmText:'Alternative senden',
           onMount: (form)=>{
             const boxes = Array.from(form.querySelectorAll('input[name="alternative_box_ids"]'));
@@ -509,7 +509,7 @@
               }
               const selected = checked.map(cb=>altMap[cb.value]).filter(Boolean);
               const fallback = selected.length ? selected : initialSelection;
-              ta.value = this.tplAlternative(b, fallback);
+              // The central renderer adds the selection; retain the personal message.
             };
             boxes.forEach(cb=>cb.addEventListener('change', sync));
             sync();
@@ -590,7 +590,7 @@
           .join('');
         const fulfillmentInfo = this.getFulfillmentInfo(b);
         const fulfillmentHint = fulfillmentInfo.note ? this.escape(fulfillmentInfo.note) : 'Keine zusätzlichen Hinweise';
-        const baseSubject = `Deine Buchung wurde aktualisiert 👷🏽 – Buchungs-ID: ${displayId(id)}`;
+        const baseSubject = `Deine Buchung wurde aktualisiert – Buchung ${displayId(id)}`;
         const parseAmount = (val)=>{
           if(val===null || val===undefined) return NaN;
           if(typeof val==='number') return val;
@@ -654,7 +654,7 @@
             const sendSwitch = form.querySelector('input[name="send_email"]');
             const companyField=form.querySelector('[name=company_name]'),typeField=form.querySelector('[name=customer_type]');
             if(companyField&&typeField){const syncCompany=()=>{companyField.required=typeField.value==='business';companyField.closest('.mmb-detail-field').hidden=typeField.value!=='business';};typeField.addEventListener('change',syncCompany);syncCompany();}
-            const watchFields = ['customer_name','customer_email','customer_phone','box_id','start_date','end_date','status','total_amount','fulfillment_method'];
+            const watchFields=Array.from(form.querySelectorAll('input[name],select[name],textarea[name]')).map(el=>el.name).filter(name=>!['message','subject'].includes(name));
             let subjectDirty = false;
             let messageDirty = false;
 
@@ -694,7 +694,7 @@
               if(!subjectInput || !messageInput) return;
               const current = buildBookingForEmail(collectCurrentValues());
               if(force || !subjectDirty){
-                subjectInput.value = baseSubject;
+                subjectInput.value = this.mailSubject(current, current.status);
               }
               if(force || !messageDirty){
                 messageInput.value = this.tplEditInfo(current);
@@ -702,7 +702,7 @@
             };
 
             if(subjectInput){
-              subjectInput.addEventListener('input', ()=>{ subjectDirty = subjectInput.value !== baseSubject; });
+              subjectInput.addEventListener('input', ()=>{ subjectDirty = subjectInput.value !== this.mailSubject(buildBookingForEmail(collectCurrentValues()), form.elements.status?.value); });
             }
             if(messageInput){
               messageInput.addEventListener('input', ()=>{ messageDirty = true; });
@@ -925,7 +925,19 @@
       }
 
       // ---------- Modal & Utils ----------
-      openModal({ title, html, confirmText='OK', cancelText='Abbrechen', onMount=null }){
+      mailSubject(booking,mode){
+        const title={confirmed:'Deine Buchung ist bestätigt',rejected:'Zu deiner Buchungsanfrage',cancelled:'Deine Buchung wurde storniert',alternative:'Eine Alternative für dein Event'}[mode]||'Deine Buchung wurde aktualisiert';
+        return `${title} – Buchung ${displayId(booking.id)}`;
+      }
+      mountMailPreview(form,getBooking,getMode){
+        const box=document.createElement('details');box.className='mmb-mail-preview';box.open=true;box.innerHTML='<summary>Vorschau der Kundenmail</summary><p data-preview-status role="status">Vorschau wird geladen …</p><iframe title="Vorschau der Kundenmail" sandbox="allow-same-origin" style="width:100%;height:540px;border:0;background:#efefe6"></iframe>';
+        const anchor=form.querySelector('[data-email-field]')||form.querySelector('.mmb-modal-actions');if(anchor?.matches('.mmb-modal-actions'))anchor.before(box);else if(anchor)anchor.after(box);else form.append(box);
+        const frame=box.querySelector('iframe'),status=box.querySelector('[data-preview-status]');let serial=0,timer;
+        const refresh=async()=>{const current=++serial;try{const result=await mmbApiPost('preview_booking_email.php',{booking:getBooking(),mode:getMode(),message:form.elements.message?.value||'',subject:form.elements.subject?.value||'',alternatives:Array.from(form.querySelectorAll('[name=alternative_box_ids]:checked')).map(el=>BOX_MAP[el.value]).filter(Boolean)});if(current!==serial||!box.isConnected)return;frame.srcdoc=result.preview.html;status.textContent='Aktueller Entwurf · Versand erst nach deiner ausdrücklichen Aktion.';}catch(e){if(current===serial)status.textContent='Vorschau nicht verfügbar: '+e.message;}};
+        const queue=()=>{clearTimeout(timer);timer=setTimeout(refresh,200);};form.addEventListener('input',queue);form.addEventListener('change',queue);form.addEventListener('mmb-order-quoted',queue);form.addEventListener('mmb-invoice-changed',queue);refresh();
+      }
+
+      openModal({ title, html, confirmText='OK', cancelText='Abbrechen', onMount=null, previewBooking=null, previewMode='updated' }){
         return new Promise((resolve)=>{
           const modal = document.createElement('div');
           modal.className = 'mmb-modal';
@@ -948,6 +960,7 @@
           const cancelBtn = modal.querySelector('[data-cancel]');
 
           if(typeof onMount==='function'){ try{ onMount(form, modal); }catch(e){} }
+          if(previewBooking)this.mountMailPreview(form,()=>previewBooking,()=>previewMode);
 
           if(cancelBtn){ cancelBtn.addEventListener('click', ()=>{ modal.remove(); resolve(null); }); }
           modal.addEventListener('click', (ev)=>{ if(ev.target===modal) { modal.remove(); resolve(null); }});
@@ -1090,15 +1103,15 @@
         const fulfillmentDetails = this.normalizeFulfillmentDetails(booking.fulfillment_details, currentFulfillmentMethod) || {};
         const depositValue = Number.isFinite(booking.deposit_eur) ? booking.deposit_eur : (Number(pricing?.deposit) || 0);
         const totalValue = Number.isFinite(booking.price_total) ? booking.price_total : (Number(pricing?.total) || 0);
-        const baseTotalValue = Number.isFinite(pricing?.base_total) ? pricing.base_total : totalValue;
+        const baseTotalValue = Number.isFinite(pricing?.base_total) ? pricing.base_total : Math.max(0,totalValue-(Number(booking.fulfillment_price_delta)||0));
         const originalValue = Number.isFinite(pricing?.original) ? pricing.original : baseTotalValue;
-        const shippingDeltaValue = Number.isFinite(pricing?.shipping_delta) ? pricing.shipping_delta : (Number.isFinite(fulfillmentChoice.priceDelta) ? fulfillmentChoice.priceDelta : 0);
+        const shippingDeltaValue = Number.isFinite(pricing?.shipping_delta) ? pricing.shipping_delta : (Number(booking.fulfillment_price_delta)||0);
         const discountAmountValue = Number.isFinite(pricing?.discount_amount) ? pricing.discount_amount : 0;
         const discountPercentExactValue = Number.isFinite(pricing?.discount_percent_exact) ? pricing.discount_percent_exact : 0;
         const discountPercentDisplayValue = pricing?.discount_percent_display || (discountPercentExactValue ? String(discountPercentExactValue) : '');
         const avgPerDayValue = Number.isFinite(pricing?.avg_per_day) ? pricing.avg_per_day : null;
         const daysValue = Number.isFinite(pricing?.days) ? pricing.days : null;
-        const baseSubject = `Deine Buchung wurde aktualisiert 👷🏽 – Buchungs-ID: ${displayId(booking.id)}`;
+        const baseSubject = this.mailSubject(booking, booking.status);
         const baseMessage = this.tplEditInfo(booking);
         const shippingAllowPhone = fulfillmentDetails.allow_contact_phone !== false;
         const shippingAllowWhatsApp = fulfillmentDetails.allow_contact_whatsapp === true || (fulfillmentDetails.contact_preferences && fulfillmentDetails.contact_preferences.whatsapp === true);
@@ -1272,7 +1285,7 @@
                   <div class="mmb-detail-field"><label>Ø Preis pro Tag</label><input inputmode="decimal" name="pricing_avg_per_day" value="${this.escape(this.formatNumberInput(avgPerDayValue))}"></div>
                   <div class="mmb-detail-field"><label>Anzahl Tage</label><input inputmode="numeric" name="pricing_days" value="${this.escape(this.formatIntegerInput(daysValue))}"></div>
                 </div></details>
-                <p class="mmb-detail-note">Beträge in Euro. Änderungen an Einzelwerten sind manuelle Preisangaben; bitte Gesamtpreis und Rabatt gemeinsam prüfen.</p>
+                <p class="mmb-detail-note">Beträge in Euro. Änderungen an Miete, Rabatt oder Versand passen den Gesamtpreis automatisch an. Kaution wird zusätzlich ausgewiesen.</p>
               </div>
 
               <div class="mmb-detail-section">
@@ -1292,11 +1305,11 @@
                     <input name="subject" value="${this.escape(baseSubject)}">
                   </div>
                   <div class="mmb-detail-field">
-                    <label>Nachricht</label>
+                    <label>Persönliche Ergänzung (optional)</label>
                     <textarea name="message">${this.escape(baseMessage)}</textarea>
                   </div>
                 </div>
-                <div class="mmb-detail-note">Nur kundenrelevante Felder werden in der E-Mail angezeigt.</div>
+                <div class="mmb-detail-note">Die aktuelle zentrale Mailvorlage ergänzt Status und Buchungsdaten automatisch. Die Vorschau versendet keine E-Mail.</div>
               </div>
 
               </div><div class="mmb-detail-footer">
@@ -1418,7 +1431,7 @@
         const sendSwitch = form.querySelector('input[name="send_email"]');
         const companyField=form.querySelector('[name=company_name]'),typeField=form.querySelector('[name=customer_type]');
             if(companyField&&typeField){const syncCompany=()=>{companyField.required=typeField.value==='business';companyField.closest('.mmb-detail-field').hidden=typeField.value!=='business';};typeField.addEventListener('change',syncCompany);syncCompany();}
-            const watchFields = ['customer_name','customer_email','customer_phone','box_id','start_date','end_date','status','total_amount','fulfillment_method'];
+            const watchFields = [...new Set(Array.from(form.querySelectorAll('input[name],select[name],textarea[name]')).map(el=>el.name).filter(n=>!['message','subject'].includes(n)))];
         let subjectDirty = false;
         let messageDirty = false;
 
@@ -1448,6 +1461,10 @@
             end_date: vals.end_date ?? booking.end_date,
             status: vals.status ?? booking.status,
             price_total: Number.isFinite(parsedAmount) ? parsedAmount : booking.price_total,
+            total_amount: Number.isFinite(parsedAmount) ? parsedAmount : booking.price_total,
+            ...Object.fromEntries(['billing_address_line1','billing_postal_code','billing_city','company_name'].map(n=>[n,vals[n]??booking[n]])),
+            fulfillment_details:this.buildFulfillmentDetailsPayload(form,fulfillmentChoiceLocal.id,booking.fulfillment_details),
+            pricing_details:{...booking.pricing_details,shipping_delta:this.parseAmount(vals.pricing_shipping_delta)},
             fulfillment_method: fulfillmentChoiceLocal.id,
             fulfillment_label: fulfillmentChoiceLocal.label,
             fulfillment_note: fulfillmentChoiceLocal.note,
@@ -1459,14 +1476,14 @@
           if(!subjectInput || !messageInput) return;
           const current = buildBookingForEmail(collectCurrentValues());
           if(force || !subjectDirty){
-            subjectInput.value = baseSubject;
+            subjectInput.value = this.mailSubject(current, current.status);
           }
           if(force || !messageDirty){
             messageInput.value = this.tplEditInfo(current);
           }
         };
 
-        if(subjectInput){ subjectInput.addEventListener('input', ()=>{ subjectDirty = subjectInput.value !== baseSubject; }); }
+        if(subjectInput){ subjectInput.addEventListener('input', ()=>{ subjectDirty = subjectInput.value !== this.mailSubject(buildBookingForEmail(collectCurrentValues()), form.elements.status?.value); }); }
         if(messageInput){ messageInput.addEventListener('input', ()=>{ messageDirty = true; }); }
 
         watchFields.forEach(name=>{
@@ -1493,8 +1510,11 @@
         }
 
         form._mmbOrder=MMBOrderAdmin.mount(form,booking,mmbApiPost);
+        form._mmbInvoice=MMBInvoiceAdmin.mount(form,booking);
         syncEmailFields(true);
         form.addEventListener('mmb-order-quoted',()=>syncEmailFields());
+        form.addEventListener('mmb-invoice-changed',()=>syncEmailFields());
+        this.mountMailPreview(form,()=>{const b=buildBookingForEmail(collectCurrentValues());if(b.order&&form._mmbOrder?.manual)b.order={...b.order,manual_total:b.total_amount};return b;},()=>['confirmed','rejected','cancelled'].includes(form.elements.status.value)?form.elements.status.value:'updated');
         form.addEventListener('submit', async (event)=>{
           event.preventDefault();
           await this.handleDetailSubmit(form, booking, closeOverlay, { baseSubject });
@@ -2025,127 +2045,12 @@
         return meaningfulKeys.length ? payload : null;
       }
 
-      tplConfirm(b){
-        const range = `${new Date(b.start_date).toLocaleDateString('de-DE')} – ${new Date(b.end_date).toLocaleDateString('de-DE')}`;
-        return `Hallo ${b.customer_name},
+      // Optional personal additions only. The server owns all status copy and booking details.
+      tplConfirm(){ return ''; }
+      tplReject(){ return ''; }
+      tplAlternative(){ return ''; }
+      tplEditInfo(){ return ''; }
 
-hier sind hervorragende Neuigkeiten für dich 🎉
-Wir haben deine Buchung mit der Buchungs-ID: ${displayId(b.id)} bestätigt.
-
-Deine Buchung im Überblick:
-👤 Name: ${b.customer_name}
-📧 E-Mail: ${b.customer_email}
-🎵 Musikbox: ${b.box_name}
-🕰️ Zeitraum: ${range}
-🚚 Abwicklung: ${this.fulfillmentEmailLine(b)}
-💶 Gesamtkosten: ${this.formatEuro(b.price_total)}
-
-Bitte überprüfe einmal, ob wir deine Buchung korrekt hinterlegt haben.
-
-Falls du noch offene Fragen hast, kannst du uns jederzeit kontaktieren.
-
-Viele Grüße
-Dein MietMichBox Team
-www.mietmichbox.de
-
-E-Mail: info@mietmichbox.de
-Telefon: 01742015500`;
-      }
-
-      tplReject(b){
-        const range = `${new Date(b.start_date).toLocaleDateString('de-DE')} – ${new Date(b.end_date).toLocaleDateString('de-DE')}`;
-        return `Hallo ${b.customer_name},
-
-vielen Dank für deine Buchung (${displayId(b.id)}) für den Zeitraum ${range}.
-Leider können wir diese Buchung nicht annehmen, da zu deinem gewählten Zeitraum bereits alle unsere Musikboxen vermietet sind.
-
-Du kannst gerne direkt in unserem Buchungskalender (https://www.mietmichbox.de/musikbox-online-buchen) eine neue Buchung zu einem anderen Zeitraum anfragen oder uns als Antwort auf diese E-Mail alternative Zeiträume nennen, sodass wir gemeinsam eine Lösung finden können. Wir helfen dir gerne schnellstmöglich weiter.
-
-Falls du noch offene Fragen hast, kannst du uns jederzeit kontaktieren.
-
-Viele Grüße
-Dein MietMichBox Team
-www.mietmichbox.de
-
-E-Mail: info@mietmichbox.de
-Telefon: 01742015500`;
-      }
-
-      tplAlternative(b, alternatives){
-        const range = `${new Date(b.start_date).toLocaleDateString('de-DE')} – ${new Date(b.end_date).toLocaleDateString('de-DE')}`;
-        const names = Array.isArray(alternatives)
-          ? alternatives.map(x=>x?.name).filter(Boolean)
-          : (alternatives && alternatives.name ? [alternatives.name] : []);
-        let altSentence;
-        if(names.length === 0){
-          altSentence = 'Wir schlagen dir als Alternative aktuell keine weitere Box vor.';
-        }else if(names.length === 1){
-          altSentence = `Wir schlagen dir als Alternative die ${names[0]} vor.`;
-        }else if(names.length === 2){
-          altSentence = `Wir schlagen dir als Alternative die ${names[0]} oder die ${names[1]} vor.`;
-        }else{
-          const list = names.slice();
-          const last = list.pop();
-          altSentence = `Wir schlagen dir als Alternative die ${list.join(', die ')} oder die ${last} vor.`;
-        }
-        return `Hallo ${b.customer_name},
-
-tut uns leid, aber unsere Musikboxen sind sehr gefragt 🔥
-
-Für deine Buchung (${displayId(b.id)}) ist die Musikbox ${b.box_name} für den Zeitraum ${range} leider nicht mehr verfügbar. ${altSentence}
-
-Du kannst gerne direkt in unserem Buchungskalender (https://www.mietmichbox.de/musikbox-online-buchen) eine neue Buchung mit einer anderen Musikbox oder zu einem anderen Zeitraum anfragen. Alternativ kannst du uns auch als Antwort auf diese E-Mail die alternative Musikbox oder den alternativen Zeitraum nennen, sodass wir deine Buchung aktualisieren können. Wir helfen dir gerne schnellstmöglich weiter.
-
-Falls du noch offene Fragen hast, kannst du uns jederzeit kontaktieren.
-
-Viele Grüße
-Dein MietMichBox Team
-www.mietmichbox.de
-
-E-Mail: info@mietmichbox.de
-Telefon: 01742015500`;
-      }
-
-      tplEditInfo(b){
-        const start = new Date(b.start_date);
-        const end = new Date(b.end_date);
-        const validStart = !Number.isNaN(start.getTime());
-        const validEnd = !Number.isNaN(end.getTime());
-        const range = (validStart && validEnd)
-          ? `${start.toLocaleDateString('de-DE')} – ${end.toLocaleDateString('de-DE')}`
-          : `${b.start_date} – ${b.end_date}`;
-        const price = Number(b.price_total ?? b.total_amount ?? 0);
-        const priceLabel = Number.isFinite(price)
-          ? price.toLocaleString('de-DE', {minimumFractionDigits:2, maximumFractionDigits:2})
-          : (b.price_total ?? b.total_amount ?? '0');
-        const statusLabel = this.translateStatus(b.status || 'pending');
-        const name = b.customer_name || 'Kund*in';
-        const email = b.customer_email || '–';
-        const box = b.box_name || BOX_MAP[String(b.box_id)] || '—';
-        const fulfillment = this.fulfillmentEmailLine(b);
-        return `Hallo ${name},
-
-wir haben Details in deiner Buchung (${displayId(b.id)}) aktualisiert.
-
-Deine aktualisierte Buchung im Überblick:
-👤 Name: ${name}
-📧 E-Mail: ${email}
-Ausstattung: ${b.order?b.order.items.map(x=>`${x.quantity}× ${x.label} — ${this.formatEuro(x.total)}`).join('\n'):box}
-🕰️ Zeitraum: ${range}
-🚚 Abwicklung: ${fulfillment}
-💶 Preis: ${priceLabel}€
-
-Bitte überprüfe einmal, ob wir deine Buchung korrekt hinterlegt haben.
-
-Falls du noch offene Fragen hast, kannst du uns jederzeit kontaktieren.
-
-Viele Grüße
-Dein MietMichBox Team
-www.mietmichbox.de
-
-E-Mail: info@mietmichbox.de
-Telefon: 01742015500`;
-      }
     }
 
     

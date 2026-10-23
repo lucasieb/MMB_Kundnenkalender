@@ -305,3 +305,4 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
 
 /* Leave the website's fixed cookie control clear of the mobile dialog actions. */
 @media(max-width:520px){.mmb-detail-footer .mmb-detail-actions,.mmb-footer{padding-left:2.25rem;box-sizing:border-box}}
+.mmb-invoice-warning{padding:12px 14px;background:#fff4d6;color:#6a4200;border-left:3px solid #d58a00;font-size:.9rem;line-height:1.5}.mmb-invoice-warning[hidden]{display:none}.mmb-mail-preview{margin:14px 0;min-width:0}.mmb-mail-preview>summary{cursor:pointer;font-weight:600;margin-bottom:10px}.mmb-mail-preview [data-preview-status]{font-size:.8rem;margin-bottom:8px}.mmb-mail-preview iframe{display:block;max-width:100%}
