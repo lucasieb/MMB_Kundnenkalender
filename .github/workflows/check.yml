@@ -23,6 +23,7 @@ jobs:
           php tests/contract.php
           php tests/orders.php
           php tests/communication.php
+          php tests/sent_archive.php
       - name: Shared embedded admin login
         run: |
           node --check admin_list.js

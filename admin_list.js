@@ -1291,7 +1291,7 @@
               <div class="mmb-detail-section">
                 <h3>Anmerkungen</h3>
                 <div class="mmb-detail-field">
-                  <label>Interne Notizen</label>
+                  <label>Anmerkung zur Buchung (auch in Kundenmails sichtbar)</label>
                   <textarea name="note">${this.escape(booking.note || '')}</textarea>
                 </div>
               </div>

@@ -15,5 +15,9 @@ return array_replace([
   'password'   => get_optional_env('SMTP_PASSWORD', ''),
   'from_email' => get_optional_env('SMTP_FROM_EMAIL', 'info@mietmichbox.de'),
   'from_name'  => get_optional_env('SMTP_FROM_NAME', 'MIETMICHBOX Team'),
-  'reply_to'   => get_optional_env('SMTP_REPLY_TO', 'info@mietmichbox.de')
+  'reply_to'   => get_optional_env('SMTP_REPLY_TO', 'info@mietmichbox.de'),
+  'sent_archive_enabled' => get_optional_env('MAIL_SENT_ARCHIVE_ENABLED', '1') === '1',
+  'imap_host' => get_optional_env('IMAP_HOST', 'imap.ionos.de'),
+  'imap_port' => (int) get_optional_env('IMAP_PORT', '993'),
+  'imap_sent_folder' => get_optional_env('IMAP_SENT_FOLDER', 'Gesendete Objekte')
 ], $private);

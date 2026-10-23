@@ -25,6 +25,7 @@ jobs:
           php tests/contract.php
           php tests/orders.php
           php tests/communication.php
+          php tests/sent_archive.php
           node --test tests/*.test.mjs
       - name: Prepare runtime files and revision marker
         run: |

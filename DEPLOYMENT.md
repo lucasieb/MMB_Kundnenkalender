@@ -63,3 +63,9 @@ The creation response reports customer and internal mail outcomes separately, an
 ## Management layout release 2026-10-22
 
 `Adminbuchungsliste` is now a small loader for `admin_list.js` and `admin_list.css`. Copy this complete loader into the existing booking-list Builder element and publish once with this release. The calendar embed and authentication are unchanged. Future management layout changes are deployed centrally; both new assets must revalidate through `.htaccess`. The list retains all existing API operations, filters and detail actions. Additional equipment lines expand locally in the row without changing a booking.
+
+
+## Gesendet-Ablage
+Nach SMTP-Annahme legt der zentrale Mailer dieselbe MIME-Nachricht per IMAP/TLS in `Gesendete Objekte` ab. Es wird keine BCC-/Zusatzmail versendet. Standardserver: `imap.ionos.de:993`; Zugangsdaten aus der bestehenden privaten SMTP-Konfiguration. Abweichungen über `IMAP_HOST`, `IMAP_PORT`, `IMAP_SENT_FOLDER` oder private `imap_username`/`imap_password` konfigurieren. `MAIL_SENT_ARCHIVE_ENABLED=0` deaktiviert die Ablage. PHP-IMAP muss verfügbar sein; die TLS-Zertifikatsprüfung bleibt aktiv.
+
+Ausstehende Kopien liegen mit 0600 in `<Domainverzeichnis>/mail-sent-queue/` (0700), außerhalb von `public_html`. Der bestehende stündliche CLI-Aufruf `booking_reminders.php --send --scheduled` wiederholt ausschließlich die IMAP-Ablage, auch außerhalb des Erinnerungs-Versandfensters. SMTP wird dabei niemals erneut aufgerufen. Globale Dateisperre und Message-ID-Suche verhindern doppelte Kopien nach parallelen Aufrufen oder unterbrochener APPEND-Antwort. Erfolgreiche Kopien werden aus der Queue gelöscht. Archivfehler dürfen einen bereits erfolgreichen SMTP-Versand nicht als fehlgeschlagen melden. CLI-Protokoll `sent_archive.pending`/`failed` überwachen. Historische Mails werden nicht rekonstruiert.
