@@ -4,6 +4,7 @@
 require __DIR__ . '/lib/PHPMailer/PHPMailer.php';
 require __DIR__ . '/lib/PHPMailer/SMTP.php';
 require __DIR__ . '/lib/PHPMailer/Exception.php';
+require_once __DIR__ . '/lib/mail_sent_archive.php';
 
 use PHPMailer\PHPMailer\Exception;
 use PHPMailer\PHPMailer\PHPMailer;
@@ -103,7 +104,6 @@ function sendMail(string $to, string $subject, string $body, string $toName = ''
         }
         $mailer->AltBody = $body;
         $mailer->send();
-        return true;
     } catch (Exception $e) {
         $error = $e->getMessage();
         if (isset($mailer) && trim((string)$mailer->ErrorInfo) !== '') {
@@ -117,4 +117,13 @@ function sendMail(string $to, string $subject, string $body, string $toName = ''
         error_log('Mail setup error: ' . $e->getMessage());
         return false;
     }
+
+    // SMTP already accepted the message. Archive failure must never trigger a re-send.
+    try {
+        global $MAIL_CONFIG;
+        mmb_archive_sent_message($mailer->getSentMIMEMessage(), $MAIL_CONFIG);
+    } catch (Throwable $e) {
+        error_log('Sent archive unavailable; SMTP delivery succeeded.');
+    }
+    return true;
 }

@@ -5,6 +5,12 @@ if(PHP_SAPI!=='cli'){http_response_code(404);exit;}
 require_once __DIR__.'/db.php';require_once __DIR__.'/lib/booking_reminders.php';
 $config=mmb_communication_config();
 $send=in_array('--send',$argv,true);$enabled=($config['enabled']??false)===true;
+// Retry only Sent-folder archiving, including outside reminder sending hours. No SMTP here.
+if($send){
+ require_once __DIR__.'/lib/mail_sent_archive.php';
+ try{$archive=mmb_flush_sent_archive(require __DIR__.'/config.mail.php');echo json_encode(['sent_archive'=>$archive]),PHP_EOL;}
+ catch(Throwable $e){error_log('Sent archive retry unavailable.');}
+}
 if($send&&!$enabled){echo json_encode(['enabled'=>false,'sent'=>0,'reason'=>'Erinnerungen warten auf bestätigte Serviceangaben.']),PHP_EOL;exit;}
 $p=pdo();$p->exec("CREATE TABLE IF NOT EXISTS booking_mail_jobs (id BIGINT AUTO_INCREMENT PRIMARY KEY,booking_id BIGINT NOT NULL,event_key VARCHAR(40) NOT NULL,rental_start DATE NOT NULL,recipient VARCHAR(200) NOT NULL,status VARCHAR(20) NOT NULL,created_at DATETIME NOT NULL,sent_at DATETIME NULL,UNIQUE KEY booking_event (booking_id,event_key,rental_start))");
 $now=new DateTimeImmutable('now',new DateTimeZone('Europe/Berlin'));
