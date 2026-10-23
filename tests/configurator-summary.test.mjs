@@ -29,3 +29,14 @@ test('photo entry preselects only a digital photobox and never dates or fulfillm
  const unknown={...context,document:{...context.document,getElementById:()=>({dataset:{initialProduct:'unknown'}})}};
  vm.runInNewContext(source,unknown);unknown.TestConfigurator.prototype.init=()=>{};assert.equal(new unknown.TestConfigurator().cart.photo,'');
 });
+
+test('contextual entries preserve defaults, focused products and optional alternative selection',()=>{
+ for(const [entry,expected] of [['sets',{}],['music',{speaker:3,speaker_qty:1}],['photo',{photo:'digital'}],['controller',{controller:1}],['tent',{tent:1}]]){
+  const ctx={...context,document:{...context.document,getElementById:()=>({dataset:{entry}})}};
+  vm.runInNewContext(source,ctx);ctx.TestConfigurator.prototype.init=()=>{};
+  const v=new ctx.TestConfigurator();for(const [key,value] of Object.entries(expected))assert.equal(v.cart[key],value);
+  assert.equal(v.start,'');assert.equal(v.end,'');assert.equal(v.method,'pickup');assert.equal(v.step,0);
+  v.rangeFields=()=>'<dates>';v.packageTiles=()=>'<sets>';v.startProducts=()=>'<products>';v.contextualStart=()=>'<focused-product>';
+  const html=v.startScreen();if(entry==='sets'){assert.match(html,/<summary>Alternativ Einzelbuchung<\/summary>/);assert.doesNotMatch(html,/<details[^>]*open/);}else assert.match(html,/<focused-product>/);
+ }
+});
