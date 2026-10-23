@@ -65,3 +65,8 @@ test('each set tile lists its actual base contents even when earlier sets are ab
   if(id!=='dj')assert.match(html,/Fotobox Digital/);if(id==='event')assert.match(html,/mmb-set-add[^]*Eventzelt/);
  }
 });
+
+
+test('set upgrade lists the selected print package instead of advertising digital at its price',()=>{
+ const html=context.TestConfigurator.prototype.packageTiles.call({cart:{package:'single',photo:'print200'},catalog:{packages:{party:{name:'Party-Set'}},photo:{print200:{name:'Print 200'}},set_discounts:{party:15}},offers:null},true,['party']);assert.match(html,/Fotobox Print 200/);assert.doesNotMatch(html,/Fotobox Digital/);
+});
