@@ -1,0 +1,6 @@
+<!DOCTYPE html>
+<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MietMichBox · Buchung</title>
+<link rel="stylesheet" href="https://firebrick-squirrel-568721.hostingersite.com/configurator.css?v=20261021-v1">
+<script defer src="https://firebrick-squirrel-568721.hostingersite.com/mmb_icons.js?v=20261021"></script>
+<script defer src="https://firebrick-squirrel-568721.hostingersite.com/configurator.js?v=20261021-v1" data-api-base="https://firebrick-squirrel-568721.hostingersite.com/"></script>
+</head><body><main id="mmb-customer" data-entry="controller" aria-label="MietMichBox Buchungsanfrage"><p class="mmb-boot" role="status">Buchung wird geladen …</p></main><noscript>Bitte aktiviere JavaScript oder kontaktiere info@mietmichbox.de für deine Anfrage.</noscript></body></html>
