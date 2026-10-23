@@ -250,7 +250,7 @@ try {
     $db->exec("INSERT INTO bookings (id,box_id,start_date,end_date,status,customer_name,customer_email,total_amount,fulfillment_method) VALUES (999,3,'2030-01-11','2030-01-12','pending','Legacy fixture','legacy@example.invalid',44,'pickup')");
     foreach([['shipping',124],['shipping',124],['pickup',44]] as [$method,$expected]){
       [$status,$saved]=request('update_booking.php',['id'=>999,'fulfillment_method'=>$method],true);
-      check($status===200&&(float)$db->query('SELECT total_amount FROM bookings WHERE id=999')->fetchColumn()===$expected,'Legacy automatic shipping total failed');
+      check($status===200&&(float)$db->query('SELECT total_amount FROM bookings WHERE id=999')->fetchColumn()===(float)$expected,'Legacy automatic shipping total failed');
     }
     check(count(file($temp.'/mail-capture.jsonl'))===$beforeMails,'Invoice update sent mail');
     file_put_contents($temp . '/admin_users.php', "\n// changed credentials\n", FILE_APPEND);
