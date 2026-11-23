@@ -43,3 +43,20 @@ $delivery['pricing_details']=['shipping_delta'=>0];$delivery['total_amount']=139
 assert_mail(str_contains(mmb_booking_message($delivery)['text'],'nach Angebot hinzu'),'Unagreed delivery must remain provisional');
 $delivery['pricing_details']['fulfillment_cost_confirmed']=true;
 assert_mail(!str_contains(mmb_booking_message($delivery)['text'],'nach Angebot hinzu'),'Explicitly free delivery must not request another offer');
+
+foreach(['delivery','delivery_setup'] as $method){
+ $timed=$b;$timed['fulfillment_method']=$method;$timed['fulfillment_details']['preferred_time']='16:00';$timed['fulfillment_details']['preferred_time_end']='16:30';$timed['fulfillment_details']['preferred_time_confirmed']=true;
+ foreach(['submission','internal','updated','confirmed','rejected','cancelled','alternative','reminder7','reminder3'] as $mode){
+  $m=mmb_booking_message($timed,$mode);
+  foreach(['text','html'] as $format){
+   assert_mail(str_contains($m[$format],'16:00–16:30 Uhr (bestätigt)'),'Confirmed window missing: '.$mode);
+   assert_mail(str_contains($m[$format],'Mietende:')&&str_contains($m[$format],booking_delivery_collection_note()),'Delivery collection instructions missing: '.$mode);
+   assert_mail(!str_contains($m[$format],'Rückgabe')&&!str_contains($m[$format],'noch abzustimmen'),'Delivery still asks customer to return equipment: '.$mode);
+  }
+ }
+ $timed['fulfillment_details']['preferred_time_confirmed']=false;
+ assert_mail(str_contains(mmb_booking_message($timed)['text'],'16:00–16:30 Uhr (noch abzustimmen)'),'Unconfirmed window missing');
+ unset($timed['fulfillment_details']['preferred_time_end']);$timed['fulfillment_details']['preferred_time_confirmed']=true;
+ assert_mail(str_contains(mmb_booking_message($timed)['text'],'16:00 Uhr (bestätigt)'),'Confirmed single time missing');
+}
+assert_mail(str_contains(mmb_booking_message($pickup,'confirmed')['text'],'Rückgabe zur vereinbarten Uhrzeit'),'Pickup return instructions lost');

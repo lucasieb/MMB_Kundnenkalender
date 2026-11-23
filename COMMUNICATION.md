@@ -33,3 +33,9 @@ Gespeicherte Liefer-/Versandkosten werden in allen Mailtypen und Vorschauen als 
 Admin-Änderungen halten Auftrag, Rechnungsangaben und Abwicklungsdetails gemeinsam aktuell. Ausdrücklich eingetragene kostenlose Lieferung wird im JSON mit `fulfillment_cost_confirmed` festgehalten. Termin-/Ausstattungsänderungen behalten vereinbarte Lieferkosten bei; eine andere Abwicklungsart wird neu berechnet. Standard-Paketversand bleibt mengenabhängig, Montage wird separat ausgewiesen. Keine Schemaänderung oder Bestandsdatenkorrektur erforderlich.
 
 Regression: `php tests/contract.php`, `php tests/communication.php` und `node --test tests/*.test.mjs` prüfen Testbuchung 139 € + 60 €, beide Vorschauen, erneutes Laden, Gebührenänderungen einschließlich 0 €, getrennte Preisnachlässe/Montage, Abholwechsel, Versandmengen und unterdrückten Versand. Die HTTP-Tests nutzen ausschließlich eine temporäre SQLite-Datenbank und einen Mail-Stub.
+
+## Lieferzeiten und Abholung – 23.11.2026
+
+Bei Lieferung und Lieferung mit Montage nennt jede Mail das Mietende und erklärt, dass MietMichBox Lieferung und Abholung übernimmt. Die Abholung zum Mietzeitraumende wird bei der Anlieferung abgestimmt. Die Rückgabeanweisung für Selbstabholer bleibt auf Selbstabholung beschränkt.
+
+Unter Lieferdetails lassen sich Wunschzeit, optionales Fensterende und eine ausdrückliche Zeitbestätigung speichern. Die JSON-Felder `preferred_time_end` und `preferred_time_confirmed` ergänzen `preferred_time`; eine Schemaänderung ist nicht nötig. Alte Wunschzeiten gelten weiterhin als unbestätigt. Zeit-/Mietbeginn-/Abwicklungsänderungen setzen die Bestätigung in der Verwaltung zurück. Kundenanfrage und Kundenportal können Zeiten wünschen, aber nicht bestätigen. Versand enthält keine Lieferzeitbestätigung. Vorschau und Mail verwenden denselben gespeicherten Stand. Speichern ohne Versand erfordert weiterhin, „Kund*in nach dem Speichern informieren“ auszuschalten.

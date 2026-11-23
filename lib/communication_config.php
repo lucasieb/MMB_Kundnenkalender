@@ -11,7 +11,7 @@ function mmb_communication_config(): array {
   'operations_email'=>'info@mietmichbox.de',
   'deposit'=>'Aktuell erheben wir keine Kaution.',
   'shipping_return'=>'Bewahre alle Verpackungen und das Verpackungsmaterial auf. Packe die gesamte Ausstattung unmittelbar nach Ende deiner Miete wieder sicher ein und sende sie mit unseren bereitgestellten Rücksendeetiketten unverzüglich an uns zurück. Ist die Paketannahme am Mietende wegen Sonntag oder Feiertag geschlossen, gib die Sendung am nächsten geöffneten Werktag (Montag bis Samstag) ab und bewahre den Einlieferungsbeleg auf. Fehlt ein Label, melde dich bitte vor dem Versand.',
-  'delivery_return'=>'Rücknahme und Uhrzeit stimmen wir persönlich mit dir ab.',
+  'delivery_return'=>'Wir übernehmen die Lieferung und die Abholung. Die Abholung zum Ende deines Mietzeitraums stimmen wir bei der Anlieferung persönlich mit dir ab.',
  ];
  $path=dirname(__DIR__,2).'/communication.private.php';$private=is_file($path)?require $path:[];
  return array_replace($defaults,is_array($private)?$private:[]);

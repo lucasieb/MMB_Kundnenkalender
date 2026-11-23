@@ -308,6 +308,35 @@ try {
     $speakerRow=$db->query('SELECT * FROM bookings WHERE id='.(int)$modernId)->fetch(PDO::FETCH_ASSOC);
     check($status===200&&(float)$speakerRow['fulfillment_price_delta']===160.0,'Two speakers retained one parcel price');
     check(count(file($temp.'/mail-capture.jsonl'))===$beforeMails,'Delivery edits/previews/silent confirmation sent mail');
+    // Confirmed delivery windows are admin-only and previews/saves never send mail.
+    $window=['method'=>'delivery','address_line1'=>'TEST Zeitfensterweg 1','postal_code'=>'46485','city'=>'Wesel','preferred_time'=>'16:00','preferred_time_end'=>'16:30','preferred_time_confirmed'=>true];
+    [$status,$created]=request('create_booking.php',array_replace($valid,['customer_name'=>'TEST Zeitfenster','cart'=>['photo'=>'digital'],'start_date'=>'2030-01-11','end_date'=>'2030-01-13','fulfillment_method'=>'delivery','fulfillment_details_json'=>$window]),true);
+    check($status===200,'Window fixture creation failed');$windowId=(int)$created['booking']['id'];
+    $readWindow=fn()=>$db->query('SELECT * FROM bookings WHERE id='.$windowId)->fetch(PDO::FETCH_ASSOC);
+    check(json_decode($readWindow()['fulfillment_details_json'],true)['preferred_time_confirmed']===false,'Customer self-confirmed delivery time');
+    $windowMailCount=count(file($temp.'/mail-capture.jsonl'));
+    [$status]=request('update_booking.php',['id'=>$windowId,'fulfillment_details_json'=>$window],true);check($status===200,'Admin window confirmation failed');
+    [$status,$list]=request('list_bookings.php');$windowRow=array_values(array_filter($list['items'],fn($b)=>(int)$b['id']===$windowId))[0];
+    $details=json_decode($windowRow['fulfillment_details_json'],true);check($details['preferred_time_end']==='16:30'&&$details['preferred_time_confirmed']===true,'Window lost on reload');
+    foreach(['updated','confirmed'] as $mode){
+      [$status,$preview]=request('preview_booking_email.php',['booking'=>$windowRow,'mode'=>$mode],true);
+      check($status===200&&str_contains($preview['preview']['text'],'16:00–16:30 Uhr (bestätigt)')&&!str_contains($preview['preview']['text'],'Rückgabe')&&str_contains($preview['preview']['text'],'bei der Anlieferung persönlich'),'Delivery window preview incorrect');
+    }
+    $portal=['booking_id'=>$windowId,'customer_email'=>$readWindow()['customer_email'],'method'=>'delivery','contact_name'=>'TEST Kontakt','contact_email'=>'test@example.invalid','contact_phone'=>'0000','meeting_point'=>'TEST Eingang','preferred_time'=>'16:00','preferred_time_end'=>'16:30','preferred_time_confirmed'=>true];
+    [$status]=request('submit_fulfillment_details.php',$portal,true);check($status===200&&json_decode($readWindow()['fulfillment_details_json'],true)['preferred_time_confirmed']===false,'Customer portal self-confirmed time');
+    [$status]=request('submit_fulfillment_details.php',array_replace($portal,['preferred_time_end'=>'15:30']),true);check($status===422,'Customer portal accepted reversed time window');
+    $changedWindow=$window;$changedWindow['preferred_time']='16:15';unset($changedWindow['preferred_time_confirmed']);
+    [$status]=request('update_booking.php',['id'=>$windowId,'fulfillment_details_json'=>$changedWindow],true);check($status===200&&json_decode($readWindow()['fulfillment_details_json'],true)['preferred_time_confirmed']===false,'Changed window retained old confirmation');
+    [$status]=request('update_booking.php',['id'=>$windowId,'fulfillment_details_json'=>$window],true);
+    [$status]=request('update_booking.php',['id'=>$windowId,'start_date'=>'2030-01-12'],true);check($status===200&&json_decode($readWindow()['fulfillment_details_json'],true)['preferred_time_confirmed']===false,'Changed rental start retained confirmation');
+    foreach([
+      ['preferred_time'=>'16:00','preferred_time_end'=>'15:30'],['preferred_time'=>'16:00','preferred_time_end'=>'16:00'],['preferred_time'=>'','preferred_time_end'=>'16:30'],['preferred_time'=>'25:00'],['preferred_time'=>'16:00','preferred_time_end'=>'25:00'],['preferred_time'=>'','preferred_time_confirmed'=>true]
+    ] as $invalidTime){
+      [$status]=request('update_booking.php',['id'=>$windowId,'fulfillment_details_json'=>$invalidTime],true);check($status===400,'Invalid window/confirmation accepted');
+    }
+    [$status]=request('update_booking.php',['id'=>$windowId,'fulfillment_details_json'=>['preferred_time'=>'16:00','preferred_time_confirmed'=>true]],true);check($status===200&&!isset(json_decode($readWindow()['fulfillment_details_json'],true)['preferred_time_end']),'Single time did not clear old window');
+    [$status]=request('update_booking.php',['id'=>$windowId,'fulfillment_details_json'=>['preferred_time'=>'','preferred_time_end'=>'','preferred_time_confirmed'=>false]],true);check($status===200&&!isset(json_decode($readWindow()['fulfillment_details_json'],true)['preferred_time']),'Cleared time returned');
+    check(count(file($temp.'/mail-capture.jsonl'))===$windowMailCount,'Window edits/preview sent mail');
     file_put_contents($temp . '/admin_users.php', "\n// changed credentials\n", FILE_APPEND);
     [$status,$state]=request('admin_login_token.php');
     check($status===200 && $state['authenticated']===false,'Changed credentials must expire existing sessions');

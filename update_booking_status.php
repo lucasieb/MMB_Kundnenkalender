@@ -218,6 +218,11 @@ try {
     foreach(['total_amount','fulfillment_price_delta'] as $field)if(isset($updates[$field])&&(!is_numeric($updates[$field])||!is_finite((float)$updates[$field])||(float)$updates[$field]<0))throw new InvalidArgumentException('Ungültiger Betrag.');
     $updates=mmb_order_invoice_update($bk,$updates);
     $updates=mmb_legacy_invoice_update($bk,$updates);
+    if((isset($updates['start_date'])&&$updates['start_date']!==$bk['start_date'])||(isset($updates['fulfillment_method'])&&$updates['fulfillment_method']!==($bk['fulfillment_method']??'pickup'))){
+      $details=mmb_cost_decode($updates['fulfillment_details_json']??$bk['fulfillment_details_json']??$bk['fulfillment_details']??null);
+      $details['preferred_time_confirmed']=false;
+      $updates['fulfillment_details_json']=booking_fulfillment_timing($details,$updates['fulfillment_method']??$bk['fulfillment_method']??'pickup',true);
+    }
     $whitelist=array_merge($whitelist,['order_json','pricing_details_json','fulfillment_details_json']);
     foreach ($updates as $col => $val) {
       if (!in_array($col, $whitelist, true)) continue;

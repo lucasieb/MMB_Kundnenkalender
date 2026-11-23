@@ -1050,7 +1050,7 @@
         return safe.toLocaleString('de-DE', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' €';
       }
       fulfillmentEmailLine(b){
-        if(b.order){const details=b.fulfillment_details||{};return b.order.fulfillment_label+' — '+b.order.fulfillment_note+(b.fulfillment_method!=='shipping'&&details.preferred_time?' · Wunschzeit: '+details.preferred_time+' Uhr (wird abgestimmt)':'')+(b.fulfillment_method!=='shipping'&&details.meeting_point?' · Hinweis: '+details.meeting_point:'');}
+        if(b.order){const details=b.fulfillment_details||{};return b.order.fulfillment_label+' — '+b.order.fulfillment_note+(b.fulfillment_method!=='shipping'&&details.preferred_time?' · Wunschzeit: '+details.preferred_time+(details.preferred_time_end?'–'+details.preferred_time_end:'')+' Uhr ('+(details.preferred_time_confirmed===true?'bestätigt':'noch abzustimmen')+')':'')+(b.fulfillment_method!=='shipping'&&details.meeting_point?' · Hinweis: '+details.meeting_point:'');}
         const info = this.getFulfillmentInfo(b);
         if(info.method==='pickup'){
           return info.priceDelta>0 ? `${info.full} +${this.formatEuro(info.priceDelta)}` : `${info.full} (gratis)`;
@@ -1118,16 +1118,6 @@
         const baseMessage = this.tplEditInfo(booking);
         const shippingAllowPhone = fulfillmentDetails.allow_contact_phone !== false;
         const shippingAllowWhatsApp = fulfillmentDetails.allow_contact_whatsapp === true || (fulfillmentDetails.contact_preferences && fulfillmentDetails.contact_preferences.whatsapp === true);
-        const preferredTimes = ['', '11:00','11:30','12:00','12:30','13:00','13:30','14:00','14:30','15:00','15:30','16:00'];
-        const existingPreferred = (fulfillmentDetails.preferred_time || '').trim();
-        if(existingPreferred && !preferredTimes.includes(existingPreferred)){
-          preferredTimes.push(existingPreferred);
-        }
-        const preferredOptionsHtml = preferredTimes.map(time=>{
-          const label = time ? `${time} Uhr` : 'Bitte auswählen';
-          const isSelected = time === (fulfillmentDetails.preferred_time || '');
-          return `<option value="${time}" ${isSelected?'selected':''}>${this.escape(label)}</option>`;
-        }).join('');
         const showExtended = currentFulfillmentMethod === 'shipping' || currentFulfillmentMethod.startsWith('delivery');
 
         overlay.innerHTML = `
@@ -1274,10 +1264,17 @@
                     <textarea name="delivery_meeting_point">${this.escape(fulfillmentDetails.meeting_point || '')}</textarea>
                   </div>
                   <div class="mmb-detail-field">
-                    <label data-timing-label>Wunschzeit für ${currentFulfillmentMethod==='pickup'?'Abholung':'Lieferung'} am ${this.escape(booking.start_date)}</label>
-                    <select name="delivery_preferred_time">${preferredOptionsHtml}</select>
+                    <label for="delivery-preferred-time" data-timing-label>Wunschzeit für ${currentFulfillmentMethod==='pickup'?'Abholung':'Lieferung'} am ${this.escape(booking.start_date)}</label>
+                    <input type="time" id="delivery-preferred-time" name="delivery_preferred_time" value="${this.escape(fulfillmentDetails.preferred_time || '')}" step="60">
+                  </div>
+                  <div class="mmb-detail-field">
+                    <label for="delivery-preferred-time-end">Zeitfenster bis (optional)</label>
+                    <input type="time" id="delivery-preferred-time-end" name="delivery_preferred_time_end" value="${this.escape(fulfillmentDetails.preferred_time_end || '')}" step="60">
                   </div>
                 </div>
+                <label class="mmb-detail-checkbox"><input type="checkbox" name="delivery_preferred_time_confirmed" ${fulfillmentDetails.preferred_time_confirmed===true?'checked':''}><span>Wunschzeit / Zeitfenster bestätigt</span></label>
+                <p class="mmb-detail-note">Ohne Bestätigung bleibt die Wunschzeit noch abzustimmen. Änderungen an Zeit, Mietbeginn oder Abwicklung setzen die Bestätigung zurück.</p>
+                <p class="mmb-detail-note" data-delivery-collection ${currentFulfillmentMethod.startsWith('delivery')?'':'hidden'}>Wir übernehmen die Lieferung und die Abholung. Die Abholung zum Ende des Mietzeitraums stimmen wir bei der Anlieferung persönlich ab.</p>
               </div>
 
               <div class="mmb-detail-section">
@@ -1413,6 +1410,7 @@
         const updateFulfillmentUI = ()=>{
           if(!fulfillmentSelect) return;
           const method = fulfillmentSelect.value;
+          const collection=form.querySelector('[data-delivery-collection]');if(collection)collection.hidden=!method.startsWith('delivery');
           const destinationTitle=form.querySelector('[data-destination-title]');if(destinationTitle)destinationTitle.textContent=method==='shipping'?'Versandadresse':'Lieferadresse';
           const sameLabel=form.querySelector('[data-same-address-label]');if(sameLabel)sameLabel.textContent=(method==='shipping'?'Versandadresse':'Lieferadresse')+' identisch mit Rechnungsadresse';
           const timingTitle=form.querySelector('[data-timing-title]'),timingHint=form.querySelector('[data-timing-hint]'),timingLabel=form.querySelector('[data-timing-label]');
@@ -1441,7 +1439,8 @@
         const sendSwitch = form.querySelector('input[name="send_email"]');
         const companyField=form.querySelector('[name=company_name]'),typeField=form.querySelector('[name=customer_type]');
             if(companyField&&typeField){const syncCompany=()=>{companyField.required=typeField.value==='business';companyField.closest('.mmb-detail-field').hidden=typeField.value!=='business';};typeField.addEventListener('change',syncCompany);syncCompany();}
-            const watchFields = [...new Set(Array.from(form.querySelectorAll('input[name],select[name],textarea[name]')).map(el=>el.name).filter(n=>!['message','subject'].includes(n)))];
+        this.mountTimingControls(form);
+        const watchFields = [...new Set(Array.from(form.querySelectorAll('input[name],select[name],textarea[name]')).map(el=>el.name).filter(n=>!['message','subject'].includes(n)))];
         let subjectDirty = false;
         let messageDirty = false;
 
@@ -1991,8 +1990,25 @@
         return payload;
       }
 
+      mountTimingControls(form){
+        const field=name=>form.querySelector(`[name="${name}"]`);
+        const start=field('delivery_preferred_time'),end=field('delivery_preferred_time_end'),confirmed=field('delivery_preferred_time_confirmed');
+        if(!start||!end||!confirmed)return;
+        const sync=()=>{
+          confirmed.disabled=!start.value;
+          if(!start.value)confirmed.checked=false;
+          end.min=start.value||'';
+          end.setCustomValidity(end.value&&(!start.value||end.value<=start.value)?'Das Ende des Zeitfensters muss nach der Wunschzeit liegen.':'');
+        };
+        const reset=()=>{confirmed.checked=false;sync();};
+        for(const name of ['delivery_preferred_time','delivery_preferred_time_end','start_date','fulfillment_method']){
+          field(name)?.addEventListener('input',reset);field(name)?.addEventListener('change',reset);
+        }
+        sync();
+      }
+
       buildFulfillmentDetailsPayload(form, method, existing){
-        if(method !== 'shipping' && !method.startsWith('delivery')){
+        if(method !== 'pickup' && method !== 'shipping' && !method.startsWith('delivery')){
           return null;
         }
         const getValue = (name)=>{
@@ -2039,8 +2055,13 @@
         if(method!=='shipping'){
           const meeting = getValue('delivery_meeting_point');
           const preferred = getValue('delivery_preferred_time');
-          if(meeting) payload.meeting_point = meeting;
-          if(preferred) payload.preferred_time = preferred;
+          if(meeting)payload.meeting_point=meeting;else delete payload.meeting_point;
+          if(preferred)payload.preferred_time=preferred;else delete payload.preferred_time;
+          const end=getValue('delivery_preferred_time_end');
+          if(end)payload.preferred_time_end=end;else delete payload.preferred_time_end;
+          payload.preferred_time_confirmed=!!preferred&&getChecked('delivery_preferred_time_confirmed');
+        }else{
+          delete payload.meeting_point;delete payload.preferred_time;delete payload.preferred_time_end;delete payload.preferred_time_confirmed;
         }
 
         Object.keys(payload).forEach(key=>{

@@ -243,7 +243,7 @@ function normalize_fulfillment_details_for_storage(?array $details, string $meth
 
   $data['method'] = $method;
 
-  $stringFields = ['label','full','note','contact_name','contact_email','contact_phone','customer_type','company_name','address_line1','postal_code','city','address_extra','meeting_point','preferred_time','submitted_via'];
+  $stringFields = ['label','full','note','contact_name','contact_email','contact_phone','customer_type','company_name','address_line1','postal_code','city','address_extra','meeting_point','preferred_time','preferred_time_end','submitted_via'];
   foreach ($stringFields as $field) {
     if (array_key_exists($field, $data)) {
       $value = trim((string)$data[$field]);
@@ -628,8 +628,7 @@ try {
     }
   }
   try {booking_delivery_company($fulfillmentDetailsArray??[]);}catch(InvalidArgumentException $e){json_response(['ok'=>false,'error'=>$e->getMessage(),'code'=>'validation'],422);}
-  if($fulfillmentMethod==='shipping'&&is_array($fulfillmentDetailsArray)){unset($fulfillmentDetailsArray['preferred_time'],$fulfillmentDetailsArray['meeting_point']);}
-  if(!empty($fulfillmentDetailsArray['preferred_time'])&&!preg_match('/^([01][0-9]|2[0-3]):[0-5][0-9]$/',(string)$fulfillmentDetailsArray['preferred_time']))json_response(['ok'=>false,'error'=>'Bitte eine gültige Wunschzeit angeben.','code'=>'validation'],422);
+  try{$fulfillmentDetailsArray=booking_fulfillment_timing($fulfillmentDetailsArray??[],$fulfillmentMethod);}catch(InvalidArgumentException $e){json_response(['ok'=>false,'error'=>$e->getMessage(),'code'=>'validation'],422);}
   $fulfillmentDetailsJson=json_encode($fulfillmentDetailsArray,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
   $verificationToken=bin2hex(random_bytes(32));
   $customer['privacy_notice_version']=BOOKING_PRIVACY_VERSION;

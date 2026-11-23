@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require __DIR__ . '/api_bootstrap.php';
 require __DIR__ . '/db.php';
+require_once __DIR__.'/lib/booking_customer.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -255,7 +256,10 @@ try {
     }
     $details['meeting_point']  = $meetingPoint;
     $details['preferred_time'] = $preferred;
+    $details['preferred_time_end']=$input['preferred_time_end']??'';
   }
+
+  try{$details=booking_fulfillment_timing($details,$method);}catch(InvalidArgumentException $e){json_response(['ok'=>false,'error'=>$e->getMessage()],422);}
 
   $targetColumns = [];
   if (has_column($pdo, 'fulfillment_details_json')) {

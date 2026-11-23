@@ -66,3 +66,28 @@ function booking_destination_details(array $booking, array $details): array {
  foreach(['contact_name'=>'customer_name','contact_email'=>'customer_email','contact_phone'=>'customer_phone'] as $target=>$source)if(empty($details[$target])&&!empty($booking[$source]))$details[$target]=$booking[$source];
  return $details;
 }
+
+/** Validate a single preferred time or same-day window. Only authenticated admin edits can confirm it. */
+function booking_fulfillment_timing(array $details,string $method,bool $admin=false): array {
+ if($method==='shipping'){
+  unset($details['preferred_time'],$details['preferred_time_end'],$details['preferred_time_confirmed'],$details['meeting_point']);
+  return $details;
+ }
+ foreach(['preferred_time','preferred_time_end'] as $key){
+  $value=$details[$key]??'';
+  if(!is_string($value))throw new InvalidArgumentException('Bitte eine gültige Wunschzeit angeben.');
+  $value=trim($value);
+  if($value!==''&&!preg_match('/^([01][0-9]|2[0-3]):[0-5][0-9]$/',$value))throw new InvalidArgumentException('Bitte eine gültige Wunschzeit angeben.');
+  if($value==='')unset($details[$key]);else $details[$key]=$value;
+ }
+ $start=$details['preferred_time']??'';$end=$details['preferred_time_end']??'';
+ if($end!==''&&($start===''||$end<=$start))throw new InvalidArgumentException('Das Ende des Zeitfensters muss nach der Wunschzeit liegen.');
+ $confirmed=$admin&&($details['preferred_time_confirmed']??false)===true;
+ if($confirmed&&$start==='')throw new InvalidArgumentException('Bitte zuerst eine Wunschzeit angeben, bevor du sie bestätigst.');
+ $details['preferred_time_confirmed']=$confirmed;
+ return $details;
+}
+
+function booking_delivery_collection_note(): string {
+ return 'Wir übernehmen die Lieferung und die Abholung. Die Abholung zum Ende deines Mietzeitraums stimmen wir bei der Anlieferung persönlich mit dir ab.';
+}

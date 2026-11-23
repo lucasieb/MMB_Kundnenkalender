@@ -13,8 +13,9 @@ function mmb_mail_sections(array $b,bool $internal=false): array {
  $d=booking_destination_details($b,$d);
  $costs=mmb_booking_costs($b);
  $method=(string)($b['fulfillment_method']??'pickup');$id=(string)($b['display_id']??str_pad((string)((int)($b['id']??0)+100),5,'0',STR_PAD_LEFT));
- $sections=[];$sections['📅 Deine Buchung']=['Buchungsnummer: '.$id,'Mietbeginn: '.mmb_mail_date($b['start_date']??''),'Rückgabe: '.mmb_mail_date($b['end_date']??'')];
- if(($o['day_unit']??'')==='24h')$sections['📅 Deine Buchung'][]=($o['days']??'').' '.((int)($o['days']??0)===1?'Miettag':'Miettage').' à 24 Stunden. Rückgabe zur vereinbarten Uhrzeit des Mietbeginns.';
+ $delivery=in_array($method,['delivery','delivery_setup'],true);
+ $sections=[];$sections['📅 Deine Buchung']=['Buchungsnummer: '.$id,'Mietbeginn: '.mmb_mail_date($b['start_date']??''),($delivery?'Mietende: ':'Rückgabe: ').mmb_mail_date($b['end_date']??'')];
+ if(($o['day_unit']??'')==='24h')$sections['📅 Deine Buchung'][]=($o['days']??'').' '.((int)($o['days']??0)===1?'Miettag':'Miettage').' à 24 Stunden.'.($delivery?'':' Rückgabe zur vereinbarten Uhrzeit des Mietbeginns.');
  $equipment=[];if(!empty($o['package_name']))$equipment[]=$o['package_name'];
  foreach($o['items']??$o['lines']??[] as $line){
   if(in_array($line['id']??'',['shipping','delivery','assembly'],true))continue;
@@ -25,12 +26,16 @@ function mmb_mail_sections(array $b,bool $internal=false): array {
  $sections['📦 Ausstattung']=$equipment;
  $handling=[['pickup'=>'Abholung in Wesel','shipping'=>'Versand','delivery'=>'Lieferung','delivery_setup'=>'Lieferung und Montage'][$method]??$method];
  if($costs['confirmed']&&in_array($method,['delivery','delivery_setup','shipping'],true))$handling[]=($method==='shipping'?'Hin- und Rückversand':($method==='delivery_setup'?'Lieferung (Auf- und Abbau separat ausgewiesen)':'Lieferung')).' zum vereinbarten Preis von '.mmb_mail_euro($costs['shipping']).'.';
- elseif(!empty($o['fulfillment_note']))$handling[]=$o['fulfillment_note'];
- elseif(!empty($b['fulfillment_note']))$handling[]=$b['fulfillment_note'];
+ else{
+  $note=(string)($o['fulfillment_note']??$b['fulfillment_note']??'');
+  if($delivery)$note=str_replace(' Abholung in Wesel kostenlos.','',$note);
+  if($note!=='')$handling[]=$note;
+ }
  if($method!=='shipping'){
-  if(!empty($d['preferred_time']))$handling[]='Wunschzeit für '.($method==='pickup'?'Abholung':'Lieferung').' am '.mmb_mail_date($b['start_date']??'').': '.$d['preferred_time'].' Uhr (noch abzustimmen)';
+  if(!empty($d['preferred_time']))$handling[]='Wunschzeit für '.($method==='pickup'?'Abholung':'Lieferung').' am '.mmb_mail_date($b['start_date']??'').': '.$d['preferred_time'].(!empty($d['preferred_time_end'])?'–'.$d['preferred_time_end']:'').' Uhr ('.(($d['preferred_time_confirmed']??false)===true?'bestätigt':'noch abzustimmen').')';
   if(!empty($d['meeting_point']))$handling[]=($method==='pickup'?'Abholhinweis: ':'Lieferhinweis: ').$d['meeting_point'];
  }else $handling[]='Die Ankunft ist spätestens zum Mietbeginn vorgesehen, häufig 1–2 Tage vorher. Versand und Rückgabe stimmen wir mit dir ab.';
+ if($delivery)$handling[]=booking_delivery_collection_note();
  $sections['🚚 Abwicklung']=$handling;
  $address=array_values(array_filter([$b['company_name']??'', $b['customer_name']??'', $b['billing_address_line1']??'',trim(($b['billing_postal_code']??'').' '.($b['billing_city']??''))],fn($v)=>trim((string)$v)!==''));
  if($address)$sections['🏠 Rechnungsadresse']=$address;
@@ -73,7 +78,7 @@ function mmb_booking_message(array $b,string $mode='submission',array $options=[
  $copy=[
  'submission'=>['Deine Anfrage ist angekommen','Danke für deine Anfrage! Wir prüfen Ausstattung und Termin und melden uns bei dir. Deine Anfrage ist noch keine verbindliche Buchung.'],
  'internal'=>['Neue Buchungsanfrage','Eine neue Anfrage wartet auf Prüfung. Bitte Verfügbarkeit, Preis und Abwicklung prüfen und anschließend persönlich bestätigen.'],
- 'confirmed'=>['Deine Buchung ist bestätigt','Gute Nachrichten: Wir haben deine Buchung bestätigt und freuen uns auf dein Event! Hier findest du deinen aktuellen Buchungsstand. Offene Uhrzeiten und organisatorische Details stimmen wir persönlich mit dir ab.'],
+ 'confirmed'=>['Deine Buchung ist bestätigt','Gute Nachrichten: Wir haben deine Buchung bestätigt und freuen uns auf dein Event! Hier findest du deinen aktuellen Buchungsstand. Weitere organisatorische Details stimmen wir persönlich mit dir ab.'],
  'updated'=>['Deine Buchung wurde aktualisiert','Hier ist der aktuelle Stand deiner Buchung. Bitte prüfe die Angaben und antworte auf diese E-Mail, wenn etwas nicht passt.'],
  'rejected'=>['Zu deiner Buchungsanfrage','Danke für deine Anfrage. Leider können wir sie in dieser Form nicht annehmen. Melde dich gern mit einem anderen Termin oder einer anderen Ausstattung.'],
  'cancelled'=>['Deine Buchung wurde storniert','Deine Buchung wurde storniert. Die folgende Übersicht zeigt die bisher erfassten Angaben. Bei Fragen antworte einfach auf diese E-Mail.'],
@@ -89,9 +94,11 @@ function mmb_booking_message(array $b,string $mode='submission',array $options=[
  if($internal)$actions['Buchungsverwaltung öffnen']='https://www.mietmichbox.de/buchungsverwaltung';
  if(in_array($mode,['confirmed','reminder7','reminder3'],true)){
   $config=mmb_communication_config();$method=$b['fulfillment_method']??'pickup';
-  $service=[$config['payment'],$config['deposit']];
+  $payment=$config['payment'];
+  if(in_array($method,['delivery','delivery_setup'],true))$payment=str_replace(' Bei Abholung ist Barzahlung vor Ort möglich.','',$payment);
+  $service=[$payment,$config['deposit']];
   if($method==='pickup'){$service[]='Abhol- und Rückgabeadresse: '.$config['pickup_address'];$service[]=$config['pickup_return'];}
-  elseif($method==='shipping')$service[]=$config['shipping_return'];else $service[]=$config['delivery_return'];
+  elseif($method==='shipping')$service[]=$config['shipping_return'];
   $sections['ℹ️ Für deine Übergabe']=$options['service_info']??$service;
  }
  $render=mmb_mail_render($title,($internal?'Hallo MietMichBox Team,':'Hallo '.$name.',')."\n\n".$intro,$sections,$actions);
