@@ -263,6 +263,51 @@ try {
       check($status===200&&(float)$db->query('SELECT total_amount FROM bookings WHERE id=999')->fetchColumn()===(float)$expected,'Legacy automatic shipping total failed');
     }
     check(count(file($temp.'/mail-capture.jsonl'))===$beforeMails,'Invoice update sent mail');
+    // Dedicated test booking: no production data, SMTP is replaced by the capture stub above.
+    [$status,$created]=request('create_booking.php',array_replace($valid,['customer_name'=>'TEST Lieferkosten','cart'=>['photo'=>'digital'],'start_date'=>'2030-01-11','end_date'=>'2030-01-13','fulfillment_method'=>'delivery','fulfillment_details_json'=>['address_line1'=>'TEST Lieferweg 1','postal_code'=>'46485','city'=>'Wesel']]),true);
+    check($status===200,'Delivery fixture creation failed');$deliveryId=(int)$created['booking']['id'];
+    $beforeMails=count(file($temp.'/mail-capture.jsonl'));
+    [$status]=request('update_booking.php',['id'=>$deliveryId,'end_date'=>'2030-01-14','fulfillment_price_delta'=>60],true);
+    check($status===200&&(float)$db->query('SELECT total_amount FROM bookings WHERE id='.$deliveryId)->fetchColumn()===199.0,'Simultaneous date and transport edit lost delivery cost');
+    foreach([60,60,75,0,60] as $fee){
+      [$status]=request('update_booking.php',['id'=>$deliveryId,'pricing_details_json'=>['base_total'=>139,'shipping_delta'=>$fee,'fulfillment_cost_confirmed'=>true],'fulfillment_price_delta'=>$fee,'total_amount'=>139+$fee],true);
+      check($status===200,'Negotiated delivery save failed');
+      [$status,$list]=request('list_bookings.php');$saved=array_values(array_filter($list['items'],fn($b)=>(int)$b['id']===$deliveryId))[0];$savedOrder=json_decode($saved['order_json'],true);
+      check((float)$saved['total_amount']===139.0+$fee&&(float)$savedOrder['shipping_delta']===(float)$fee&&!$savedOrder['quote_required'],'Delivery invoice did not persist');
+      foreach(['updated','confirmed'] as $mode){
+        [$status,$preview]=request('preview_booking_email.php',['booking'=>$saved,'mode'=>$mode],true);
+        check($status===200&&str_contains($preview['preview']['text'],number_format(139+$fee,2,',','.').' €')&&str_contains($preview['preview']['text'],'Lieferkosten: '.number_format($fee,2,',','.').' €')&&!str_contains($preview['preview']['text'],'Individuelle Preisanpassung')&&!str_contains($preview['preview']['text'],'nach Angebot hinzu'),'Reloaded delivery preview incorrect');
+      }
+    }
+    [$status]=request('update_booking_status.php',['booking_id'=>$deliveryId,'status'=>'confirmed','send_email'=>false],true);check($status===200,'Silent confirmation failed');
+    [$status]=request('update_booking_status.php',['booking_id'=>$deliveryId,'update'=>['fulfillment_price_delta'=>70,'total_amount'=>209],'send_email'=>false],true);
+    check($status===200,'Status-dialog invoice update failed');
+    $saved=$db->query('SELECT * FROM bookings WHERE id='.$deliveryId)->fetch(PDO::FETCH_ASSOC);
+    [$status,$preview]=request('preview_booking_email.php',['booking'=>$saved,'mode'=>'confirmed'],true);
+    check($status===200&&str_contains($preview['preview']['text'],'Lieferkosten: 70,00 €')&&str_contains($preview['preview']['text'],'209,00 €'),'Status-dialog invoice out of sync');
+    [$status]=request('update_booking_status.php',['booking_id'=>$deliveryId,'update'=>['fulfillment_price_delta'=>60,'total_amount'=>199],'send_email'=>false],true);
+    [$status]=request('update_booking.php',['id'=>$deliveryId,'end_date'=>'2030-01-15'],true);
+    $saved=$db->query('SELECT * FROM bookings WHERE id='.$deliveryId)->fetch(PDO::FETCH_ASSOC);
+    check($status===200&&(float)$saved['total_amount']===199.0&&(float)$saved['fulfillment_price_delta']===60.0,'Date edit lost agreed transport');
+    [$status]=request('update_booking.php',['id'=>$deliveryId,'fulfillment_method'=>'pickup'],true);
+    $saved=$db->query('SELECT * FROM bookings WHERE id='.$deliveryId)->fetch(PDO::FETCH_ASSOC);
+    check($status===200&&(float)$saved['total_amount']===139.0&&(float)$saved['fulfillment_price_delta']===0.0,'Pickup did not remove delivery');
+    // Assembly stays a separate service; transport must not be counted twice.
+    $setupId=(int)$setup['booking']['id'];$setupRow=$db->query('SELECT * FROM bookings WHERE id='.$setupId)->fetch(PDO::FETCH_ASSOC);$setupBase=(float)$setupRow['total_amount'];
+    [$status]=request('update_booking.php',['id'=>$setupId,'fulfillment_price_delta'=>60],true);
+    $setupRow=$db->query('SELECT * FROM bookings WHERE id='.$setupId)->fetch(PDO::FETCH_ASSOC);
+    [$status,$preview]=request('preview_booking_email.php',['booking'=>$setupRow,'mode'=>'confirmed'],true);
+    check($status===200&&(float)$setupRow['total_amount']===$setupBase+60&&str_contains($preview['preview']['text'],'Lieferkosten (Montage separat): 60,00 €')&&str_contains($preview['preview']['text'],'Eventzelt Auf- und Abbau — 160,00 €')&&!str_contains($preview['preview']['text'],'Individuelle Preisanpassung'),'Assembly and delivery not separated');
+    foreach([-1,'invalid'] as $badFee){
+      [$status]=request('update_booking.php',['id'=>$deliveryId,'fulfillment_price_delta'=>$badFee],true);check($status===400,'Invalid delivery fee accepted');
+    }
+    [$status]=request('update_booking.php',['id'=>$deliveryId,'fulfillment_method'=>'shipping'],true);check($status===400,'Photobox shipping accepted on update');
+    // Normal speaker parcels still reprice per speaker, rather than retaining a one-parcel charge.
+    [$status]=request('update_booking.php',['id'=>$modernId,'cart'=>['speaker'=>3,'speaker_qty'=>1],'fulfillment_method'=>'shipping','fulfillment_details_json'=>['address_line1'=>'TEST Paketweg 1','postal_code'=>'46485','city'=>'Wesel']],true);check($status===200,'Speaker shipping setup failed');
+    [$status]=request('update_booking.php',['id'=>$modernId,'cart'=>['speaker'=>3,'speaker_qty'=>2]],true);
+    $speakerRow=$db->query('SELECT * FROM bookings WHERE id='.(int)$modernId)->fetch(PDO::FETCH_ASSOC);
+    check($status===200&&(float)$speakerRow['fulfillment_price_delta']===160.0,'Two speakers retained one parcel price');
+    check(count(file($temp.'/mail-capture.jsonl'))===$beforeMails,'Delivery edits/previews/silent confirmation sent mail');
     file_put_contents($temp . '/admin_users.php', "\n// changed credentials\n", FILE_APPEND);
     [$status,$state]=request('admin_login_token.php');
     check($status===200 && $state['authenticated']===false,'Changed credentials must expire existing sessions');

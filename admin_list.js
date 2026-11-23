@@ -160,6 +160,7 @@
             internal_mail_sent_at:r.internal_mail_sent_at||'',
             note:r.note ?? '',
             price_total:Number.isFinite(totalAmount)?totalAmount:0,
+            total_amount:Number.isFinite(totalAmount)?totalAmount:0,
             deposit_eur:Number.isFinite(deposit)?deposit:0,
             fulfillment_method:fulfillmentMeta.method,
             fulfillment_label:fulfillmentMeta.label,
@@ -1473,11 +1474,11 @@
             total_amount: Number.isFinite(parsedAmount) ? parsedAmount : booking.price_total,
             ...Object.fromEntries(['billing_address_line1','billing_postal_code','billing_city','company_name'].map(n=>[n,vals[n]??booking[n]])),
             fulfillment_details:this.buildFulfillmentDetailsPayload(form,fulfillmentChoiceLocal.id,booking.fulfillment_details),
-            pricing_details:{...booking.pricing_details,shipping_delta:this.parseAmount(vals.pricing_shipping_delta)},
+            pricing_details:{...booking.pricing_details,shipping_delta:this.parseAmount(vals.pricing_shipping_delta),fulfillment_cost_confirmed:form.elements.namedItem('pricing_shipping_delta')?.dataset.fulfillmentCostConfirmed==='true'||(vals.fulfillment_method===booking.fulfillment_method&&booking.pricing_details?.fulfillment_cost_confirmed)},
             fulfillment_method: fulfillmentChoiceLocal.id,
             fulfillment_label: fulfillmentChoiceLocal.label,
             fulfillment_note: fulfillmentChoiceLocal.note,
-            fulfillment_price_delta: fulfillmentChoiceLocal.priceDelta
+            fulfillment_price_delta: this.parseAmount(vals.pricing_shipping_delta)
           };
         };
 
@@ -1934,6 +1935,7 @@
         };
 
         const payload = {};
+        if(form.querySelector('[name="pricing_shipping_delta"]')?.dataset.fulfillmentCostConfirmed==='true'||(sanitized.fulfillment_method===booking.fulfillment_method&&booking.pricing_details?.fulfillment_cost_confirmed))payload.fulfillment_cost_confirmed=true;
         const total = parseAmountField('total_amount');
         if(Number.isFinite(total)) payload.total = total; else payload.total = sanitized.total_amount;
 

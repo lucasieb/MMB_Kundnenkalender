@@ -26,3 +26,20 @@ $legacyMail=mmb_booking_message(['id'=>900,'customer_name'=>'Test Altbuchung','b
 assert_mail(str_contains($legacyMail['text'],'80,00 €')&&str_contains($legacyMail['text'],'124,00 €'),'Legacy mail freight/total missing');
 assert_mail(str_contains($legacyMail['html'],'mietmichbox-logo.png')&&str_contains($legacyMail['html'],'white-space:nowrap'),'Brand logo and phone wrapping protection missing');
 assert_mail(!str_contains($legacyMail['html'],'border-radius'),'Mail shell must stay square');
+
+// Reproduce the saved 139 + 60 invoice with the old canonical snapshot still at 139.
+$photo=mmb_order_quote(['photo'=>'digital'],'2030-01-11','2030-01-13','delivery');
+$delivery=['id'=>900,'customer_name'=>'TEST Lieferung','order'=>$photo,'price_total'=>199,'fulfillment_method'=>'delivery','fulfillment_price_delta'=>0,'pricing_details'=>['shipping_delta'=>60]];
+foreach(['updated','confirmed','reminder7','reminder3'] as $mode){
+ $m=mmb_booking_message($delivery,$mode);
+ foreach(['text','html'] as $format){
+  assert_mail(str_contains($m[$format],'199,00 €')&&str_contains($m[$format],'Lieferkosten: 60,00 €'),'Saved delivery fee/total missing: '.$mode);
+  assert_mail(!str_contains($m[$format],'Individuelle Preisanpassung')&&!str_contains($m[$format],'nach Angebot hinzu')&&!str_contains($m[$format],'nach Entfernung auf Angebot'),'Agreed delivery still treated as provisional: '.$mode);
+ }
+}
+$delivery['total_amount']=189;
+assert_mail(str_contains(mmb_booking_message($delivery)['text'],'Individuelle Preisanpassung: -10,00 €'),'Real discount must remain separate from delivery');
+$delivery['pricing_details']=['shipping_delta'=>0];$delivery['total_amount']=139;
+assert_mail(str_contains(mmb_booking_message($delivery)['text'],'nach Angebot hinzu'),'Unagreed delivery must remain provisional');
+$delivery['pricing_details']['fulfillment_cost_confirmed']=true;
+assert_mail(!str_contains(mmb_booking_message($delivery)['text'],'nach Angebot hinzu'),'Explicitly free delivery must not request another offer');

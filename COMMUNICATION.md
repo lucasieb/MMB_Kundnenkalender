@@ -25,3 +25,11 @@ Aktivierung: `communication.private.php` außerhalb `public_html`, Dateirechte 0
 Onlinezahlungen, 2 % Vorauszahlungsskonto, automatisierte Rechnungen/Verträge, automatische Versandetiketten und Rezensionen. Händlerkonto, wirtschaftliche/regulatorische Abklärung der Zahlarten sowie die endgültigen Zahlungs-/Vertragsregeln sind Voraussetzungen für den nächsten Schritt. Die technischen und fachlichen Vorschläge werden separat dokumentiert.
 
 Betrieb: Im hPanel des PHP-Hosts ist der stündliche Aufruf gespeichert. `Output anzeigen` liefert die Ausführungsausgabe; die CLI meldet nur Zähler, keine Kundendaten. Luca, info@mietmichbox.de, ist für Versandprobleme zuständig. Unklare Versandzustände weiterhin prüfen und nicht automatisch wiederholen. Der erste tatsächliche Hostinger-Lauf ist nach der Einrichtung noch zu beobachten.
+
+## Vereinbarte Lieferkosten – 23.11.2026
+
+Gespeicherte Liefer-/Versandkosten werden in allen Mailtypen und Vorschauen als eigene Kosten ausgewiesen. Vereinbarte Lieferung ersetzt den allgemeinen Angebotstext; eine echte weitere Preisänderung bleibt separat sichtbar. Die Bestätigungsvorschau übernimmt die gespeicherte Gesamtsumme der Verwaltung. Bereits inkonsistente ältere Auftragsschnappschüsse werden beim Lesen anhand der gespeicherten Rechnungsangaben dargestellt, ohne Buchungen zu ändern.
+
+Admin-Änderungen halten Auftrag, Rechnungsangaben und Abwicklungsdetails gemeinsam aktuell. Ausdrücklich eingetragene kostenlose Lieferung wird im JSON mit `fulfillment_cost_confirmed` festgehalten. Termin-/Ausstattungsänderungen behalten vereinbarte Lieferkosten bei; eine andere Abwicklungsart wird neu berechnet. Standard-Paketversand bleibt mengenabhängig, Montage wird separat ausgewiesen. Keine Schemaänderung oder Bestandsdatenkorrektur erforderlich.
+
+Regression: `php tests/contract.php`, `php tests/communication.php` und `node --test tests/*.test.mjs` prüfen Testbuchung 139 € + 60 €, beide Vorschauen, erneutes Laden, Gebührenänderungen einschließlich 0 €, getrennte Preisnachlässe/Montage, Abholwechsel, Versandmengen und unterdrückten Versand. Die HTTP-Tests nutzen ausschließlich eine temporäre SQLite-Datenbank und einen Mail-Stub.

@@ -7,6 +7,7 @@ require_admin();
 require_once __DIR__ . '/lib/booking_customer.php';
 require_once __DIR__.'/lib/order_quote.php';
 require_once __DIR__.'/lib/booking_invoice.php';
+require_once __DIR__.'/lib/booking_costs.php';
 
 $pdo = null;
 
@@ -79,6 +80,9 @@ try {
   }catch(InvalidArgumentException $e){http_response_code(422);echo json_encode(['ok'=>false,'error'=>$e->getMessage()]);exit;}
 
   unset($data['order_json'],$data['package_id']); // Canonical components are generated exclusively from a validated cart.
+  $invoiceInput=mmb_cost_decode($data['pricing_details_json']??$data['pricing_details']??null);
+  $requestedFee=$invoiceInput['shipping_delta']??$data['fulfillment_price_delta']??null;
+  if($requestedFee!==null&&(!is_numeric($requestedFee)||!is_finite((float)$requestedFee)||(float)$requestedFee<0))throw new InvalidArgumentException('Ungültige Liefer-/Versandkosten.');
   $oldOrder=json_decode((string)($existing['order_json']??''),true);
   if($oldOrder){
     $changed=isset($data['cart']);
@@ -87,6 +91,18 @@ try {
       $cart=isset($data['cart'])?mmb_order_decode($data['cart']):$oldOrder['cart'];
       if(array_key_exists('box_id',$data)&&!isset($data['cart'])&&(int)$data['box_id']!==(int)$existing['box_id'])throw new InvalidArgumentException('Produkte bitte im Ausstattungsbereich ändern.');
       $order=mmb_order_quote($cart,(string)($data['start_date']??$existing['start_date']),(string)($data['end_date']??$existing['end_date']),(string)($data['fulfillment_method']??$existing['fulfillment_method']));
+      // Retain agreed transport on equipment/date changes; changing method starts a new quote.
+      $savedCosts=mmb_booking_costs($existing);
+      if(in_array($order['fulfillment_id'],['delivery','delivery_setup'],true)&&$order['fulfillment_id']===($existing['fulfillment_method']??'')&&$savedCosts['confirmed']){
+        $order['shipping_delta']=$order['fulfillment_price_delta']=$savedCosts['shipping'];
+        $order['total']=round($order['base_total']+$savedCosts['shipping'],2);
+        $order['fulfillment_cost_confirmed']=true;$order['quote_required']=false;$order['fulfillment_adds_to_total']=true;
+      }
+      if($requestedFee!==null&&$order['fulfillment_id']!=='pickup'){
+        $order['shipping_delta']=$order['fulfillment_price_delta']=round((float)$requestedFee,2);
+        $order['total']=round($order['base_total']+$order['shipping_delta'],2);
+        if($order['shipping_delta']>0||!empty($invoiceInput['fulfillment_cost_confirmed'])){$order['fulfillment_cost_confirmed']=true;$order['quote_required']=false;$order['fulfillment_adds_to_total']=true;}
+      }
       $data['box_id']=$order['primary_box_id'];$data['package_id']=$order['package'];
       $data['fulfillment_method']=$order['fulfillment_id'];$data['fulfillment_label']=$order['fulfillment_label'];$data['fulfillment_note']=$order['fulfillment_note'];$data['fulfillment_price_delta']=$order['shipping_delta'];
       if(!empty($data['manual_price_override'])&&isset($data['total_amount'])){$order['manual_total']=(float)$data['total_amount'];}else{$data['total_amount']=$order['total'];$data['pricing_details_json']=$order;unset($data['pricing_details']);}
@@ -99,8 +115,9 @@ try {
     }elseif(isset($data['total_amount'])){$oldOrder['manual_total']=(float)$data['total_amount'];$data['order_json']=$oldOrder;}
     $activeOrder=$data['order_json']??$oldOrder;
     // A repeated method field or display label must not trigger a recalculation or overwrite manual totals.
-    foreach(['fulfillment_label'=>'fulfillment_label','fulfillment_note'=>'fulfillment_note','fulfillment_price_delta'=>'shipping_delta'] as $field=>$orderKey)if(array_key_exists($field,$data))$data[$field]=$activeOrder[$orderKey];
+    foreach(['fulfillment_label'=>'fulfillment_label','fulfillment_note'=>'fulfillment_note'] as $field=>$orderKey)if(array_key_exists($field,$data))$data[$field]=$activeOrder[$orderKey];
   }elseif(isset($data['cart']))throw new InvalidArgumentException('Diese Altbuchung wird weiterhin über ihre bisherigen Felder verwaltet.');
+  $data=mmb_order_invoice_update($existing,$data);
   $data=mmb_legacy_invoice_update($existing,$data);
   if(isset($data['status'])&&!in_array($data['status'],['pending','confirmed','rejected','cancelled'],true))throw new InvalidArgumentException('Ungültiger Status.');
   $nextStart=(string)($data['start_date']??$existing['start_date']);$nextEnd=(string)($data['end_date']??$existing['end_date']);

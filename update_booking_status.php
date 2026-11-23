@@ -24,6 +24,8 @@ require __DIR__ . '/api_bootstrap.php';
 // Infrastruktur
 require __DIR__ . '/db.php';
 require_once __DIR__.'/lib/order_quote.php';
+require_once __DIR__.'/lib/booking_costs.php';
+require_once __DIR__.'/lib/booking_invoice.php';
 
 // Mailer ist optional – nur laden, wenn vorhanden
 $HAS_MAILER = is_file(__DIR__ . '/mailer.php');
@@ -212,6 +214,11 @@ try {
 
     if(!empty($bk['order_json'])&&array_intersect(['box_id','start_date','end_date','fulfillment_method'],array_keys($updates))){throw new InvalidArgumentException('Produkt- und Terminänderungen bitte über die Detailansicht speichern.');}
     $whitelist = ['customer_name','customer_email','customer_phone','box_id','start_date','end_date','total_amount','status','fulfillment_method','fulfillment_label','fulfillment_note','fulfillment_price_delta'];
+    $updates=array_intersect_key($updates,array_flip($whitelist));
+    foreach(['total_amount','fulfillment_price_delta'] as $field)if(isset($updates[$field])&&(!is_numeric($updates[$field])||!is_finite((float)$updates[$field])||(float)$updates[$field]<0))throw new InvalidArgumentException('Ungültiger Betrag.');
+    $updates=mmb_order_invoice_update($bk,$updates);
+    $updates=mmb_legacy_invoice_update($bk,$updates);
+    $whitelist=array_merge($whitelist,['order_json','pricing_details_json','fulfillment_details_json']);
     foreach ($updates as $col => $val) {
       if (!in_array($col, $whitelist, true)) continue;
       $fields[] = "$col=?";
@@ -221,6 +228,7 @@ try {
       } elseif ($col === 'total_amount' || $col === 'fulfillment_price_delta') {
         $val = (float)$val;
       }
+      if(in_array($col,['order_json','pricing_details_json','fulfillment_details_json'],true)&&is_array($val))$val=json_encode($val,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
       $vals[] = $val;
       $bk[$col] = $val;
     }

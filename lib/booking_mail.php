@@ -2,6 +2,7 @@
 declare(strict_types=1);
 require_once __DIR__.'/communication_config.php';
 require_once __DIR__.'/booking_customer.php';
+require_once __DIR__.'/booking_costs.php';
 
 /** One saved booking snapshot for all customer and team communications. Never recalculate old orders. */
 function mmb_mail_decode($value): array { if(is_array($value))return $value;$decoded=json_decode((string)($value??''),true);return is_array($decoded)?$decoded:[]; }
@@ -10,6 +11,7 @@ function mmb_mail_date($value): string { $d=DateTimeImmutable::createFromFormat(
 function mmb_mail_sections(array $b,bool $internal=false): array {
  $o=mmb_mail_decode($b['order']??$b['order_json']??null);$d=mmb_mail_decode($b['fulfillment_details']??$b['fulfillment_details_json']??null);
  $d=booking_destination_details($b,$d);
+ $costs=mmb_booking_costs($b);
  $method=(string)($b['fulfillment_method']??'pickup');$id=(string)($b['display_id']??str_pad((string)((int)($b['id']??0)+100),5,'0',STR_PAD_LEFT));
  $sections=[];$sections['📅 Deine Buchung']=['Buchungsnummer: '.$id,'Mietbeginn: '.mmb_mail_date($b['start_date']??''),'Rückgabe: '.mmb_mail_date($b['end_date']??'')];
  if(($o['day_unit']??'')==='24h')$sections['📅 Deine Buchung'][]=($o['days']??'').' '.((int)($o['days']??0)===1?'Miettag':'Miettage').' à 24 Stunden. Rückgabe zur vereinbarten Uhrzeit des Mietbeginns.';
@@ -22,7 +24,8 @@ function mmb_mail_sections(array $b,bool $internal=false): array {
  if(!$equipment)$equipment[]=(string)($b['box_name']??[1=>'Marshall Bromley 750',2=>'Teufel Rockster Neo',3=>'SOUNDBOKS 4'][(int)($b['box_id']??3)]??'Mietausstattung');
  $sections['📦 Ausstattung']=$equipment;
  $handling=[['pickup'=>'Abholung in Wesel','shipping'=>'Versand','delivery'=>'Lieferung','delivery_setup'=>'Lieferung und Montage'][$method]??$method];
- if(!empty($o['fulfillment_note']))$handling[]=$o['fulfillment_note'];
+ if($costs['confirmed']&&in_array($method,['delivery','delivery_setup','shipping'],true))$handling[]=($method==='shipping'?'Hin- und Rückversand':($method==='delivery_setup'?'Lieferung (Auf- und Abbau separat ausgewiesen)':'Lieferung')).' zum vereinbarten Preis von '.mmb_mail_euro($costs['shipping']).'.';
+ elseif(!empty($o['fulfillment_note']))$handling[]=$o['fulfillment_note'];
  elseif(!empty($b['fulfillment_note']))$handling[]=$b['fulfillment_note'];
  if($method!=='shipping'){
   if(!empty($d['preferred_time']))$handling[]='Wunschzeit für '.($method==='pickup'?'Abholung':'Lieferung').' am '.mmb_mail_date($b['start_date']??'').': '.$d['preferred_time'].' Uhr (noch abzustimmen)';
@@ -40,14 +43,13 @@ function mmb_mail_sections(array $b,bool $internal=false): array {
  if($internal&&!empty($b['customer_birthdate']))$contact[]='Geburtsdatum (freiwillig): '.mmb_mail_date($b['customer_birthdate']);
  if($contact)$sections['👤 Kontakt']=$contact;
  $cost=[];
- if(!empty($o['shipping_delta']))$cost[]='Hin- und Rückversand: '.mmb_mail_euro($o['shipping_delta']);
+ if($costs['shipping']>0||$costs['confirmed'])$cost[]=$costs['label'].': '.mmb_mail_euro($costs['shipping']);
  if(!empty($o['duration_discount_percent']))$cost[]='Mietdauerrabatt: '.$o['duration_discount_percent'].' % auf die entsprechend berechneten Positionen; bereits enthalten.';
  if(!empty($o['set_discount_percent']))$cost[]='Setvorteil: '.$o['set_discount_percent'].' %; Ersparnis '.mmb_mail_euro($o['set_discount_amount']??0).' gegenüber gleicher Einzel-Ausstattung. Bereits in den Positionspreisen enthalten.';
  foreach($o['items']??$o['lines']??[] as $line)if(in_array($line['id']??'',['shipping','delivery','assembly'],true))$cost[]=($line['label']??'Abwicklung').' — '.mmb_mail_euro($line['total']??0);
- if(isset($o['manual_total'])&&abs((float)$o['manual_total']-(float)($o['total']??0))>=0.01)$cost[]='Individuelle Preisanpassung: '.mmb_mail_euro($o['manual_total']-$o['total']);
- $cost[]='Mietsumme: '.mmb_mail_euro($b['total_amount']??$o['total']??0);
- if(!empty($o['quote_required'])||in_array($method,['delivery','delivery_setup'],true))$cost[]='Vorläufige Summe; individuelle Fahrt-/Frachtkosten kommen nach Angebot hinzu. Den vollständigen Preis stimmen wir vorab mit dir ab.';
- if(!$o){$legacy=mmb_mail_decode($b['pricing_details_json']??$b['pricing_details']??null);$freight=(float)($legacy['shipping_delta']??$b['fulfillment_price_delta']??0);if($freight>0)array_unshift($cost,'Hin- und Rückversand: '.mmb_mail_euro($freight));}
+ if($o&&abs($costs['adjustment'])>=0.01)$cost[]='Individuelle Preisanpassung: '.mmb_mail_euro($costs['adjustment']);
+ $cost[]='Mietsumme: '.mmb_mail_euro($costs['total']);
+ if($costs['open'])$cost[]='Vorläufige Summe; individuelle Fahrt-/Frachtkosten kommen nach Angebot hinzu. Den vollständigen Preis stimmen wir vorab mit dir ab.';
  $sections['💶 Kosten']=$cost;
  $note=trim((string)($b['customer_note']??$b['notes']??$b['note']??''));if($note!=='')$sections['📝 Deine Anmerkung']=[$note];
  return $sections;
