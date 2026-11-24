@@ -88,6 +88,14 @@
       { id:'delivery', label:'Lieferung', full:'Lieferung (NRW-weit)', note:'zzgl. individueller Lieferpauschale – wir melden uns mit einem Angebot', priceDelta:0, addsToTotal:false },
       { id:'unknown', label:'Nicht erfasst', full:'Nicht erfasst', note:'Bei älteren Anfragen wurde die Abwicklung nicht gespeichert. Bitte mit der Kundschaft klären.', priceDelta:0, addsToTotal:false }
     ];
+    // Keep keystrokes untouched; normalize optional compact input only after editing.
+    const normalizePreferredTime=value=>{
+      const raw=String(value??'').trim();
+      let parts=raw.match(/^(\d{1,2}):(\d{2})$/);
+      if(!parts&&/^\d{3,4}$/.test(raw))parts=[raw,raw.slice(0,-2),raw.slice(-2)];
+      if(!parts||Number(parts[1])>23||Number(parts[2])>59)return raw;
+      return parts[1].padStart(2,'0')+':'+parts[2];
+    };
     const FULFILLMENT_LOOKUP = Object.fromEntries(FULFILLMENT_CHOICES.map(opt=>[opt.id,opt]));
 
     // Anzeige-ID (nur Ziffern), Prefix 00 + laufend ab 100
@@ -1265,15 +1273,15 @@
                   </div>
                   <div class="mmb-detail-field">
                     <label for="delivery-preferred-time" data-timing-label>Wunschzeit für ${currentFulfillmentMethod==='pickup'?'Abholung':'Lieferung'} am ${this.escape(booking.start_date)}</label>
-                    <input type="time" id="delivery-preferred-time" name="delivery_preferred_time" value="${this.escape(fulfillmentDetails.preferred_time || '')}" step="60">
+                    <input type="text" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="16:00" id="delivery-preferred-time" name="delivery_preferred_time" value="${this.escape(fulfillmentDetails.preferred_time || '')}">
                   </div>
                   <div class="mmb-detail-field">
                     <label for="delivery-preferred-time-end">Zeitfenster bis (optional)</label>
-                    <input type="time" id="delivery-preferred-time-end" name="delivery_preferred_time_end" value="${this.escape(fulfillmentDetails.preferred_time_end || '')}" step="60">
+                    <input type="text" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="16:30" id="delivery-preferred-time-end" name="delivery_preferred_time_end" value="${this.escape(fulfillmentDetails.preferred_time_end || '')}">
                   </div>
                 </div>
                 <label class="mmb-detail-checkbox"><input type="checkbox" name="delivery_preferred_time_confirmed" ${fulfillmentDetails.preferred_time_confirmed===true?'checked':''}><span>Wunschzeit / Zeitfenster bestätigt</span></label>
-                <p class="mmb-detail-note">Ohne Bestätigung bleibt die Wunschzeit noch abzustimmen. Änderungen an Zeit, Mietbeginn oder Abwicklung setzen die Bestätigung zurück.</p>
+                <p class="mmb-detail-note">Uhrzeiten als HH:MM oder vier Ziffern eingeben, z. B. 16:30 oder 1630. Ohne Bestätigung bleibt die Wunschzeit noch abzustimmen. Änderungen an Zeit, Mietbeginn oder Abwicklung setzen die Bestätigung zurück.</p>
                 <p class="mmb-detail-note" data-delivery-collection ${currentFulfillmentMethod.startsWith('delivery')?'':'hidden'}>Wir übernehmen die Lieferung und die Abholung. Die Abholung zum Ende des Mietzeitraums stimmen wir bei der Anlieferung persönlich ab.</p>
               </div>
 
@@ -1995,15 +2003,23 @@
         const start=field('delivery_preferred_time'),end=field('delivery_preferred_time_end'),confirmed=field('delivery_preferred_time_confirmed');
         if(!start||!end||!confirmed)return;
         const sync=()=>{
-          confirmed.disabled=!start.value;
-          if(!start.value)confirmed.checked=false;
-          end.min=start.value||'';
-          end.setCustomValidity(end.value&&(!start.value||end.value<=start.value)?'Das Ende des Zeitfensters muss nach der Wunschzeit liegen.':'');
+          if(field('fulfillment_method')?.value==='shipping'){start.setCustomValidity('');end.setCustomValidity('');confirmed.checked=false;confirmed.disabled=true;return;}
+          const from=normalizePreferredTime(start.value),to=normalizePreferredTime(end.value);
+          const valid=value=>/^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(value);
+          start.setCustomValidity(from&&!valid(from)?'Bitte eine gültige Uhrzeit als HH:MM eingeben, z. B. 17:00.':'');
+          confirmed.disabled=!valid(from);
+          if(confirmed.disabled)confirmed.checked=false;
+          end.setCustomValidity(to&&!valid(to)?'Bitte eine gültige Uhrzeit als HH:MM eingeben, z. B. 16:30.':to&&(!valid(from)||to<=from)?'Das Ende des Zeitfensters muss nach der Wunschzeit liegen.':'');
         };
         const reset=()=>{confirmed.checked=false;sync();};
         for(const name of ['delivery_preferred_time','delivery_preferred_time_end','start_date','fulfillment_method']){
           field(name)?.addEventListener('input',reset);field(name)?.addEventListener('change',reset);
         }
+        for(const input of [start,end])input.addEventListener('blur',()=>{
+          const value=normalizePreferredTime(input.value);
+          if(value!==input.value){input.value=value;input.dispatchEvent(new Event('change',{bubbles:true}));}
+          sync();
+        });
         sync();
       }
 
@@ -2054,10 +2070,10 @@
 
         if(method!=='shipping'){
           const meeting = getValue('delivery_meeting_point');
-          const preferred = getValue('delivery_preferred_time');
+          const preferred = normalizePreferredTime(getValue('delivery_preferred_time'));
           if(meeting)payload.meeting_point=meeting;else delete payload.meeting_point;
           if(preferred)payload.preferred_time=preferred;else delete payload.preferred_time;
-          const end=getValue('delivery_preferred_time_end');
+          const end=normalizePreferredTime(getValue('delivery_preferred_time_end'));
           if(end)payload.preferred_time_end=end;else delete payload.preferred_time_end;
           payload.preferred_time_confirmed=!!preferred&&getChecked('delivery_preferred_time_confirmed');
         }else{
